@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { CatalogTable } from "@/components/catalog-table";
+import { AirplayTable } from "@/components/airplay-table";
 import { RegionAirplayChart } from "@/components/region-airplay-chart";
 import { Sparkline } from "@/components/sparkline";
 import { StatCards } from "@/components/stat-cards";
@@ -89,10 +89,10 @@ describe("RegionAirplayChart", () => {
   });
 });
 
-describe("CatalogTable", () => {
+describe("AirplayTable", () => {
   it("lists every track with its ISRC and spins", () => {
     render(
-      <CatalogTable
+      <AirplayTable
         tracks={TRACKS}
         focusRegion="All"
         onFocusRegion={() => {}}
@@ -113,7 +113,7 @@ describe("CatalogTable", () => {
     const northern = track.airplay.find((a) => a.region === "Northern")!.spins;
 
     render(
-      <CatalogTable
+      <AirplayTable
         tracks={[track]}
         focusRegion="Northern"
         onFocusRegion={() => {}}
@@ -131,7 +131,7 @@ describe("CatalogTable", () => {
 
   it("filters by search text", () => {
     render(
-      <CatalogTable
+      <AirplayTable
         tracks={TRACKS}
         focusRegion="All"
         onFocusRegion={() => {}}
@@ -141,17 +141,17 @@ describe("CatalogTable", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Search the catalogue"), {
-      target: { value: "Rwenzori" },
+      target: { value: "Ggwe" },
     });
 
-    expect(screen.getByText("Rwenzori Echo")).toBeTruthy();
-    expect(screen.queryByText("Kampala Nights")).toBeNull();
+    expect(screen.getByText("Ggwe Ondabika")).toBeTruthy();
+    expect(screen.queryByText("Nkwagala")).toBeNull();
   });
 
   it("asks the parent to remove a track", () => {
     const onDelete = vi.fn();
     render(
-      <CatalogTable
+      <AirplayTable
         tracks={[TRACKS[0]]}
         focusRegion="All"
         onFocusRegion={() => {}}
@@ -177,7 +177,7 @@ describe("Sparkline", () => {
 
 describe("TrackMetadataForm", () => {
   const values: MetadataValues = {
-    title: "Kampala Nights",
+    title: "Nkwagala",
     primaryArtist: "Ray Bwete",
     featuredArtists: "Aisha Nakato",
     releaseDate: "2026-09-10",
@@ -278,5 +278,44 @@ describe("TrackMetadataForm", () => {
     });
 
     expect(screen.getByText(/Expected CC-XXX-YY-NNNNN/)).toBeTruthy();
+  });
+});
+
+describe("AirplayTable reusability", () => {
+  it("hides the remove action when no onDelete is passed", () => {
+    render(<AirplayTable tracks={TRACKS} />);
+
+    expect(screen.queryByRole("button", { name: /Remove .* from the catalogue/ })).toBeNull();
+    expect(screen.getAllByRole("row").length).toBe(TRACKS.length + 2);
+  });
+
+  it("hides the region switcher when the parent does not drive focus", () => {
+    render(<AirplayTable tracks={TRACKS} />);
+
+    expect(screen.queryByRole("button", { name: "All regions" })).toBeNull();
+  });
+
+  it("still offers the region switcher when a handler is supplied", () => {
+    render(<AirplayTable tracks={TRACKS} onFocusRegion={() => {}} />);
+
+    expect(screen.getByRole("button", { name: "All regions" })).toBeTruthy();
+  });
+
+  it("accepts a custom heading", () => {
+    render(<AirplayTable tracks={TRACKS} title="Kidandali chart" />);
+
+    expect(screen.getByText("Kidandali chart")).toBeTruthy();
+  });
+
+  it("surfaces each recording's genre", () => {
+    render(<AirplayTable tracks={[TRACKS[0]]} />);
+
+    expect(screen.getByText(TRACKS[0].genre!)).toBeTruthy();
+  });
+
+  it("can turn the search box off", () => {
+    render(<AirplayTable tracks={TRACKS} showSearch={false} />);
+
+    expect(screen.queryByLabelText("Search the catalogue")).toBeNull();
   });
 });

@@ -25,8 +25,8 @@ airplay model the artist portal uses. See [`lib/uprs.ts`](lib/uprs.ts).
 3. split across each region's reporting stations in proportion to reach,
 4. then divided between the rights holders on the recording.
 
-Nothing accrues before a recording's release date. ~638 rows across 29 stations and 6 periods on the
-seeded catalogue.
+Nothing accrues before a recording's release date. ~704 rows across 32 stations and 6 periods on the
+seeded catalogue — about 62,300 plays and a UGX 19.8m pool.
 
 **Distribution policy** — primary artist 60%, featured artists split the remaining 40% equally; a
 solo recording takes 100%.
@@ -121,9 +121,14 @@ Matching is a pure, seeded function (`simulateScan`), so it is fully unit-tested
 
 **3. Active catalogue** — every uploaded track with its total spins across the Uganda FM panel.
 
-- Columns: track + artists, ISRC, release date, master format, reporting stations, total spins with
-  week-over-week change, a 14-day trend sparkline and the regional airplay split.
-- Sortable on track, release date, stations and spins; searchable across title, artist and ISRC.
+Rendered by [`components/airplay-table.tsx`](components/airplay-table.tsx), which is a reusable
+table rather than a portal-specific one. Every piece of chrome is opt-in: pass `onDelete` to get the
+remove action, `onFocusRegion` to get the region switcher, and `title`/`emptyHint` to reframe it.
+With none of them it degrades to a read-only read-out.
+
+- Columns: track + artists + genre, ISRC, release date, master format, reporting stations, total
+  spins with week-over-week change, a 14-day trend sparkline and the regional airplay split.
+- Sortable on track, release date, stations and spins; searchable across title, artist, genre and ISRC.
 - Selecting a region re-points the spin and station columns at that region and re-ranks the table.
 
 **4. Airplay by region** — Central, Eastern, Western and Northern.
@@ -179,8 +184,12 @@ There is no database yet. Track rows live in `.data/tracks.json` and delivered m
 the shape a real repository would, so moving to Postgres later is a one-file change.
 
 > **Demo data.** The seeded catalogue, the station panel in [`lib/regions.ts`](lib/regions.ts) and
-> every spin count are synthetic fixtures. Artist names are invented and no figure here is real
-> reporting for a real recording.
+> every spin count are synthetic fixtures. Artist names are invented, and while the station names and
+> hubs are drawn from real Ugandan radio, the name/hub/reach pairing is illustrative — this is not a
+> verified UPRS station registry and no figure here is real reporting for a real recording.
+>
+> **Changing the seed data?** Rows persist to `.data/tracks.json` (gitignored) on first run, so edit
+> [`lib/catalog.ts`](lib/catalog.ts) and delete `.data/` to re-seed.
 
 ## Layout
 
@@ -196,7 +205,7 @@ components/
   artist-portal.tsx        client state: staging, delivery, filtering
   upload-dropzone.tsx      drag & drop, validation, staged file list
   track-metadata-form.tsx  the five metadata fields + ISRC generator
-  catalog-table.tsx        sortable/searchable catalogue
+  airplay-table.tsx        reusable sortable/searchable airplay table
   region-airplay-chart.tsx regional breakdown
   station-monitor.tsx      monitor grid, telemetry drift, scan orchestration
   station-card.tsx         status, player, waveform, last-detected badge
@@ -211,7 +220,7 @@ lib/
   airplay.ts               seeded airplay model
   catalog.ts               track construction, seed rows, designation allocation
   store.ts                 file-backed catalogue store (server-only)
-  regions.ts               Uganda regions + FM station panel
+  regions.ts               Uganda regions, hubs and FM station panel
   monitoring.ts            monitored panel, telemetry, fingerprint matching
   monitor-audio.ts         synthesized monitor feed (Web Audio)
   uprs.ts                  memberships, tariff, ledger, report, CSV

@@ -36,7 +36,7 @@ const DETECTIONS: Detection[] = [
     stationId: "capital-kla",
     stationName: "Capital FM",
     medium: "FM",
-    track: { title: "Kampala Nights", primaryArtist: "Ray Bwete", isrc: "UG-BMT-26-00001" },
+    track: { title: "Nkwagala", primaryArtist: "Ray Bwete", isrc: "UG-BMT-26-00001" },
     confidence: 0.943,
     matchedSeconds: 18,
     method: "Chromaprint v2 · spectral peak",
@@ -178,7 +178,7 @@ describe("StationCard", () => {
     );
 
     expect(screen.getByText("Last detected track")).toBeTruthy();
-    expect(screen.getByText("Kampala Nights")).toBeTruthy();
+    expect(screen.getByText("Nkwagala")).toBeTruthy();
     expect(screen.getByText(/Ray Bwete/)).toBeTruthy();
     expect(screen.getByText("94.3%")).toBeTruthy();
     expect(screen.getByText("12:00:05")).toBeTruthy();
@@ -224,7 +224,7 @@ describe("DetectionFeed", () => {
   it("lists each detection with timestamp, station, title and confidence", () => {
     render(<DetectionFeed detections={DETECTIONS} onClear={() => {}} />);
 
-    expect(screen.getByText("Kampala Nights")).toBeTruthy();
+    expect(screen.getByText("Nkwagala")).toBeTruthy();
     expect(screen.getByText(/Capital FM/)).toBeTruthy();
     expect(screen.getByText("94.3%")).toBeTruthy();
     expect(screen.getByText("Unidentified audio")).toBeTruthy();
@@ -247,7 +247,7 @@ describe("DetectionFeed", () => {
     fireEvent.click(screen.getByRole("button", { name: /Unmatched/ }));
 
     expect(screen.getByText("Unidentified audio")).toBeTruthy();
-    expect(screen.queryByText("Kampala Nights")).toBeNull();
+    expect(screen.queryByText("Nkwagala")).toBeNull();
   });
 
   it("asks the parent to clear", () => {

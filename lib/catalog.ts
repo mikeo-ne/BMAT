@@ -14,6 +14,7 @@ interface SeedRow {
   title: string;
   primaryArtist: string;
   featuredArtists: string[];
+  genre: string;
   releaseDate: string;
   isrc: string;
   fileName: string;
@@ -27,12 +28,13 @@ interface SeedRow {
 const SEED_ROWS: SeedRow[] = [
   {
     id: "trk_01",
-    title: "Kampala Nights",
+    title: "Nkwagala",
     primaryArtist: "Ray Bwete",
     featuredArtists: ["Aisha Nakato"],
+    genre: "Luganda pop",
     releaseDate: "2026-07-24",
     isrc: "UG-BMT-26-00001",
-    fileName: "Ray Bwete - Kampala Nights.mp3",
+    fileName: "Ray Bwete - Nkwagala.mp3",
     format: "MP3",
     sizeBytes: 9_216_512,
     durationSec: 214,
@@ -41,12 +43,13 @@ const SEED_ROWS: SeedRow[] = [
   },
   {
     id: "trk_02",
-    title: "Nile Sunrise",
+    title: "Omukwano",
     primaryArtist: "Doreen Achieng",
     featuredArtists: [],
+    genre: "Afro-fusion",
     releaseDate: "2026-06-05",
     isrc: "UG-BMT-26-00002",
-    fileName: "Doreen Achieng - Nile Sunrise.wav",
+    fileName: "Doreen Achieng - Omukwano.wav",
     format: "WAV",
     sizeBytes: 41_223_168,
     durationSec: 247,
@@ -55,12 +58,13 @@ const SEED_ROWS: SeedRow[] = [
   },
   {
     id: "trk_03",
-    title: "Mukono Drums",
+    title: "Mulongo",
     primaryArtist: "Mukisa Collective",
     featuredArtists: ["Peter Okoth", "Lillian Kyomukama"],
+    genre: "Kidandali",
     releaseDate: "2026-08-14",
     isrc: "UG-BMT-26-00003",
-    fileName: "Mukisa Collective - Mukono Drums.mp3",
+    fileName: "Mukisa Collective - Mulongo.mp3",
     format: "MP3",
     sizeBytes: 7_982_144,
     durationSec: 189,
@@ -69,12 +73,13 @@ const SEED_ROWS: SeedRow[] = [
   },
   {
     id: "trk_04",
-    title: "Rwenzori Echo",
+    title: "Ggwe Ondabika",
     primaryArtist: "Kasese Sound System",
     featuredArtists: [],
+    genre: "Afrobeats",
     releaseDate: "2026-03-20",
     isrc: "UG-BMT-26-00004",
-    fileName: "Kasese Sound System - Rwenzori Echo.mp3",
+    fileName: "Kasese Sound System - Ggwe Ondabika.mp3",
     format: "MP3",
     sizeBytes: 8_642_048,
     durationSec: 203,
@@ -86,6 +91,7 @@ const SEED_ROWS: SeedRow[] = [
     title: "Boda Boda Anthem",
     primaryArtist: "Tessy Nakimuli",
     featuredArtists: ["Ray Bwete"],
+    genre: "Afrobeats",
     releaseDate: "2026-08-28",
     isrc: "UG-BMT-26-00005",
     fileName: "Tessy Nakimuli - Boda Boda Anthem.wav",
@@ -97,12 +103,13 @@ const SEED_ROWS: SeedRow[] = [
   },
   {
     id: "trk_06",
-    title: "Gulu Moonlight",
+    title: "Nalongo",
     primaryArtist: "Peter Okoth",
     featuredArtists: [],
+    genre: "Kidandali",
     releaseDate: "2026-05-02",
     isrc: "UG-BMT-26-00006",
-    fileName: "Peter Okoth - Gulu Moonlight.mp3",
+    fileName: "Peter Okoth - Nalongo.mp3",
     format: "MP3",
     sizeBytes: 6_815_744,
     durationSec: 231,
@@ -124,6 +131,7 @@ export function buildSeedTracks(now: Date = new Date()): Track[] {
       title: row.title,
       primaryArtist: row.primaryArtist,
       featuredArtists: row.featuredArtists,
+      genre: row.genre,
       releaseDate: row.releaseDate,
       isrc: row.isrc,
       audio: {
@@ -152,6 +160,7 @@ export function buildTrack(input: {
   title: string;
   primaryArtist: string;
   featuredArtists: string[];
+  genre?: string;
   releaseDate: string;
   isrc: string;
   fileName: string;
@@ -170,6 +179,7 @@ export function buildTrack(input: {
     title: input.title,
     primaryArtist: input.primaryArtist,
     featuredArtists: input.featuredArtists,
+    genre: input.genre,
     releaseDate: input.releaseDate,
     isrc: normaliseIsrc(input.isrc) ?? input.isrc.toUpperCase(),
     audio: {

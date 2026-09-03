@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
-import { CatalogTable } from "@/components/catalog-table";
+import { AirplayTable } from "@/components/airplay-table";
 import { RegionAirplayChart } from "@/components/region-airplay-chart";
 import { StatCards } from "@/components/stat-cards";
 import {
@@ -373,7 +373,7 @@ export function ArtistPortal({ initialTracks, panelSize }: ArtistPortalProps) {
         onFocusRegion={setFocusRegion}
       />
 
-      <CatalogTable
+      <AirplayTable
         tracks={tracks}
         focusRegion={focusRegion}
         onFocusRegion={setFocusRegion}

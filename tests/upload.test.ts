@@ -50,16 +50,16 @@ describe("validateAudioFile", () => {
 
 describe("parseFileName", () => {
   it("splits an 'Artist - Title' delivery name", () => {
-    expect(parseFileName("Ray Bwete - Kampala Nights.mp3")).toEqual({
-      title: "Kampala Nights",
+    expect(parseFileName("Ray Bwete - Nkwagala.mp3")).toEqual({
+      title: "Nkwagala",
       primaryArtist: "Ray Bwete",
       featuredArtists: [],
     });
   });
 
   it("handles underscores and an en dash", () => {
-    expect(parseFileName("Ray_Bwete_–_Kampala_Nights.wav")).toEqual({
-      title: "Kampala Nights",
+    expect(parseFileName("Ray_Bwete_–_Nkwagala.wav")).toEqual({
+      title: "Nkwagala",
       primaryArtist: "Ray Bwete",
       featuredArtists: [],
     });

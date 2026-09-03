@@ -1,5 +1,5 @@
 import { createRandom, hashSeed } from "@/lib/airplay";
-import type { Region } from "@/lib/regions";
+import { stationById as panelStation, type Hub, type Region } from "@/lib/regions";
 import type { Track } from "@/lib/types";
 
 /**
@@ -24,34 +24,30 @@ export interface MonitoredStation {
   frequency: string;
   medium: Medium;
   region: Region;
-  location: string;
+  location: Hub;
+}
+
+/**
+ * Region and hub are read off the spin panel rather than restated here, so the
+ * two lists cannot drift apart. Only the frequency is monitoring-specific.
+ */
+function radio(id: string, name: string, frequency: string): MonitoredStation {
+  const panel = panelStation(id);
+
+  return {
+    id,
+    name,
+    frequency,
+    medium: "FM",
+    region: panel?.region ?? "Central",
+    location: panel?.location ?? "Kampala",
+  };
 }
 
 export const MONITORED_STATIONS: MonitoredStation[] = [
-  {
-    id: "capital-kla",
-    name: "Capital FM",
-    frequency: "91.3 MHz",
-    medium: "FM",
-    region: "Central",
-    location: "Kampala",
-  },
-  {
-    id: "cbs-kla",
-    name: "CBS FM",
-    frequency: "89.2 MHz",
-    medium: "FM",
-    region: "Central",
-    location: "Kampala",
-  },
-  {
-    id: "galaxy-kla",
-    name: "Galaxy FM",
-    frequency: "100.2 MHz",
-    medium: "FM",
-    region: "Central",
-    location: "Kampala",
-  },
+  radio("capital-kla", "Capital FM", "91.3 MHz"),
+  radio("cbs-kla", "CBS FM", "89.2 MHz"),
+  radio("galaxy-kla", "Galaxy FM", "100.2 MHz"),
   {
     id: "nbs-tv-kla",
     name: "NBS TV",
@@ -60,54 +56,13 @@ export const MONITORED_STATIONS: MonitoredStation[] = [
     region: "Central",
     location: "Kampala",
   },
-  {
-    id: "kfm-kla",
-    name: "KFM",
-    frequency: "93.7 MHz",
-    medium: "FM",
-    region: "Central",
-    location: "Kampala",
-  },
-  {
-    id: "bukedde-kla",
-    name: "Bukedde FM",
-    frequency: "88.4 MHz",
-    medium: "FM",
-    region: "Central",
-    location: "Kampala",
-  },
-  {
-    id: "better-mba",
-    name: "Better FM",
-    frequency: "92.9 MHz",
-    medium: "FM",
-    region: "Eastern",
-    location: "Mbale",
-  },
-  {
-    id: "radiowest-mbr",
-    name: "Radio West",
-    frequency: "95.4 MHz",
-    medium: "FM",
-    region: "Western",
-    location: "Mbarara",
-  },
-  {
-    id: "mega-gul",
-    name: "Mega FM",
-    frequency: "97.0 MHz",
-    medium: "FM",
-    region: "Northern",
-    location: "Gulu",
-  },
-  {
-    id: "upcountry-gul",
-    name: "Upcountry FM",
-    frequency: "96.3 MHz",
-    medium: "FM",
-    region: "Northern",
-    location: "Gulu",
-  },
+  radio("kfm-kla", "KFM", "93.7 MHz"),
+  radio("bukedde-kla", "Bukedde FM", "88.4 MHz"),
+  radio("gaaki-jin", "Radio Gaaki", "89.7 MHz"),
+  radio("better-mba", "Better FM", "92.9 MHz"),
+  radio("radiowest-mbr", "Radio West", "95.4 MHz"),
+  radio("mega-gul", "Mega FM", "97.0 MHz"),
+  radio("upcountry-gul", "Upcountry FM", "96.3 MHz"),
 ];
 
 export function stationById(id: string): MonitoredStation | undefined {

@@ -30,6 +30,8 @@ export interface Track {
   title: string;
   primaryArtist: string;
   featuredArtists: string[];
+  /** Ugandan radio format the recording is worked to, e.g. "Kidandali". */
+  genre?: string;
   releaseDate: string;
   isrc: string;
   audio: TrackAudio;

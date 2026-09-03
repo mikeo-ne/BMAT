@@ -96,7 +96,7 @@ describe("date helpers", () => {
 
 describe("initials", () => {
   it("takes up to two initials", () => {
-    expect(initials("Kampala Nights")).toBe("KN");
+    expect(initials("Boda Boda Anthem")).toBe("BB");
     expect(initials("Nile")).toBe("N");
   });
 });

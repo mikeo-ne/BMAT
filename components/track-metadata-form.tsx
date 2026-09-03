@@ -84,7 +84,7 @@ export function TrackMetadataForm({
           <input
             id="md-title"
             className="field"
-            placeholder="Kampala Nights"
+            placeholder="Nkwagala"
             value={values.title}
             aria-invalid={Boolean(errors.title)}
             aria-describedby={errors.title ? "md-title-error" : undefined}
