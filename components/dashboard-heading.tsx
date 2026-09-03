@@ -12,6 +12,7 @@ const TITLES: Record<string, string> = {
   "/dashboard/mix-parser": "Unidentified Audio & DJ Mix Parser",
   "/dashboard/analytics/regional": "Airplay Geography & Hit Velocity",
   "/dashboard/alerts": "Live Airplay Alerts & Webhooks",
+  "/dashboard/charts": "National Charts",
 };
 
 /** Topbar title, derived from the active route. */

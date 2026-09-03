@@ -53,7 +53,12 @@ const NAV = [
     hint: "WhatsApp, email, webhooks",
     status: "live" as const,
   },
-  { href: "/dashboard/charts", label: "National Charts", hint: "Weekly Top 100", status: "soon" as const },
+  {
+    href: "/dashboard/charts",
+    label: "National Charts",
+    hint: "Weekly airplay Top 100",
+    status: "live" as const,
+  },
   { href: "/dashboard/royalties", label: "Royalties", hint: "Distribution & payouts", status: "soon" as const },
 ];
 

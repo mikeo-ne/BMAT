@@ -264,6 +264,30 @@ Until station playout feeds are wired up, [`lib/airplay.ts`](lib/airplay.ts) der
 
 `sum(trend) === spins` holds for every region, and the tests assert it.
 
+## National Charts — `/dashboard/charts`
+
+The public weekly national airplay chart. [`lib/charts.ts`](lib/charts.ts) ranks every recording
+with spins in the last seven reporting days; last week's ranking comes from the seven days before
+that, so movement, debuts and the biggest climber are read straight off the airplay curve. Peak
+position is the one fixture element — the prototype keeps only fourteen days of history — and is
+bounded above by the current rank so a peak can never be worse than today's slot.
+
+---
+
+## Database schema (migration target)
+
+[`prisma/schema.prisma`](prisma/schema.prisma) is the reviewed persistence artefact: `User`, `Track`,
+`RadioStation`, `AirplayMatch`, `RoyaltyReport` and `AdCampaign`, plus the supporting `AdSlot`,
+`SplitSheet`, `SplitParty`, `RoyaltyLine` and `UnidentifiedClip` tables. Every model maps to an
+in-memory counterpart that the test suite already exercises, so the field list is not aspirational.
+
+The running prototype keeps its catalogue in `.data/` behind [`lib/store.ts`](lib/store.ts); nothing
+imports the generated Prisma client yet. `tests/prisma-schema.test.ts` runs the Prisma wasm validator
+in-process (no database, no Rust-engine download), so `npm test` fails if the schema stops parsing or
+a relation dangles. `npm run db:validate` does the same via the CLI on a machine with normal egress.
+
+---
+
 ## Getting started
 
 ```bash
@@ -357,9 +381,13 @@ lib/
   catalog.ts               track construction, seed rows, designation allocation
   store.ts                 file-backed catalogue store (server-only)
   regions.ts               Uganda regions, hubs and FM station panel
+  charts.ts                weekly national chart, movement, debuts
   monitoring.ts            monitored panel, telemetry, fingerprint matching
   monitor-audio.ts         synthesized monitor feed (Web Audio)
   audio-fingerprint.ts     pure spectral landmark extraction
+
+prisma/
+  schema.prisma            persistence target (validated by tests)
   uprs.ts                  memberships, tariff, ledger, report, CSV
   advertising.ts           contracts, slots, compliance, heatmap, breaches
   mix-parser.ts            timeline, transitions, queue, waveform, search

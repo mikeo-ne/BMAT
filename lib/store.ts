@@ -14,6 +14,10 @@ import type { Track } from "@/lib/types";
  * and delivered masters in `.data/uploads/`. Both are gitignored. The read/write
  * surface here is intentionally the same shape a real repository would expose,
  * so swapping in Postgres/Prisma later is a one-file change.
+ *
+ * The migration target is prisma/schema.prisma (User, Track, RadioStation,
+ * AirplayMatch, RoyaltyReport, AdCampaign plus the supporting tables), validated
+ * by tests/prisma-schema.test.ts so the schema stays in step with these shapes.
  */
 
 export const DATA_DIR = path.join(process.cwd(), ".data");
