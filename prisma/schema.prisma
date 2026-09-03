@@ -1,0 +1,239 @@
+// BMAT — persistence target for the prototype.
+//
+// The running prototype keeps its catalogue in `.data/tracks.json` behind
+// lib/store.ts, whose read/write surface already mirrors a real repository so
+// this schema is a drop-in migration target. Nothing here is generated or wired
+// yet; it exists so the move to Postgres is a reviewed, validated artefact.
+//
+// Every model maps to an in-memory counterpart that is exercised by the test
+// suite (lib/types.ts, lib/regions.ts, lib/uprs.ts, lib/advertising.ts,
+// lib/mix-parser.ts, lib/splits.ts), so the field list is not aspirational.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ARTIST
+  LABEL
+  CMO_ADMIN
+  ADVERTISER
+  A_AND_R
+}
+
+enum TrackStatus {
+  PROCESSING
+  LIVE
+  REJECTED
+}
+
+enum StationMedium {
+  FM
+  TV
+}
+
+enum SlotOutcome {
+  FULFILLED
+  UNVERIFIED
+  OFF_WINDOW
+  MISSED
+}
+
+enum SplitRole {
+  PRIMARY_ARTIST
+  FEATURED_ARTIST
+  PRODUCER
+  SONGWRITER
+  PUBLISHER
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  displayName String
+  role        UserRole @default(ARTIST)
+  // UPRS member ids the account can act for.
+  memberIds   String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tracks       Track[]
+  campaigns    AdCampaign[]
+  reports      RoyaltyReport[]
+  splitSignOffs SplitParty[]
+}
+
+model Track {
+  id              String      @id @default(cuid())
+  title           String
+  primaryArtist   String
+  featuredArtists String[]
+  genre           String?
+  releaseDate     DateTime
+  isrc            String      @unique
+  audioFileName   String
+  audioFormat     String
+  audioMimeType   String
+  audioSizeBytes  Int
+  audioDurationSec Int?
+  status          TrackStatus @default(PROCESSING)
+  uploadedAt      DateTime    @default(now())
+
+  ownerId String?
+  owner   User?   @relation(fields: [ownerId], references: [id])
+
+  matches     AirplayMatch[]
+  royaltyLines RoyaltyLine[]
+  splitSheet  SplitSheet?
+  clips       UnidentifiedClip[]
+
+  @@index([primaryArtist])
+  @@index([status])
+}
+
+model RadioStation {
+  id        String        @id
+  name      String
+  region    String
+  location  String
+  frequency String
+  reach     Int
+  medium    StationMedium @default(FM)
+  monitored Boolean       @default(false)
+
+  matches   AirplayMatch[]
+  campaigns AdCampaign[]
+}
+
+// A fingerprinted playout: the join between the catalogue and the panel that
+// every royalty figure downstream is built from.
+model AirplayMatch {
+  id         String   @id @default(cuid())
+  detectedAt DateTime
+  hour       Int?
+  confidence Float
+  verified   Boolean  @default(false)
+  plays      Int      @default(1)
+
+  trackId   String
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  stationId String
+  station   RadioStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  @@index([trackId, detectedAt])
+  @@index([stationId, detectedAt])
+}
+
+model RoyaltyReport {
+  id          String   @id @default(cuid())
+  period      String
+  generatedAt DateTime @default(now())
+  totalPlays  Int
+  poolUgx     Int
+  poolUsd     Float
+  status      String   @default("DRAFT")
+
+  generatedById String
+  generatedBy   User   @relation(fields: [generatedById], references: [id])
+
+  lines RoyaltyLine[]
+}
+
+model RoyaltyLine {
+  id        String @id @default(cuid())
+  memberId  String
+  artist    String
+  isrc      String
+  stationId String
+  plays     Int
+  allocationUgx Int
+
+  reportId String
+  report   RoyaltyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  trackId  String?
+  track    Track?        @relation(fields: [trackId], references: [id])
+}
+
+model AdCampaign {
+  id            String @id @default(cuid())
+  brand         String
+  product       String
+  agency        String
+  jingleFile    String
+  jingleBytes   Int
+  jingleSec     Int
+  playsPerDay   Int
+  windowStartHour Int
+  windowEndHour Int
+  days          Int
+  startsOn      DateTime
+
+  ownerId String?
+  owner   User?   @relation(fields: [ownerId], references: [id])
+  stationId String
+  station   RadioStation @relation(fields: [stationId], references: [id])
+
+  slots AdSlot[]
+}
+
+model AdSlot {
+  id        String      @id @default(cuid())
+  day       DateTime
+  slotIndex Int
+  outcome   SlotOutcome
+  airedAt   DateTime?
+  airedHour Int?
+
+  campaignId String
+  campaign   AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, day])
+}
+
+model SplitSheet {
+  id       String @id @default(cuid())
+  isrc     String @unique
+  title    String
+  raisedAt DateTime @default(now())
+
+  // One split sheet per recording.
+  trackId String @unique
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  parties SplitParty[]
+}
+
+model SplitParty {
+  id       String    @id @default(cuid())
+  name     String
+  role     SplitRole
+  sharePct Int
+  memberId String?
+  signedAt DateTime?
+  channel  String?
+
+  sheetId String
+  sheet   SplitSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  // The user account that digitally signed, when it is one of ours.
+  signOffById String?
+  signOffBy   User?   @relation(fields: [signOffById], references: [id])
+}
+
+// Unresolved mix-parser segments awaiting an A&R link.
+model UnidentifiedClip {
+  id          String   @id @default(cuid())
+  startSec    Int
+  endSec      Int
+  confidence  Float
+  linkedTitle String?
+  linkedAt    DateTime?
+
+  trackId String?
+  track   Track?  @relation(fields: [trackId], references: [id])
+}
