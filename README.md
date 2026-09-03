@@ -63,9 +63,11 @@ Both are generated client-side and prefixed with a UTF-8 BOM so Excel reads them
 
 ### Station grid
 
-Ten monitored Ugandan feeds — Capital FM 91.3, CBS FM 89.2, Galaxy FM 100.2, NBS TV (Ch. 34 DTT),
-KFM, Bukedde FM, Better FM, Radio West, Mega FM and Upcountry FM — spanning all four regions.
-Defined in [`lib/monitoring.ts`](lib/monitoring.ts).
+Eleven monitored Ugandan feeds — Capital FM 91.3, CBS FM 89.2, Galaxy FM 100.2, NBS TV (Ch. 34 DTT),
+KFM, Bukedde FM, Better FM, Radio West, Mega FM, Upcountry FM and Radio Gaaki 89.7 (Jinja) — spanning
+all four regions. Defined in [`lib/monitoring.ts`](lib/monitoring.ts), where each entry derives its
+region and hub from the shared spin panel in [`lib/regions.ts`](lib/regions.ts) so the two lists
+cannot drift.
 
 Each card carries:
 
@@ -95,6 +97,29 @@ match threshold and is recorded as **unmatched** rather than dropped — unmatch
 that a delivery is missing from the catalogue. Stations whose feed is offline produce no detection.
 
 Matching is a pure, seeded function (`simulateScan`), so it is fully unit-tested.
+
+### Live fingerprint peak detector
+
+[`components/audio-fingerprint-visualizer.tsx`](components/audio-fingerprint-visualizer.tsx) is the
+one part of the monitor that reads *real* audio. It opens the operator's microphone through
+`getUserMedia`, runs it through a native `AnalyserNode`, and paints the magnitude spectrum with
+extracted spectral landmarks overlaid. No audio libraries — the Web Audio API only.
+
+Landmark extraction lives in [`lib/audio-fingerprint.ts`](lib/audio-fingerprint.ts) as a pure
+function so it is testable without a canvas or an `AudioContext`. It follows the constellation
+approach: a bin qualifies when it is a strict local maximum within a comparison window **and** clears
+a magnitude floor, with a minimum bin spacing so a harmonic comb collapses to its strongest member
+rather than firing on every partial. The DC and rumble bins are excluded.
+
+> **Not a recognition engine.** There is no reference index to match against, so the landmarks are a
+> measure of spectral salience, not identified works. The UI says so, and the recognition path stays
+> the simulated `simulateScan` above.
+
+Two operational notes:
+
+- `getUserMedia` needs a secure context, so the preview must be served over HTTPS.
+- Denied, missing-device and unsupported-browser cases each surface a distinct message in the panel
+  rather than failing to the console.
 
 ---
 
@@ -210,6 +235,7 @@ components/
   station-monitor.tsx      monitor grid, telemetry drift, scan orchestration
   station-card.tsx         status, player, waveform, last-detected badge
   waveform.tsx             canvas oscilloscope driven by the AnalyserNode
+  audio-fingerprint-visualizer.tsx  live mic spectrum + landmark overlay
   detection-feed.tsx       timestamped fingerprint matches
   cmo-audit.tsx            filter state, report generation, CSV export
   cmo-table.tsx            sortable/paginated enterprise ledger table
@@ -223,6 +249,7 @@ lib/
   regions.ts               Uganda regions, hubs and FM station panel
   monitoring.ts            monitored panel, telemetry, fingerprint matching
   monitor-audio.ts         synthesized monitor feed (Web Audio)
+  audio-fingerprint.ts     pure spectral landmark extraction
   uprs.ts                  memberships, tariff, ledger, report, CSV
   format.ts  types.ts  upload.ts
 tests/                     vitest unit + component tests

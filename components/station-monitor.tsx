@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { AudioFingerprintVisualizer } from "@/components/audio-fingerprint-visualizer";
 import { DetectionFeed } from "@/components/detection-feed";
 import { StationCard } from "@/components/station-card";
 import { formatClock, formatRatio, timeAgo } from "@/lib/format";
@@ -270,6 +271,8 @@ export function StationMonitor({ catalogue }: StationMonitorProps) {
       </section>
 
       <DetectionFeed detections={detections} onClear={() => setDetections([])} />
+
+      <AudioFingerprintVisualizer />
 
       <p className="pb-2 text-center text-[11px] text-muted">
         Station list, telemetry and detection outcomes are simulated for this prototype. Audio
