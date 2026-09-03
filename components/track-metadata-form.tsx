@@ -165,7 +165,7 @@ export function TrackMetadataForm({
             <input
               id="md-isrc"
               className="field font-mono uppercase"
-              placeholder="UG-BMT-26-00001"
+              placeholder="UG-ESD-26-00001"
               value={values.isrc}
               aria-invalid={Boolean(errors.isrc)}
               aria-describedby="md-isrc-status"

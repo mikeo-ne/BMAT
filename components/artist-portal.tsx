@@ -149,7 +149,7 @@ export function ArtistPortal({ initialTracks, panelSize }: ArtistPortalProps) {
     setGeneratingIsrc(true);
     setNotice(null);
 
-    const registrant = activeMeta.primaryArtist || "BMAT";
+    const registrant = activeMeta.primaryArtist || "ESD";
     const releaseDate = isValidIsoDate(activeMeta.releaseDate) ? activeMeta.releaseDate : today;
     const params = new URLSearchParams({ registrant, releaseDate });
 
@@ -279,7 +279,7 @@ export function ArtistPortal({ initialTracks, panelSize }: ArtistPortalProps) {
               Deliver a master
             </h2>
             <p className="text-xs text-muted">
-              Upload the audio, fill in the metadata, and BMAT assigns an ISRC before it goes to the{" "}
+              Upload the audio, fill in the metadata, and East Sound assigns an ISRC before it goes to the{" "}
               {panelSize}-station Uganda FM panel.
             </p>
           </div>

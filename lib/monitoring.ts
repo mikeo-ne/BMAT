@@ -5,7 +5,7 @@ import type { Track } from "@/lib/types";
 /**
  * Live station monitoring.
  *
- * BMAT listens to each station's broadcast feed, fingerprints the audio and
+ * East Sound listens to each station's broadcast feed, fingerprints the audio and
  * matches it against the delivered catalogue. Until real stream capture is
  * running, this module models the ingest side: the monitored panel, per-station
  * telemetry, and the fingerprint match outcomes.

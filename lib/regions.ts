@@ -1,5 +1,5 @@
 /**
- * Uganda broadcast geography + the FM station panel BMAT ingests spin logs from.
+ * Uganda broadcast geography + the FM station panel East Sound ingests spin logs from.
  *
  * NOTE: the station panel is bundled demo fixture data so the portal is usable
  * without a live ingest feed. The names below are modelled on real Ugandan

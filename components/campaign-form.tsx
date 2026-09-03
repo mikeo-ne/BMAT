@@ -154,7 +154,7 @@ export function CampaignForm({ onCreate, nextId }: CampaignFormProps) {
         Create campaign
       </h2>
       <p className="mt-1 text-xs leading-relaxed text-muted">
-        Upload the jingle and set the contracted airtime. BMAT audits every booked spot against
+        Upload the jingle and set the contracted airtime. East Sound audits every booked spot against
         fingerprinted playout and reports the gap.
       </p>
 

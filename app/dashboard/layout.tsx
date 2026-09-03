@@ -73,11 +73,11 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
       <aside className="flex shrink-0 flex-col border-b border-line bg-surface lg:w-64 lg:border-b-0 lg:border-r">
         <div className="flex items-center gap-3 px-5 py-5">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand text-sm font-bold text-brand-ink">
-            BM
+            ES
           </div>
           <div className="leading-tight">
-            <div className="text-sm font-semibold tracking-tight">BMAT</div>
-            <div className="text-[11px] text-muted">Broadcast Music Analytics</div>
+            <div className="text-sm font-semibold tracking-tight">East Sound</div>
+            <div className="text-[11px] text-muted">Music airplay analytics</div>
           </div>
         </div>
 

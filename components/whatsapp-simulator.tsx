@@ -100,7 +100,7 @@ export function WhatsappSimulator({ events, intervalMs = 2600 }: WhatsappSimulat
               ES
             </span>
             <div className="min-w-0">
-              <p className="truncate text-xs font-semibold">EastSound Alerts</p>
+              <p className="truncate text-xs font-semibold">East Sound Alerts</p>
               <p className="truncate text-[10px] text-accent">online</p>
             </div>
           </div>
@@ -148,7 +148,7 @@ export function WhatsappSimulator({ events, intervalMs = 2600 }: WhatsappSimulat
           {/* Composer, inert — this is a one-way alert channel. */}
           <div className="flex items-center gap-2 border-t border-line bg-surface px-3 py-2">
             <span className="flex-1 rounded-full border border-line px-3 py-1.5 text-[11px] text-muted">
-              Message EastSound Alerts
+              Message East Sound Alerts
             </span>
             <span
               className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs text-brand-ink"

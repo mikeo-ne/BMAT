@@ -271,7 +271,7 @@ export function AudioFingerprintVisualizer({
           </h2>
           <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted">
             Reads the local microphone through a native <code>AnalyserNode</code> and marks
-            spectral landmarks. Landmarks are salience, not matched works — BMAT holds no reference
+            spectral landmarks. Landmarks are salience, not matched works — East Sound holds no reference
             index to match against.
           </p>
         </div>

@@ -146,6 +146,6 @@ describe("webhook payload", () => {
     expect(station.name).toBe(event.station.name);
     expect(station.hub).toBe(event.station.hub);
     expect(payload.verified).toBe(event.verified);
-    expect(payload.source).toBe("bmat");
+    expect(payload.source).toBe("east-sound");
   });
 });

@@ -7,7 +7,7 @@
  * hashes are then paired against a reference index.
  *
  * This module implements only the extraction half, and does so on a single
- * magnitude frame rather than a time series — BMAT has no reference index to
+ * magnitude frame rather than a time series — East Sound has no reference index to
  * match against, so the peaks here are a visualisation of spectral salience,
  * **not** a working recognition result. The matching half is simulated
  * separately in `lib/monitoring.ts`.

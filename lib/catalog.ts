@@ -4,7 +4,7 @@ import { FM_STATIONS, REGIONS, type Region } from "@/lib/regions";
 import type { Track } from "@/lib/types";
 
 /**
- * Synthetic catalogue used to seed a fresh BMAT instance so the portal renders
+ * Synthetic catalogue used to seed a fresh East Sound instance so the portal renders
  * with data in it. Every row here is invented demo data — names, ISRCs and spin
  * counts are not real reporting for real artists.
  */
@@ -33,7 +33,7 @@ const SEED_ROWS: SeedRow[] = [
     featuredArtists: ["Aisha Nakato"],
     genre: "Luganda pop",
     releaseDate: "2026-07-24",
-    isrc: "UG-BMT-26-00001",
+    isrc: "UG-ESD-26-00001",
     fileName: "Ray Bwete - Nkwagala.mp3",
     format: "MP3",
     sizeBytes: 9_216_512,
@@ -48,7 +48,7 @@ const SEED_ROWS: SeedRow[] = [
     featuredArtists: [],
     genre: "Afro-fusion",
     releaseDate: "2026-06-05",
-    isrc: "UG-BMT-26-00002",
+    isrc: "UG-ESD-26-00002",
     fileName: "Doreen Achieng - Omukwano.wav",
     format: "WAV",
     sizeBytes: 41_223_168,
@@ -63,7 +63,7 @@ const SEED_ROWS: SeedRow[] = [
     featuredArtists: ["Peter Okoth", "Lillian Kyomukama"],
     genre: "Kidandali",
     releaseDate: "2026-08-14",
-    isrc: "UG-BMT-26-00003",
+    isrc: "UG-ESD-26-00003",
     fileName: "Mukisa Collective - Mulongo.mp3",
     format: "MP3",
     sizeBytes: 7_982_144,
@@ -78,7 +78,7 @@ const SEED_ROWS: SeedRow[] = [
     featuredArtists: [],
     genre: "Afrobeats",
     releaseDate: "2026-03-20",
-    isrc: "UG-BMT-26-00004",
+    isrc: "UG-ESD-26-00004",
     fileName: "Kasese Sound System - Ggwe Ondabika.mp3",
     format: "MP3",
     sizeBytes: 8_642_048,
@@ -93,7 +93,7 @@ const SEED_ROWS: SeedRow[] = [
     featuredArtists: ["Ray Bwete"],
     genre: "Afrobeats",
     releaseDate: "2026-08-28",
-    isrc: "UG-BMT-26-00005",
+    isrc: "UG-ESD-26-00005",
     fileName: "Tessy Nakimuli - Boda Boda Anthem.wav",
     format: "WAV",
     sizeBytes: 36_700_160,
@@ -108,7 +108,7 @@ const SEED_ROWS: SeedRow[] = [
     featuredArtists: [],
     genre: "Kidandali",
     releaseDate: "2026-05-02",
-    isrc: "UG-BMT-26-00006",
+    isrc: "UG-ESD-26-00006",
     fileName: "Peter Okoth - Nalongo.mp3",
     format: "MP3",
     sizeBytes: 6_815_744,
@@ -123,7 +123,7 @@ const SEED_ROWS: SeedRow[] = [
     featuredArtists: ["Doreen Achieng"],
     genre: "Luganda pop",
     releaseDate: "2026-07-19",
-    isrc: "UG-BMT-26-00007",
+    isrc: "UG-ESD-26-00007",
     fileName: "Ray Bwete - Katono.mp3",
     format: "MP3",
     sizeBytes: 7_442_180,

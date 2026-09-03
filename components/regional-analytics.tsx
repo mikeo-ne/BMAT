@@ -148,7 +148,7 @@ export function RegionalAnalytics({ catalogue }: RegionalAnalyticsProps) {
       <p className="pb-2 text-center text-[11px] text-muted">
         Hub spin totals are apportioned from the deterministic airplay model by hub reach; the
         streaming-search index is a synthetic proxy. Cross-border markets are modelled, not measured —
-        BMAT has no Nairobi or Dar es Salaam panel.
+        East Sound has no Nairobi or Dar es Salaam panel.
       </p>
     </div>
   );

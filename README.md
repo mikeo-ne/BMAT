@@ -1,6 +1,6 @@
-# BMAT
+# East Sound
 
-**Broadcast Music Analytics** — measures music airplay across Uganda's FM panel and gives artists,
+**East Sound** — measures music airplay across Uganda's FM panel and gives artists,
 labels and stations one shared source of truth for spins.
 
 Currently built:
@@ -68,7 +68,7 @@ Both are generated client-side and prefixed with a UTF-8 BOM so Excel reads them
 
 ## Ad Campaign Auditor — `/dashboard/advertisers`
 
-Advertisers book airtime and BMAT audits it against fingerprinted playout.
+Advertisers book airtime and East Sound audits it against fingerprinted playout.
 
 - **Campaign creation** — upload the jingle as an MP3 and set the contract in the
   shape a media buyer writes it: *5x daily between 06:00 and 10:00 on Capital FM, for 14 days*.
@@ -128,7 +128,7 @@ there is no server round-trip yet, so a refresh returns to the four seeded buys.
   still quiet. That is the Ugandan break pattern: Gulu, Mbale or Mbarara first, Kampala two or three
   weeks later.
 
-> Cross-border demand is **modelled, not measured** — BMAT has no Nairobi or Dar es Salaam panel. Hub
+> Cross-border demand is **modelled, not measured** — East Sound has no Nairobi or Dar es Salaam panel. Hub
 > spins are apportioned from the domestic airplay model by reach, and the search index is a synthetic
 > proxy.
 

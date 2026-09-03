@@ -30,13 +30,13 @@ export async function GET(request: Request) {
 
   if (kind === "report") {
     csv = reportToCsv(model.report);
-    fileName = "bmat-uprs-distribution-report.csv";
+    fileName = "east-sound-uprs-distribution-report.csv";
   } else if (kind === "batches") {
     csv = batchesToCsv(model.batches);
-    fileName = "bmat-payout-batches.csv";
+    fileName = "east-sound-payout-batches.csv";
   } else if (kind === "statements") {
     csv = statementsToCsv(model.statements);
-    fileName = "bmat-royalty-statements.csv";
+    fileName = "east-sound-royalty-statements.csv";
   } else {
     return NextResponse.json({ error: "kind must be statements, batches or report." }, { status: 400 });
   }

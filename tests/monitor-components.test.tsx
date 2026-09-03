@@ -36,7 +36,7 @@ const DETECTIONS: Detection[] = [
     stationId: "capital-kla",
     stationName: "Capital FM",
     medium: "FM",
-    track: { title: "Nkwagala", primaryArtist: "Ray Bwete", isrc: "UG-BMT-26-00001" },
+    track: { title: "Nkwagala", primaryArtist: "Ray Bwete", isrc: "UG-ESD-26-00001" },
     confidence: 0.943,
     matchedSeconds: 18,
     method: "Chromaprint v2 · spectral peak",

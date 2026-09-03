@@ -15,11 +15,11 @@ const NOW = new Date("2026-09-03T00:00:00Z");
 
 describe("hashSeed / createRandom", () => {
   it("is stable for the same input", () => {
-    expect(hashSeed("UG-BMT-26-00001")).toBe(hashSeed("UG-BMT-26-00001"));
+    expect(hashSeed("UG-ESD-26-00001")).toBe(hashSeed("UG-ESD-26-00001"));
   });
 
   it("differs across inputs", () => {
-    expect(hashSeed("UG-BMT-26-00001")).not.toBe(hashSeed("UG-BMT-26-00002"));
+    expect(hashSeed("UG-ESD-26-00001")).not.toBe(hashSeed("UG-ESD-26-00002"));
   });
 
   it("stays inside [0,1)", () => {
@@ -48,7 +48,7 @@ describe("regionShare", () => {
 
 describe("generateAirplay", () => {
   const airplay = generateAirplay({
-    seed: "UG-BMT-26-00001",
+    seed: "UG-ESD-26-00001",
     releaseDate: "2026-08-28",
     now: NOW,
   });
@@ -78,7 +78,7 @@ describe("generateAirplay", () => {
 
   it("is deterministic for the same seed", () => {
     const again = generateAirplay({
-      seed: "UG-BMT-26-00001",
+      seed: "UG-ESD-26-00001",
       releaseDate: "2026-08-28",
       now: NOW,
     });
@@ -87,7 +87,7 @@ describe("generateAirplay", () => {
 
   it("changes when the seed changes", () => {
     const other = generateAirplay({
-      seed: "UG-BMT-26-00002",
+      seed: "UG-ESD-26-00002",
       releaseDate: "2026-08-28",
       now: NOW,
     });
@@ -126,7 +126,7 @@ describe("generateAirplay", () => {
 describe("combinedTrend", () => {
   it("adds the daily curves together", () => {
     const airplay = generateAirplay({
-      seed: "UG-BMT-26-00003",
+      seed: "UG-ESD-26-00003",
       releaseDate: "2026-08-14",
       now: NOW,
     });

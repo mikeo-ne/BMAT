@@ -52,7 +52,7 @@ describe("buildTrack", () => {
       primaryArtist: "Artist",
       featuredArtists: [],
       releaseDate: "2026-08-01",
-      isrc: "ugbmt2600001",
+      isrc: "ugesd2600001",
       fileName: "test.mp3",
       format: "MP3",
       mimeType: "audio/mpeg",
@@ -62,7 +62,7 @@ describe("buildTrack", () => {
       now: NOW,
     });
 
-    expect(track.isrc).toBe("UG-BMT-26-00001");
+    expect(track.isrc).toBe("UG-ESD-26-00001");
     expect(track.status).toBe("live");
     expect(track.totalSpins).toBeGreaterThan(0);
     expect(trendFor(track, "All")).toHaveLength(14);
@@ -77,12 +77,12 @@ describe("nextDesignation / suggestIsrc", () => {
   });
 
   it("continues after the highest designation already used", () => {
-    // Seeded demo rows occupy UG-BMT-26-00001..00007.
-    expect(nextDesignation(tracks, "UG-BMT-26-00001")).toBe(8);
+    // Seeded demo rows occupy UG-ESD-26-00001..00007.
+    expect(nextDesignation(tracks, "UG-ESD-26-00001")).toBe(8);
   });
 
   it("ignores other years of the same registrant", () => {
-    expect(nextDesignation(tracks, "UG-BMT-27-00001")).toBe(1);
+    expect(nextDesignation(tracks, "UG-ESD-27-00001")).toBe(1);
   });
 
   it("suggests the next free ISRC for a registrant", () => {

@@ -41,7 +41,7 @@ export interface SplitSheet {
 }
 
 const PRODUCERS = ["DJ Ssebbi", "Nessim Beats", "Hans Room", "Kampala Beat Lab"];
-const PUBLISHERS = ["EastSound Publishing", "Mekono Music", "Pearl Rights Admin"];
+const PUBLISHERS = ["East Sound Publishing", "Mekono Music", "Pearl Rights Admin"];
 
 function memberIdFor(name: string): string {
   const slug = name
@@ -175,7 +175,7 @@ export interface RightsDispute {
   headline: string;
   detail: string;
   raisedAt: string;
-  /** True when the ISRC is not in the BMAT catalogue. */
+  /** True when the ISRC is not in the East Sound catalogue. */
   external: boolean;
 }
 
@@ -194,7 +194,7 @@ export function rightTypeLabel(rightType: DisputeClaimant["rightType"]): string 
  *
  * Three shapes, all of which a CMO has to resolve before it can pay anyone:
  * two parties each claiming the whole of the same right, a split sheet whose
- * shares total more than 100, and a claim against an ISRC BMAT has no record of.
+ * shares total more than 100, and a claim against an ISRC East Sound has no record of.
  */
 export function buildDisputes(sheets: SplitSheet[], now: Date = new Date()): RightsDispute[] {
   const disputes: RightsDispute[] = [];
@@ -210,7 +210,7 @@ export function buildDisputes(sheets: SplitSheet[], now: Date = new Date()): Rig
       severity: "critical",
       claimants: [
         {
-          name: "EastSound Publishing",
+          name: "East Sound Publishing",
           claimPct: 100,
           rightType: "mechanical",
           registeredOn: new Date(now.getTime() - 86_400_000 * 21).toISOString(),
@@ -224,7 +224,7 @@ export function buildDisputes(sheets: SplitSheet[], now: Date = new Date()): Rig
       ],
       overlapPct: 100,
       headline: `Two publishers claiming 100% mechanical rights for ISRC ${first.isrc}`,
-      detail: `EastSound Publishing and Mekono Music have each registered the full mechanical right for “${first.title}”. Neither claim references the other, and the executed split sheet on file allocates only 10% to a publisher. Payments are held until one claim is withdrawn or the sheet is varied.`,
+      detail: `East Sound Publishing and Mekono Music have each registered the full mechanical right for “${first.title}”. Neither claim references the other, and the executed split sheet on file allocates only 10% to a publisher. Payments are held until one claim is withdrawn or the sheet is varied.`,
       raisedAt: new Date(now.getTime() - 86_400_000 * 2).toISOString(),
       external: false,
     });
@@ -253,7 +253,7 @@ export function buildDisputes(sheets: SplitSheet[], now: Date = new Date()): Rig
     });
   }
 
-  // 3. A claim against an ISRC BMAT has no record of. This is the shape a real
+  // 3. A claim against an ISRC East Sound has no record of. This is the shape a real
   //    registry sees constantly: a publisher asserting rights over a code that
   //    was never delivered to the CMO.
   disputes.push({
@@ -279,7 +279,7 @@ export function buildDisputes(sheets: SplitSheet[], now: Date = new Date()): Rig
     overlapPct: 100,
     headline: "Two publishers claiming 100% mechanical rights for ISRC UG-A01-26-00012",
     detail:
-      "Both A01 Records and Pearl Rights Admin assert the whole mechanical right, and BMAT holds no delivered master under this ISRC. With no reference recording to fingerprint against, neither claim can be verified — the work has to be delivered and matched before either party is paid.",
+      "Both A01 Records and Pearl Rights Admin assert the whole mechanical right, and East Sound holds no delivered master under this ISRC. With no reference recording to fingerprint against, neither claim can be verified — the work has to be delivered and matched before either party is paid.",
     raisedAt: new Date(now.getTime() - 86_400_000 * 1).toISOString(),
     external: true,
   });
