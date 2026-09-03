@@ -10,7 +10,7 @@ import type { Track } from "@/lib/types";
 /**
  * Tiny file-backed catalogue store.
  *
- * BMAT has no database wired up yet, so track rows live in `.data/tracks.json`
+ * East Sound has no database wired up yet, so track rows live in `.data/tracks.json`
  * and delivered masters in `.data/uploads/`. Both are gitignored. The read/write
  * surface here is intentionally the same shape a real repository would expose,
  * so swapping in Postgres/Prisma later is a one-file change.

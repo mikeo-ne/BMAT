@@ -135,7 +135,7 @@ describe("searchCatalogue", () => {
   it("matches on title, artist and ISRC", () => {
     expect(searchCatalogue(CATALOGUE, "Nkwagala").length).toBeGreaterThan(0);
     expect(searchCatalogue(CATALOGUE, "Ray Bwete").length).toBeGreaterThan(0);
-    expect(searchCatalogue(CATALOGUE, "UG-BMT-26-00007").length).toBe(1);
+    expect(searchCatalogue(CATALOGUE, "UG-ESD-26-00007").length).toBe(1);
   });
 
   it("is case-insensitive and trims", () => {

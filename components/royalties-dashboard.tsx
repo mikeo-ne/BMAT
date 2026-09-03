@@ -162,7 +162,7 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
               type="button"
               className="btn btn-ghost"
               onClick={() =>
-                downloadCsv(`bmat-royalty-statements-${stamp()}.csv`, statementsToCsv(statements))
+                downloadCsv(`east-sound-royalty-statements-${stamp()}.csv`, statementsToCsv(statements))
               }
             >
               Download statements
@@ -170,7 +170,7 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={() => downloadCsv(`bmat-payout-batches-${stamp()}.csv`, batchesToCsv(batches))}
+              onClick={() => downloadCsv(`east-sound-payout-batches-${stamp()}.csv`, batchesToCsv(batches))}
             >
               Download batches
             </button>

@@ -313,7 +313,7 @@ export interface AirtimeAlert {
  *
  * "Missed" is a hard breach — the spot never aired. "Off-window" and
  * "unverified" are softer: the spot ran, but not where the contract says or not
- * where BMAT could prove it.
+ * where East Sound could prove it.
  */
 export function buildAirtimeAlerts(
   campaigns: AdCampaign[],

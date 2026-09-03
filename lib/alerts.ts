@@ -35,7 +35,7 @@ export interface AlertRule {
   label: string;
   channels: ChannelId[];
   enabled: boolean;
-  /** Only fire for plays BMAT could fingerprint against the catalogue. */
+  /** Only fire for plays East Sound could fingerprint against the catalogue. */
   verifiedOnly: boolean;
 }
 
@@ -113,7 +113,7 @@ export interface AlertEvent {
   message: string;
 }
 
-const SIGNATURES = ["EastSound", "BMAT Fingerprint", "the UPRS registry"];
+const SIGNATURES = ["the East Sound panel", "East Sound Fingerprint", "the UPRS registry"];
 
 /**
  * Deterministic play events for the rules that are switched on.
@@ -185,7 +185,7 @@ export function simulateAlertEvents(
  * The push copy, in the shape the product ships.
  *
  * `🔥 AIRPLAY ALERT: Your track 'Katono' was just played on Capital FM
- * (91.3 Kampala) at 15:42 EAT! Verified by EastSound.`
+ * (91.3 Kampala) at 15:42 EAT! Verified by the East Sound panel.`
  */
 export function whatsappMessage(title: string, station: StationRef, atIso: string): string {
   const signature = SIGNATURES[hashSeed(`${title}:${station.id}`) % SIGNATURES.length];
@@ -193,7 +193,7 @@ export function whatsappMessage(title: string, station: StationRef, atIso: strin
   return `🔥 AIRPLAY ALERT: Your track '${title}' was just played on ${station.name} (${freq}${station.hub}) at ${formatEatClock(atIso)}! Verified by ${signature}.`;
 }
 
-/** Same event, when BMAT could not fingerprint the playout. */
+/** Same event, when East Sound could not fingerprint the playout. */
 export function unverifiedMessage(title: string, station: StationRef, atIso: string): string {
   const freq = station.frequency === "—" ? "" : `${station.frequency.replace(" MHz", "")} `;
   return `⚠️ UNVERIFIED AIRPLAY: A play resembling '${title}' was logged on ${station.name} (${freq}${station.hub}) at ${formatEatClock(atIso)}, but no fingerprint match was returned. Not billable until resolved.`;
@@ -213,6 +213,6 @@ export function webhookPayload(event: AlertEvent): Record<string, unknown> {
       hub: event.station.hub,
     },
     verified: event.verified,
-    source: "bmat",
+    source: "east-sound",
   };
 }

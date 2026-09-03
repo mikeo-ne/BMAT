@@ -51,8 +51,8 @@ export function registrantCode(registrant?: string): string {
 
   if (cleaned.length > 0) return cleaned.padEnd(3, "X");
 
-  // No registrant supplied yet -> BMAT placeholder block.
-  return "BMT";
+  // No registrant supplied yet -> East Sound placeholder block.
+  return "ESD";
 }
 
 export function padDesignation(designation: number): string {
@@ -117,7 +117,7 @@ export function checkIsrc(value: string): IsrcCheck {
     return {
       valid: false,
       canonical: null,
-      message: "Expected CC-XXX-YY-NNNNN, e.g. UG-BMT-26-00001.",
+      message: "Expected CC-XXX-YY-NNNNN, e.g. UG-ESD-26-00001.",
     };
   }
 

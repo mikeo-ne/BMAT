@@ -16,7 +16,7 @@ const NOW = new Date("2026-09-03T00:00:00Z");
 /**
  * Guard rails for the mock data.
  *
- * The fixture panel and catalogue are what make BMAT legible as a Ugandan
+ * The fixture panel and catalogue are what make East Sound legible as a Ugandan
  * product rather than a generic dashboard, so these tests fail loudly if a
  * station loses its hub, a region goes unrepresented, or a track ships without
  * a genre.

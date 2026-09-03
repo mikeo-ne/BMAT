@@ -1,7 +1,7 @@
 /**
  * The synthesized monitor feed.
  *
- * BMAT cannot reach live broadcast streams from this environment, so the audio
+ * East Sound cannot reach live broadcast streams from this environment, so the audio
  * widget plays a locally generated stand-in for a station's incoming feed. It is
  * real Web Audio: the same `AnalyserNode` that feeds the waveform visualizer is
  * in the signal path, so the picture on screen is the sound you hear rather than

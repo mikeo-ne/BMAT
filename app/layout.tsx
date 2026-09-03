@@ -5,11 +5,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "BMAT — Broadcast Music Analytics",
-    template: "%s · BMAT",
+    default: "East Sound",
+    template: "%s · East Sound",
   },
   description:
-    "BMAT measures music airplay across Uganda's FM panel and gives artists, labels and stations one shared source of truth for spins.",
+    "East Sound measures music airplay across Uganda's FM panel and gives artists, labels and stations one shared source of truth for spins.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

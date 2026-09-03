@@ -26,7 +26,7 @@ export interface GeoHub {
 }
 
 /**
- * The hubs BMAT reads airplay across — the five Ugandan cities the panel is
+ * The hubs East Sound reads airplay across — the five Ugandan cities the panel is
  * worked to, plus the two cross-border markets Ugandan records break into first.
  */
 export const GEO_HUBS: GeoHub[] = [

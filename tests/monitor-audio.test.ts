@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { audioContextAvailable, MonitorFeed } from "@/lib/monitor-audio";
 
 /**
- * The monitor feed is the only part of BMAT that talks to the Web Audio API, and
+ * The monitor feed is the only part of East Sound that talks to the Web Audio API, and
  * jsdom ships no AudioContext — so without this mock the synthesis graph is never
  * executed by the suite at all.
  */

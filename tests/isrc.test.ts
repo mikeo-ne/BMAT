@@ -24,10 +24,10 @@ describe("registrantCode", () => {
     expect(registrantCode("Ab")).toBe("ABX");
   });
 
-  it("returns the BMAT placeholder block when nothing is supplied", () => {
-    expect(registrantCode()).toBe("BMT");
-    expect(registrantCode("")).toBe("BMT");
-    expect(registrantCode("   ")).toBe("BMT");
+  it("returns the East Sound placeholder block when nothing is supplied", () => {
+    expect(registrantCode()).toBe("ESD");
+    expect(registrantCode("")).toBe("ESD");
+    expect(registrantCode("   ")).toBe("ESD");
   });
 
   it("is deterministic", () => {
@@ -85,8 +85,8 @@ describe("generateIsrc", () => {
 
 describe("isValidIsrc / normaliseIsrc", () => {
   it.each([
-    "UG-BMT-26-00001",
-    "UGBMT2600001",
+    "UG-ESD-26-00001",
+    "UGESD2600001",
     " ug-bmt-26-00001 ",
     "GB-ABC-99-12345",
   ])("accepts %s", (value) => {
@@ -95,17 +95,17 @@ describe("isValidIsrc / normaliseIsrc", () => {
 
   it.each([
     "",
-    "UG-BMT-26-0001", // designation too short
+    "UG-ESD-26-0001", // designation too short
     "UG-BM-26-00001", // registrant too short
     "U-BMT-26-00001", // country too short
-    "UG-BMT-2A-00001", // non-numeric year
+    "UG-ESD-2A-00001", // non-numeric year
     "not-an-isrc",
   ])("rejects %s", (value) => {
     expect(isValidIsrc(value)).toBe(false);
   });
 
   it("normalises to the hyphenated form", () => {
-    expect(normaliseIsrc("ugbmt2600001")).toBe("UG-BMT-26-00001");
+    expect(normaliseIsrc("ugesd2600001")).toBe("UG-ESD-26-00001");
     expect(normaliseIsrc("nope")).toBeNull();
   });
 });

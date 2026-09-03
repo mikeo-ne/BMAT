@@ -1,4 +1,4 @@
-# Deploy the read-only BMAT showcase to GitHub Pages.
+# Deploy the read-only East Sound showcase to GitHub Pages.
 #
 # GitHub Pages cannot run the Node server (API routes, SSR, the .data store),
 # so this builds a static export via scripts/build-static.sh and publishes it.

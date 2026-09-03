@@ -1,4 +1,4 @@
-// BMAT — persistence target for the prototype.
+// East Sound — persistence target for the prototype.
 //
 // The running prototype keeps its catalogue in `.data/tracks.json` behind
 // lib/store.ts, whose read/write surface already mirrors a real repository so
