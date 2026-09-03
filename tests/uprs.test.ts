@@ -206,7 +206,18 @@ describe("applyFilters", () => {
 
     const result = applyFilters(LEDGER, filters);
     expect(result.length).toBeGreaterThan(0);
-    expect(result.every((r) => r.id === row.id)).toBe(true);
+
+    // A member can hold several works, so the intersection is over the four
+    // dimensions rather than a single row id.
+    expect(
+      result.every(
+        (r) =>
+          r.stationId === row.stationId &&
+          r.region === row.region &&
+          r.period === row.period &&
+          r.memberId === row.memberId,
+      ),
+    ).toBe(true);
   });
 
   it("returns nothing for an impossible combination", () => {

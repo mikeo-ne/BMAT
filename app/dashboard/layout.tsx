@@ -23,6 +23,36 @@ const NAV = [
     hint: "UPRS ledger & royalty splits",
     status: "live" as const,
   },
+  {
+    href: "/dashboard/splits",
+    label: "Rights & Splits",
+    hint: "Ownership, sign-off, disputes",
+    status: "live" as const,
+  },
+  {
+    href: "/dashboard/advertisers",
+    label: "Ad Campaign Auditor",
+    hint: "Booked vs verified airtime",
+    status: "live" as const,
+  },
+  {
+    href: "/dashboard/mix-parser",
+    label: "Mix Parser",
+    hint: "Transitions & unknown audio",
+    status: "live" as const,
+  },
+  {
+    href: "/dashboard/analytics/regional",
+    label: "Regional Analytics",
+    hint: "Geography & hit velocity",
+    status: "live" as const,
+  },
+  {
+    href: "/dashboard/alerts",
+    label: "Airplay Alerts",
+    hint: "WhatsApp, email, webhooks",
+    status: "live" as const,
+  },
   { href: "/dashboard/charts", label: "National Charts", hint: "Weekly Top 100", status: "soon" as const },
   { href: "/dashboard/royalties", label: "Royalties", hint: "Distribution & payouts", status: "soon" as const },
 ];

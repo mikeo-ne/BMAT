@@ -77,8 +77,8 @@ describe("nextDesignation / suggestIsrc", () => {
   });
 
   it("continues after the highest designation already used", () => {
-    // Seeded demo rows occupy UG-BMT-26-00001..00006.
-    expect(nextDesignation(tracks, "UG-BMT-26-00001")).toBe(7);
+    // Seeded demo rows occupy UG-BMT-26-00001..00007.
+    expect(nextDesignation(tracks, "UG-BMT-26-00001")).toBe(8);
   });
 
   it("ignores other years of the same registrant", () => {

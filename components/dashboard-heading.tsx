@@ -7,6 +7,11 @@ const TITLES: Record<string, string> = {
   "/dashboard/artist": "Artist & Label Portal",
   "/dashboard/monitoring": "Live Station Monitor",
   "/dashboard/cmo": "CMO & Regulatory Audit",
+  "/dashboard/splits": "Rights & Split-Sheet Management",
+  "/dashboard/advertisers": "Ad Campaign Auditor",
+  "/dashboard/mix-parser": "Unidentified Audio & DJ Mix Parser",
+  "/dashboard/analytics/regional": "Airplay Geography & Hit Velocity",
+  "/dashboard/alerts": "Live Airplay Alerts & Webhooks",
 };
 
 /** Topbar title, derived from the active route. */

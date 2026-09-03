@@ -1,17 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  formatBytes,
-  formatCompact,
-  formatDate,
-  formatDuration,
-  formatNumber,
-  formatPercent,
-  initials,
-  isValidIsoDate,
-  lastNDaysIso,
-  todayIso,
-} from "@/lib/format";
+import { formatBytes, formatCompact, formatDate, formatDuration, formatNumber, formatPercent, initials, isValidIsoDate, lastNDaysIso, todayIso, formatShare } from "@/lib/format";
 
 describe("formatNumber / formatCompact", () => {
   it("groups thousands", () => {
@@ -98,5 +87,26 @@ describe("initials", () => {
   it("takes up to two initials", () => {
     expect(initials("Boda Boda Anthem")).toBe("BB");
     expect(initials("Nile")).toBe("N");
+  });
+});
+
+describe("formatShare", () => {
+  it("renders a 0-1 ratio as an unsigned percentage", () => {
+    expect(formatShare(0.729)).toBe("73%");
+    expect(formatShare(0.729, 1)).toBe("72.9%");
+    expect(formatShare(0.5)).toBe("50%");
+    expect(formatShare(1)).toBe("100%");
+    expect(formatShare(0)).toBe("0%");
+  });
+
+  it("never signs a level, unlike formatPercent", () => {
+    expect(formatShare(0.85)).toBe("85%");
+    expect(formatPercent(0.85, 0)).toBe("+85%");
+  });
+
+  it("falls back for null and non-finite input", () => {
+    expect(formatShare(null)).toBe("—");
+    expect(formatShare(Number.NaN)).toBe("—");
+    expect(formatShare(Number.POSITIVE_INFINITY)).toBe("—");
   });
 });

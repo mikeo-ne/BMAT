@@ -3,10 +3,12 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { CmoTable } from "@/components/cmo-table";
+import { DisputeAlerts } from "@/components/dispute-alerts";
 import { DistributionReport } from "@/components/distribution-report";
 import { ActiveFilterChips, MultiSelect } from "@/components/multi-select";
 import { formatNumber, formatPeriod, lastNMonths } from "@/lib/format";
 import { REGIONS } from "@/lib/regions";
+import type { RightsDispute } from "@/lib/splits";
 import {
   applyFilters,
   buildMembers,
@@ -26,6 +28,8 @@ import type { Track } from "@/lib/types";
 interface CmoAuditProps {
   catalogue: Track[];
   now: string;
+  /** Open rights disputes for the CMO to clear before paying. */
+  disputes?: RightsDispute[];
 }
 
 /** Triggers a browser download for a generated CSV string. */
@@ -45,7 +49,7 @@ function downloadCsv(fileName: string, csv: string): void {
 
 const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
 
-export function CmoAudit({ catalogue, now }: CmoAuditProps) {
+export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
   const referenceDate = useMemo(() => new Date(now), [now]);
 
   const ledger = useMemo(
@@ -290,6 +294,14 @@ export function CmoAudit({ catalogue, now }: CmoAuditProps) {
 
       {/* Keyed on the filters so a new selection starts back on page one. */}
       <CmoTable rows={filtered} key={JSON.stringify(filters)} />
+
+      {disputes ? (
+        <DisputeAlerts
+          disputes={disputes}
+          heading="Dispute resolution"
+          intro="Overlapping ISRC registrations and unexecutable split sheets. Royalties on an affected recording are held until the claim is cleared."
+        />
+      ) : null}
 
       <p className="pb-2 text-center text-[11px] text-muted">
         Flat rates applied: {Object.values(TARIFF).map((t) => `${t.label} ${t.ugxPerPlay}`).join(" · ")}{" "}

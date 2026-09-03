@@ -15,6 +15,17 @@ export function formatPercent(value: number | null, digits = 1): string {
   return `${sign}${(value * 100).toFixed(digits)}%`;
 }
 
+/**
+ * A 0-1 ratio as a plain percentage, unsigned.
+ *
+ * Distinct from `formatPercent`, which signs positives and is meant for
+ * deltas. Use this for levels such as fulfilment or share of total.
+ */
+export function formatShare(ratio: number | null, digits = 0): string {
+  if (ratio === null || !Number.isFinite(ratio)) return "—";
+  return `${(ratio * 100).toFixed(digits)}%`;
+}
+
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB"];
@@ -155,4 +166,29 @@ export function formatCurrency(value: number, digits = 0): string {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(value);
+}
+
+/* -------------------------------------------------------------------------- */
+/* East Africa Time                                                            */
+/* -------------------------------------------------------------------------- */
+
+/** Uganda, Kenya and Tanzania all run UTC+3 with no daylight saving. */
+export const EAT_OFFSET_HOURS = 3;
+
+/** Shift a UTC timestamp into EAT wall-clock time. */
+export function toEat(iso: string | Date, from: Date = new Date(iso)): Date {
+  return new Date(from.getTime() + EAT_OFFSET_HOURS * 3_600_000);
+}
+
+/** "15:42 EAT" — the wall clock an operator in Kampala reads. */
+export function formatEatClock(iso: string): string {
+  const d = toEat(iso);
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${hh}:${mm} EAT`;
+}
+
+/** Hour of day (0-23) in EAT, for time-of-day bucketing. */
+export function eatHour(iso: string): number {
+  return toEat(iso).getUTCHours();
 }

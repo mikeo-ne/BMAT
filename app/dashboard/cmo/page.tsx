@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { CmoAudit } from "@/components/cmo-audit";
+import { buildDisputes, buildSplitSheets } from "@/lib/splits";
 import { readTracks } from "@/lib/store";
 
 export const metadata: Metadata = {
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CmoAuditPage() {
   const catalogue = await readTracks();
+  const disputes = buildDisputes(buildSplitSheets(catalogue));
 
-  return <CmoAudit catalogue={catalogue} now={new Date().toISOString()} />;
+  return <CmoAudit catalogue={catalogue} now={new Date().toISOString()} disputes={disputes} />;
 }

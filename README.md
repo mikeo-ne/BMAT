@@ -59,6 +59,96 @@ Both are generated client-side and prefixed with a UTF-8 BOM so Excel reads them
 
 ---
 
+## Ad Campaign Auditor — `/dashboard/advertisers`
+
+Advertisers book airtime and BMAT audits it against fingerprinted playout.
+
+- **Campaign creation** — upload the jingle as an MP3 and set the contract in the
+  shape a media buyer writes it: *5x daily between 06:00 and 10:00 on Capital FM, for 14 days*.
+  Validated on MP3 type, a 12 MB ceiling, a window that closes after it opens, and 1-12 spots a day.
+- **Compliance gauge** — a 270° SVG dial of verified in-window spots against contracted spots, with
+  the breached and never-aired counts alongside. Pure SVG, so it is deterministic in SSR.
+- **Time-of-day heatmap** — station × hour grid in East Africa Time. Cells inside the contracted
+  window are tinted differently from cells outside it, so an off-window buy is visible at a glance.
+- **Fraud / missed-airtime queue** — three breach types, worst first. *Missed* is a hard breach (the
+  spot never aired); *off-window* and *unverified* ran but cannot be billed as booked.
+
+Slots are generated deterministically per campaign ([`lib/advertising.ts`](lib/advertising.ts)), so a
+campaign always audits the same way. Campaigns booked through the form live in component state —
+there is no server round-trip yet, so a refresh returns to the four seeded buys.
+
+---
+
+## Unidentified Audio & DJ Mix Parser — `/dashboard/mix-parser`
+
+- **60-minute timeline** — a seekable SVG waveform over a downsampled amplitude envelope, with each
+  segment tinted by what the parser made of it. Click to seek, play to advance the playhead.
+- **Transition markers** — every music hand-over is marked and listed with both sides named, and any
+  gap over three seconds is flagged as dead air.
+- **Unidentified segment queue** — anything under the 60% confidence floor, with its confidence bar.
+  An unidentified play is a royalty nobody is being paid for, so the queue is a work list.
+- **A&R tagging modal** — listen to a 10-second excerpt, search the catalogue by title, artist or
+  ISRC, and link the clip. Each link keeps the confidence the parser originally returned, which is
+  what would let the matcher be retrained.
+
+> The hour is generated deterministically per station and the excerpt is synthesised locally through
+> the same `MonitorFeed` the station grid uses. There is no captured stream and no reference index,
+> so nothing here is a recognition result.
+
+---
+
+## Rights & Split-Sheet Management — `/dashboard/splits`
+
+- **Ownership donut** — shares drawn against 100 rather than against the sheet total, so a sheet
+  that over-allocates visibly overflows instead of quietly renormalising. Hover a slice to isolate it.
+- **Collaboration approvals** — who has signed, by which channel and when, with per-party reminders.
+  A sheet is executable only when every collaborator has signed.
+- **Dispute resolution** — the CMO queue appears both here and inside
+  [`/dashboard/cmo`](app/dashboard/cmo/page.tsx), because a sheet cannot be executed while its
+  registration is contested. Three shapes: two parties each claiming the whole of one right, a sheet
+  totalling more than 100%, and a claim against an ISRC with no delivered recording — which cannot be
+  verified at all until the work is delivered and matched.
+
+---
+
+## Airplay Geography & Hit Velocity — `/dashboard/analytics/regional`
+
+- **Hub map** — Kampala, Jinja, Mbarara, Gulu and Mbale plus Nairobi and Dar es Salaam, plotted by
+  longitude and latitude with marker radius tracking the week's spins. Click a hub to filter.
+- **Track velocity** — radio spin growth over 7 days against a streaming-search index. Radio leading
+  search usually means station push; search leading radio is the shape of an organic breakout.
+- **A&R hit predictor** — tracks over 50 spins this week in a *secondary* market while Kampala is
+  still quiet. That is the Ugandan break pattern: Gulu, Mbale or Mbarara first, Kampala two or three
+  weeks later.
+
+> Cross-border demand is **modelled, not measured** — BMAT has no Nairobi or Dar es Salaam panel. Hub
+> spins are apportioned from the domestic airplay model by reach, and the search index is a synthetic
+> proxy.
+
+---
+
+## Live Airplay Alerts & Webhooks — `/dashboard/alerts`
+
+- **Notification triggers** — per track or per station, toggle WhatsApp, email and webhook
+  independently. A rule with no channels stays enabled but fires nowhere, which is how an operator
+  mutes one record without deleting the subscription.
+- **Simulated handset** — a phone frame showing the pushes as they land, revealed one at a time on a
+  timer rather than all at once, because the point is what an artist experiences. The copy comes from
+  `whatsappMessage` — the same function a real gateway would call:
+
+  > 🔥 AIRPLAY ALERT: Your track 'Katono' was just played on Capital FM (91.3 Kampala) at 15:42 EAT!
+  > Verified by the UPRS registry.
+
+- **Delivery log** — the same events as they would arrive over email and webhook, with the JSON body
+  a webhook subscriber receives.
+
+Times render in East Africa Time (UTC+3) via `formatEatClock`, even though the ledger stores UTC.
+
+> Play events are generated deterministically from the rule set. No WhatsApp Business API, SMTP or
+> webhook endpoint is connected, and nothing leaves the browser.
+
+---
+
 ## Live Station Monitor
 
 ### Station grid
@@ -239,6 +329,26 @@ components/
   detection-feed.tsx       timestamped fingerprint matches
   cmo-audit.tsx            filter state, report generation, CSV export
   cmo-table.tsx            sortable/paginated enterprise ledger table
+  dispute-alerts.tsx       overlapping ISRC registrations (splits + CMO)
+  ad-auditor.tsx           campaign state, gauge, heatmap, breach queue
+  campaign-form.tsx        jingle upload + contract terms
+  compliance-gauge.tsx     contracted vs verified dial
+  hour-heatmap.tsx         station x hour airtime grid
+  airtime-alerts.tsx       missed and breached slots
+  mix-parser-view.tsx      station, playhead, tagging state
+  mix-timeline.tsx         60-minute seekable SVG waveform
+  unidentified-queue.tsx   sub-threshold segments
+  tagging-modal.tsx        10s excerpt + catalogue search + link
+  split-manager.tsx        sheet selector, pie, approvals
+  split-pie.tsx            ownership donut
+  split-approvals.tsx      sign-off status and reminders
+  regional-analytics.tsx   hub selection, velocity, predictor
+  hub-map.tsx              lon/lat hub plot
+  velocity-chart.tsx       spins vs search index
+  hit-predictor.tsx        emerging secondary-market tracks
+  alerts-view.tsx          rules, events, webhook log
+  alert-settings.tsx       per-target channel toggles
+  whatsapp-simulator.tsx   simulated handset
   multi-select.tsx         searchable multi-select + filter chips
   distribution-report.tsx  royalty pool, tier breakdown, member allocation
 lib/
@@ -251,6 +361,11 @@ lib/
   monitor-audio.ts         synthesized monitor feed (Web Audio)
   audio-fingerprint.ts     pure spectral landmark extraction
   uprs.ts                  memberships, tariff, ledger, report, CSV
+  advertising.ts           contracts, slots, compliance, heatmap, breaches
+  mix-parser.ts            timeline, transitions, queue, waveform, search
+  splits.ts                split sheets, sign-off, rights disputes
+  geography.ts             hubs, hub metrics, velocity, hit predictor
+  alerts.ts                channels, rules, events, push copy
   format.ts  types.ts  upload.ts
 tests/                     vitest unit + component tests
 ```

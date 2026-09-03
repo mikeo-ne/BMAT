@@ -116,6 +116,21 @@ const SEED_ROWS: SeedRow[] = [
     status: "live",
     daysAgo: 58,
   },
+  {
+    id: "trk_07",
+    title: "Katono",
+    primaryArtist: "Ray Bwete",
+    featuredArtists: ["Doreen Achieng"],
+    genre: "Luganda pop",
+    releaseDate: "2026-07-19",
+    isrc: "UG-BMT-26-00007",
+    fileName: "Ray Bwete - Katono.mp3",
+    format: "MP3",
+    sizeBytes: 7_442_180,
+    durationSec: 214,
+    status: "live",
+    daysAgo: 46,
+  },
 ];
 
 export function buildSeedTracks(now: Date = new Date()): Track[] {
