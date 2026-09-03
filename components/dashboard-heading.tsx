@@ -6,6 +6,7 @@ const TITLES: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/dashboard/artist": "Artist & Label Portal",
   "/dashboard/monitoring": "Live Station Monitor",
+  "/dashboard/cmo": "CMO & Regulatory Audit",
 };
 
 /** Topbar title, derived from the active route. */

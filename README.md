@@ -7,6 +7,55 @@ Currently built:
 
 - **Artist & Label Portal** — [`/dashboard/artist`](app/dashboard/artist/page.tsx)
 - **Live Station Monitor** — [`/dashboard/monitoring`](app/dashboard/monitoring/page.tsx)
+- **CMO & Regulatory Audit** — [`/dashboard/cmo`](app/dashboard/cmo/page.tsx)
+
+---
+
+## CMO & Regulatory Audit
+
+An enterprise ledger for **UPRS** (Uganda Performing Right Society) built from the same catalogue and
+airplay model the artist portal uses. See [`lib/uprs.ts`](lib/uprs.ts).
+
+### The ledger
+
+`buildPlayLedger` expands the catalogue into aggregated **member × station × period** rows:
+
+1. each recording's regional 14-day spins are annualised to a month,
+2. scaled by the campaign factor for that month, so history peaks near release and decays as catalogue,
+3. split across each region's reporting stations in proportion to reach,
+4. then divided between the rights holders on the recording.
+
+Nothing accrues before a recording's release date. ~638 rows across 29 stations and 6 periods on the
+seeded catalogue.
+
+**Distribution policy** — primary artist 60%, featured artists split the remaining 40% equally; a
+solo recording takes 100%.
+
+### Filters
+
+Four multi-select dropdowns, each with search, select-all and clear:
+
+- **Station** — every reporting station, hint shows its region and tariff tier
+- **Region** — Central / Eastern / Western / Northern
+- **Date range** — the reporting months present in the ledger
+- **Artist Membership ID** — every rights holder, with their work count
+
+Empty means "no constraint". Active filters appear as removable chips.
+
+### Distribution report
+
+**Generate Distribution Report** computes over the filtered rows and shows total play count, the
+estimated royalty pool in UGX and indicative USD, members payable, a flat-rate breakdown by station
+tier, a per-region split, and a per-member allocation table sorted by amount with each member's share
+of the pool.
+
+Two CSV downloads — the full ledger behind the report, and the summary plus per-member allocation.
+Both are generated client-side and prefixed with a UTF-8 BOM so Excel reads them correctly.
+
+> **The tariff is a placeholder.** `TARIFF`, `DISTRIBUTION_POLICY` and `UGX_PER_USD` in
+> [`lib/uprs.ts`](lib/uprs.ts) are invented to make the arithmetic visible end to end. They are **not**
+> the published UPRS schedule. The report says so on the page and in the CSV header. Replace them
+> before any figure reaches a member or a licensee.
 
 ---
 
@@ -103,7 +152,7 @@ npm run dev          # http://localhost:3000 → redirects to /dashboard/artist
 ```
 
 ```bash
-npm test             # vitest, 166 tests
+npm test             # vitest, 231 tests
 npm run typecheck    # next typegen && tsc --noEmit
 npm run lint         # eslint
 npm run build        # production build
@@ -140,6 +189,7 @@ app/
   dashboard/
     artist/page.tsx        the portal (server component, reads the catalogue)
     monitoring/page.tsx    live station monitor
+    cmo/page.tsx           UPRS audit ledger
     layout.tsx             sidebar + topbar shell
   api/tracks/              route handlers
 components/
@@ -152,6 +202,10 @@ components/
   station-card.tsx         status, player, waveform, last-detected badge
   waveform.tsx             canvas oscilloscope driven by the AnalyserNode
   detection-feed.tsx       timestamped fingerprint matches
+  cmo-audit.tsx            filter state, report generation, CSV export
+  cmo-table.tsx            sortable/paginated enterprise ledger table
+  multi-select.tsx         searchable multi-select + filter chips
+  distribution-report.tsx  royalty pool, tier breakdown, member allocation
 lib/
   isrc.ts                  ISRC generation, validation, parsing
   airplay.ts               seeded airplay model
@@ -160,6 +214,7 @@ lib/
   regions.ts               Uganda regions + FM station panel
   monitoring.ts            monitored panel, telemetry, fingerprint matching
   monitor-audio.ts         synthesized monitor feed (Web Audio)
+  uprs.ts                  memberships, tariff, ledger, report, CSV
   format.ts  types.ts  upload.ts
 tests/                     vitest unit + component tests
 ```
@@ -170,3 +225,6 @@ Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS 4 �
 
 Geist is self-hosted via the `geist` package (`next/font/local`) so builds do not depend on
 `fonts.googleapis.com` being reachable.
+
+`next.config.ts` sets `allowedDevOrigins: ["*.e2b.app"]` so the sandboxed live preview can reach
+Next's dev-only resources; without it Next 16 blocks them as cross-origin with a 403.

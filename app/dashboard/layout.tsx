@@ -17,6 +17,12 @@ const NAV = [
     hint: "Fingerprint the broadcast panel",
     status: "live" as const,
   },
+  {
+    href: "/dashboard/cmo",
+    label: "CMO & Regulatory Audit",
+    hint: "UPRS ledger & royalty splits",
+    status: "live" as const,
+  },
   { href: "/dashboard/charts", label: "National Charts", hint: "Weekly Top 100", status: "soon" as const },
   { href: "/dashboard/royalties", label: "Royalties", hint: "Distribution & payouts", status: "soon" as const },
 ];

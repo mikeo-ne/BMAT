@@ -127,3 +127,32 @@ export function formatLatency(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) return "—";
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`;
 }
+
+/** Last n calendar months as "YYYY-MM", oldest first, ending with this month. */
+export function lastNMonths(n: number, from: Date = new Date()): string[] {
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() - (n - 1 - i), 1));
+    return d.toISOString().slice(0, 7);
+  });
+}
+
+/** "2026-08" -> "Aug 2026" */
+export function formatPeriod(period: string): string {
+  const parsed = new Date(`${period}-01T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return period;
+  return parsed.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+/** "2026-08-01T00:00:00Z" for the first day of a "YYYY-MM" period. */
+export function periodStartIso(period: string): string {
+  return `${period}-01T00:00:00Z`;
+}
+
+/** 1234567.891 -> "1,234,567.89" */
+export function formatCurrency(value: number, digits = 0): string {
+  if (!Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+}
