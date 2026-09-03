@@ -19,6 +19,8 @@ describe("prisma schema", () => {
       "RadioStation",
       "AirplayMatch",
       "RoyaltyReport",
+      "RoyaltyStatement",
+      "PayoutBatch",
       "AdCampaign",
     ]) {
       expect(models, `missing model ${name}`).toContain(name);
@@ -44,5 +46,21 @@ describe("prisma schema", () => {
       const isrc = model.fields.find((f) => f.name === "isrc")!;
       expect(isrc.isUnique, `${modelName}.isrc must be unique`).toBe(true);
     }
+  });
+
+  it("links royalty statements to reports and payout batches", async () => {
+    const datamodel = readFileSync(new URL("../prisma/schema.prisma", import.meta.url), "utf8");
+    const dmmf = await getDMMF({ datamodel });
+
+    const statement = dmmf.datamodel.models.find((m) => m.name === "RoyaltyStatement")!;
+    const batch = dmmf.datamodel.models.find((m) => m.name === "PayoutBatch")!;
+
+    const statementRels = statement.fields.filter((f) => f.relationName).map((f) => f.type);
+    expect(statementRels).toContain("RoyaltyReport");
+    expect(statementRels).toContain("PayoutBatch");
+
+    const batchRels = batch.fields.filter((f) => f.relationName).map((f) => f.type);
+    expect(batchRels).toContain("RoyaltyStatement");
+    expect(batchRels).toContain("User");
   });
 });

@@ -59,7 +59,12 @@ const NAV = [
     hint: "Weekly airplay Top 100",
     status: "live" as const,
   },
-  { href: "/dashboard/royalties", label: "Royalties", hint: "Distribution & payouts", status: "soon" as const },
+  {
+    href: "/dashboard/royalties",
+    label: "Royalties",
+    hint: "Distribution & payouts",
+    status: "live" as const,
+  },
 ];
 
 export default function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
