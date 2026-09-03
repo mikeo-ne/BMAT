@@ -45,11 +45,15 @@ jobs:
           path: .static-build/out
 
   deploy:
+    # GitHub Pages only permits deploys from the default branch. Pushes to the
+    # working branch still run `build` (verifying the export compiles) but must
+    # not attempt a deploy that the environment protection rules will reject.
+    if: github.ref == 'refs/heads/main'
+    needs: build
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
