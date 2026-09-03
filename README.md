@@ -3,7 +3,49 @@
 **Broadcast Music Analytics** — measures music airplay across Uganda's FM panel and gives artists,
 labels and stations one shared source of truth for spins.
 
-This repository currently contains the **Artist & Label Portal** at [`/dashboard/artist`](app/dashboard/artist/page.tsx).
+Currently built:
+
+- **Artist & Label Portal** — [`/dashboard/artist`](app/dashboard/artist/page.tsx)
+- **Live Station Monitor** — [`/dashboard/monitoring`](app/dashboard/monitoring/page.tsx)
+
+---
+
+## Live Station Monitor
+
+### Station grid
+
+Ten monitored Ugandan feeds — Capital FM 91.3, CBS FM 89.2, Galaxy FM 100.2, NBS TV (Ch. 34 DTT),
+KFM, Bukedde FM, Better FM, Radio West, Mega FM and Upcountry FM — spanning all four regions.
+Defined in [`lib/monitoring.ts`](lib/monitoring.ts).
+
+Each card carries:
+
+- **Live status indicator** — `Live` / `Degraded` / `Offline` with feed latency and 24h uptime.
+  Telemetry is seeded per station and drifts every 2.5s, so the panel reads as live.
+- **Audio player widget** — transport, volume and a rolling signal-level history. One feed plays at
+  a time.
+- **Real-time waveform visualizer** — a canvas oscilloscope reading the `AnalyserNode` in the signal
+  path on every animation frame. It is the sound you hear, not an animation beside it; a paused
+  card settles to the baseline so idle cannot be mistaken for live.
+- **Last Detected Track badge** — title, artist, ISRC, confidence bar and detection time, or an
+  explicit "Unmatched audio — not in the catalogue" / "No detection yet".
+
+### Audio
+
+This environment cannot reach live broadcast streams, so the widget plays a locally synthesized
+stand-in for a station's feed ([`lib/monitor-audio.ts`](lib/monitor-audio.ts)): a pink-noise bed
+through a bandpass plus three LFO-modulated partials. Swapping in a real stream means pointing
+`start()` at a `<audio>` element via `createMediaElementSource` — nothing downstream changes.
+
+### Fingerprint scan
+
+**Run Audio Fingerprint Scan** walks the panel and appends detections to the live feed, one station
+at a time. Each entry carries a UTC timestamp, station name and frequency, track title, artist, ISRC,
+confidence, matched-window length and the matching method. Roughly one in eight falls below the 60%
+match threshold and is recorded as **unmatched** rather than dropped — unmatched audio is the signal
+that a delivery is missing from the catalogue. Stations whose feed is offline produce no detection.
+
+Matching is a pure, seeded function (`simulateScan`), so it is fully unit-tested.
 
 ---
 
@@ -61,7 +103,7 @@ npm run dev          # http://localhost:3000 → redirects to /dashboard/artist
 ```
 
 ```bash
-npm test             # vitest, 106 tests
+npm test             # vitest, 166 tests
 npm run typecheck    # next typegen && tsc --noEmit
 npm run lint         # eslint
 npm run build        # production build
@@ -97,6 +139,7 @@ the shape a real repository would, so moving to Postgres later is a one-file cha
 app/
   dashboard/
     artist/page.tsx        the portal (server component, reads the catalogue)
+    monitoring/page.tsx    live station monitor
     layout.tsx             sidebar + topbar shell
   api/tracks/              route handlers
 components/
@@ -105,12 +148,18 @@ components/
   track-metadata-form.tsx  the five metadata fields + ISRC generator
   catalog-table.tsx        sortable/searchable catalogue
   region-airplay-chart.tsx regional breakdown
+  station-monitor.tsx      monitor grid, telemetry drift, scan orchestration
+  station-card.tsx         status, player, waveform, last-detected badge
+  waveform.tsx             canvas oscilloscope driven by the AnalyserNode
+  detection-feed.tsx       timestamped fingerprint matches
 lib/
   isrc.ts                  ISRC generation, validation, parsing
   airplay.ts               seeded airplay model
   catalog.ts               track construction, seed rows, designation allocation
   store.ts                 file-backed catalogue store (server-only)
   regions.ts               Uganda regions + FM station panel
+  monitoring.ts            monitored panel, telemetry, fingerprint matching
+  monitor-audio.ts         synthesized monitor feed (Web Audio)
   format.ts  types.ts  upload.ts
 tests/                     vitest unit + component tests
 ```

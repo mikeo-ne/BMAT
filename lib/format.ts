@@ -95,3 +95,35 @@ export function initials(name: string): string {
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("") || "??";
 }
+
+/** "14:03:52" in UTC — detection feed timestamps. */
+export function formatClock(iso: string): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return "--:--:--";
+  return parsed.toISOString().slice(11, 19);
+}
+
+/** "just now", "3s ago", "4m ago", "2h ago", "3d ago". */
+export function timeAgo(iso: string, now: Date = new Date()): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return "—";
+
+  const seconds = Math.max(0, Math.round((now.getTime() - parsed.getTime()) / 1000));
+
+  if (seconds < 5) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86_400)}d ago`;
+}
+
+/** 0.87 -> "87%" */
+export function formatRatio(value: number, digits = 0): string {
+  if (!Number.isFinite(value)) return "—";
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+export function formatLatency(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "—";
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`;
+}

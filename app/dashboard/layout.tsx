@@ -1,6 +1,8 @@
 import Link from "next/link";
 
+import { DashboardHeading } from "@/components/dashboard-heading";
 import { PANEL_SIZE } from "@/lib/catalog";
+import { MONITORED_STATIONS, monitoredCount } from "@/lib/monitoring";
 
 const NAV = [
   {
@@ -9,7 +11,12 @@ const NAV = [
     hint: "Deliver masters, track spins",
     status: "live" as const,
   },
-  { href: "/dashboard/stations", label: "Station Reporting", hint: "Panel ingest health", status: "soon" as const },
+  {
+    href: "/dashboard/monitoring",
+    label: "Live Station Monitor",
+    hint: "Fingerprint the broadcast panel",
+    status: "live" as const,
+  },
   { href: "/dashboard/charts", label: "National Charts", hint: "Weekly Top 100", status: "soon" as const },
   { href: "/dashboard/royalties", label: "Royalties", hint: "Distribution & payouts", status: "soon" as const },
 ];
@@ -34,8 +41,7 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
               <Link
                 key={item.href}
                 href={item.href}
-                aria-current="page"
-                className="flex min-w-max flex-col rounded-lg border border-line bg-surface-2 px-3 py-2 lg:min-w-0"
+                className="flex min-w-max flex-col rounded-lg px-3 py-2 transition-colors hover:bg-surface-2 lg:min-w-0"
               >
                 <span className="text-sm font-medium text-foreground">{item.label}</span>
                 <span className="text-[11px] text-muted">{item.hint}</span>
@@ -66,7 +72,8 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
               Panel online
             </div>
             <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
-              {PANEL_SIZE} FM stations reporting across 4 regions.
+              {MONITORED_STATIONS.length} feeds monitored ({monitoredCount("FM")} FM,{" "}
+              {monitoredCount("TV")} TV) · {PANEL_SIZE} stations in the spin panel.
             </p>
           </div>
         </div>
@@ -74,12 +81,7 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-line bg-background/85 px-5 py-3 backdrop-blur lg:px-8">
-          <div className="min-w-0">
-            <p className="truncate text-xs uppercase tracking-[0.14em] text-muted">Dashboard</p>
-            <h1 className="truncate text-base font-semibold tracking-tight">
-              Artist &amp; Label Portal
-            </h1>
-          </div>
+          <DashboardHeading />
           <div className="flex items-center gap-3">
             <span className="hidden text-xs text-muted sm:inline">Nyege Nyege Tapes</span>
             <div
