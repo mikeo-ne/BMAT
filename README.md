@@ -8,6 +8,13 @@ Currently built:
 - **Artist & Label Portal** — [`/dashboard/artist`](app/dashboard/artist/page.tsx)
 - **Live Station Monitor** — [`/dashboard/monitoring`](app/dashboard/monitoring/page.tsx)
 - **CMO & Regulatory Audit** — [`/dashboard/cmo`](app/dashboard/cmo/page.tsx)
+- **Rights & Split-Sheet Management** — [`/dashboard/splits`](app/dashboard/splits/page.tsx)
+- **Ad Campaign Auditor** — [`/dashboard/advertisers`](app/dashboard/advertisers/page.tsx)
+- **Mix Parser** — [`/dashboard/mix-parser`](app/dashboard/mix-parser/page.tsx)
+- **Regional Analytics** — [`/dashboard/analytics/regional`](app/dashboard/analytics/regional/page.tsx)
+- **Airplay Alerts** — [`/dashboard/alerts`](app/dashboard/alerts/page.tsx)
+- **National Charts** — [`/dashboard/charts`](app/dashboard/charts/page.tsx)
+- **Royalties — Distribution & Payouts** — [`/dashboard/royalties`](app/dashboard/royalties/page.tsx)
 
 ---
 
@@ -304,12 +311,17 @@ npm run build        # production build
 
 ### API
 
-| Method   | Path                 | Purpose                                                      |
-| -------- | -------------------- | ------------------------------------------------------------ |
-| `GET`    | `/api/tracks`        | Catalogue rows                                               |
-| `POST`   | `/api/tracks`        | Deliver a master (`multipart/form-data`) — validates, stores, assigns airplay |
-| `PUT`    | `/api/tracks`        | Allocate the next free ISRC for a registrant + release year   |
-| `DELETE` | `/api/tracks/:id`    | Withdraw a track and delete its stored master                |
+| Method   | Path                            | Purpose                                                      |
+| -------- | ------------------------------- | ------------------------------------------------------------ |
+| `GET`    | `/api/catalogue`                | Catalogue rows, panel size and summary                       |
+| `GET`    | `/api/stations`                 | Spin panel + monitored flag, optional `?region=` filter      |
+| `GET`    | `/api/charts`                   | Weekly national airplay chart                                |
+| `GET`    | `/api/tracks`                   | Catalogue rows                                               |
+| `POST`   | `/api/tracks`                   | Deliver a master (`multipart/form-data`) — validates, stores, assigns airplay |
+| `PUT`    | `/api/tracks`                   | Allocate the next free ISRC for a registrant + release year   |
+| `DELETE` | `/api/tracks/:id`               | Withdraw a track and delete its stored master                |
+| `GET`    | `/api/royalties`                | Distribution report + member statements + payout batches     |
+| `GET`    | `/api/royalties/export`         | CSV download for `?kind=statements\|batches\|report`          |
 
 `POST` returns `422` with per-field errors (`title`, `primaryArtist`, `releaseDate`, `isrc`, `audio`)
 so the form can surface them inline.
@@ -354,6 +366,11 @@ There is no database yet. Track rows live in `.data/tracks.json` and delivered m
 [`lib/store.ts`](lib/store.ts) is the only module that touches the filesystem and deliberately exposes
 the shape a real repository would, so moving to Postgres later is a one-file change.
 
+[`prisma/schema.prisma`](prisma/schema.prisma) is the reviewed persistence target and already models
+the catalogue, airplay matches, royalty reports and statements, payout batches, ad campaigns and
+split sheets. It is validated in-process by `npm test` so the schema stays in step with the code
+without needing a Postgres server.
+
 > **Demo data.** The seeded catalogue, the station panel in [`lib/regions.ts`](lib/regions.ts) and
 > every spin count are synthetic fixtures. Artist names are invented, and while the station names and
 > hubs are drawn from real Ugandan radio, the name/hub/reach pairing is illustrative — this is not a
@@ -370,8 +387,20 @@ app/
     artist/page.tsx        the portal (server component, reads the catalogue)
     monitoring/page.tsx    live station monitor
     cmo/page.tsx           UPRS audit ledger
+    splits/page.tsx        ownership, sign-off, disputes
+    advertisers/page.tsx   airtime audit
+    mix-parser/page.tsx    transitions & unknown audio
+    analytics/regional/page.tsx  geography, velocity, predictor
+    alerts/page.tsx        alert rules + webhook log
+    charts/page.tsx        weekly national chart
+    royalties/page.tsx     member statements + payout batches
     layout.tsx             sidebar + topbar shell
-  api/tracks/              route handlers
+  api/
+    tracks/                delivery routes
+    royalties/             royalty report + CSV export
+    catalogue/             catalogue + summary
+    stations/              panel registry
+    charts/                weekly chart
 components/
   artist-portal.tsx        client state: staging, delivery, filtering
   upload-dropzone.tsx      drag & drop, validation, staged file list
@@ -407,6 +436,7 @@ components/
   whatsapp-simulator.tsx   simulated handset
   multi-select.tsx         searchable multi-select + filter chips
   distribution-report.tsx  royalty pool, tier breakdown, member allocation
+  royalties-dashboard.tsx  statements, batches, approval/payment state, CSV
 lib/
   isrc.ts                  ISRC generation, validation, parsing
   airplay.ts               seeded airplay model
@@ -417,9 +447,7 @@ lib/
   monitoring.ts            monitored panel, telemetry, fingerprint matching
   monitor-audio.ts         synthesized monitor feed (Web Audio)
   audio-fingerprint.ts     pure spectral landmark extraction
-
-prisma/
-  schema.prisma            persistence target (validated by tests)
+  royalties.ts             statements, payout batches, CSV export
   uprs.ts                  memberships, tariff, ledger, report, CSV
   advertising.ts           contracts, slots, compliance, heatmap, breaches
   mix-parser.ts            timeline, transitions, queue, waveform, search
@@ -427,6 +455,9 @@ prisma/
   geography.ts             hubs, hub metrics, velocity, hit predictor
   alerts.ts                channels, rules, events, push copy
   format.ts  types.ts  upload.ts
+
+prisma/
+  schema.prisma            persistence target (validated by tests)
 tests/                     vitest unit + component tests
 ```
 

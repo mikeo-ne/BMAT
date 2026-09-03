@@ -44,6 +44,13 @@ enum SlotOutcome {
   MISSED
 }
 
+enum PayoutStatus {
+  DRAFT
+  APPROVED
+  PAID
+  BLOCKED
+}
+
 enum SplitRole {
   PRIMARY_ARTIST
   FEATURED_ARTIST
@@ -62,10 +69,11 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tracks       Track[]
-  campaigns    AdCampaign[]
-  reports      RoyaltyReport[]
-  splitSignOffs SplitParty[]
+  tracks         Track[]
+  campaigns      AdCampaign[]
+  reports        RoyaltyReport[]
+  splitSignOffs  SplitParty[]
+  payoutBatches  PayoutBatch[]
 }
 
 model Track {
@@ -141,7 +149,8 @@ model RoyaltyReport {
   generatedById String
   generatedBy   User   @relation(fields: [generatedById], references: [id])
 
-  lines RoyaltyLine[]
+  lines      RoyaltyLine[]
+  statements RoyaltyStatement[]
 }
 
 model RoyaltyLine {
@@ -157,6 +166,52 @@ model RoyaltyLine {
   report   RoyaltyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
   trackId  String?
   track    Track?        @relation(fields: [trackId], references: [id])
+}
+
+// A member's accrued entitlement for one reporting period, sliced out of a
+// RoyaltyReport. This is what member services approves and pays.
+model RoyaltyStatement {
+  id           String      @id @default(cuid())
+  memberId     String
+  artist       String
+  period       String
+  plays        Int
+  stations     Int
+  works        Int
+  allocationUgx Int
+  allocationUsd Float
+  shareOfPool  Float
+  status       PayoutStatus @default(DRAFT)
+  approvedAt   DateTime?
+  paidAt       DateTime?
+  paymentReference String?
+
+  reportId String
+  report   RoyaltyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  batchId  String?
+  batch    PayoutBatch?  @relation(fields: [batchId], references: [id])
+
+  @@index([reportId])
+  @@index([memberId, period])
+  @@unique([reportId, memberId, period])
+}
+
+// The group of statements released to payment for one reporting period.
+model PayoutBatch {
+  id           String      @id @default(cuid())
+  period       String      @unique
+  status       PayoutStatus @default(DRAFT)
+  allocationUgx Int
+  allocationUsd Float
+  members      Int
+  plays        Int
+  paidAt       DateTime?
+  createdById  String
+  createdBy    User        @relation(fields: [createdById], references: [id])
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  statements RoyaltyStatement[]
 }
 
 model AdCampaign {

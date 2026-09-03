@@ -13,6 +13,7 @@ const TITLES: Record<string, string> = {
   "/dashboard/analytics/regional": "Airplay Geography & Hit Velocity",
   "/dashboard/alerts": "Live Airplay Alerts & Webhooks",
   "/dashboard/charts": "National Charts",
+  "/dashboard/royalties": "Royalties",
 };
 
 /** Topbar title, derived from the active route. */
