@@ -43,3 +43,6 @@ next-env.d.ts
 # BMAT local data store (catalogue rows + delivered masters)
 /.data/
 
+# GitHub Pages static-export staging area (scripts/build-static.sh)
+/.static-build/
+

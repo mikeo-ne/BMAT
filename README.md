@@ -296,7 +296,7 @@ npm run dev          # http://localhost:3000 → redirects to /dashboard/artist
 ```
 
 ```bash
-npm test             # vitest, 231 tests
+npm test             # vitest, 365 tests
 npm run typecheck    # next typegen && tsc --noEmit
 npm run lint         # eslint
 npm run build        # production build
@@ -313,6 +313,38 @@ npm run build        # production build
 
 `POST` returns `422` with per-field errors (`title`, `primaryArtist`, `releaseDate`, `isrc`, `audio`)
 so the form can surface them inline.
+
+## Deployment
+
+The app has two shapes, because GitHub Pages can only serve files.
+
+### Full application — a Node host (Vercel, Netlify, Docker, `npm start`)
+
+`npm run build` + `npm start` runs the whole thing: the `/api/tracks` routes, the dynamically
+rendered pages, and the file-backed store behind [`lib/store.ts`](lib/store.ts). This is the
+production shape and the one to use when you need upload and persistence. Deploy it to any Node
+host — Vercel is the default target for Next 16.
+
+### GitHub Pages — read-only static export
+
+GitHub Pages serves static files only; it cannot run the API routes, the server-side rendering, or
+the on-disk store. [`scripts/build-static.sh`](scripts/build-static.sh) therefore produces a
+**read-only snapshot**: it stages the source, removes `app/api`, drops the `force-dynamic` flags,
+sets `output: "export"` with the repo `basePath`, and emits `.static-build/out`. Every page is
+prerendered from the seed catalogue.
+
+[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) runs that script on push
+to `main` (and the working branch) and publishes the `out` directory with `actions/deploy-pages`.
+The site lands at `https://mikeo-ne.github.io/BMAT/`.
+
+Because there is no server behind it, the static site cannot accept deliveries: the artist portal
+loads, but submitting the upload form posts to an API that does not exist there, so it fails with
+the inline error toast rather than saving. Treat the GitHub Pages build as a demonstration of the
+dashboards, not the working product.
+
+```bash
+npm run build:static   # local equivalent of what the workflow does → .static-build/out
+```
 
 ## Storage
 

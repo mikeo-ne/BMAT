@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // BMAT: gitignored staging for the GitHub Pages static export, and the
+    // file-backed data store. Both hold generated/copied code, not source.
+    ".static-build/**",
+    ".data/**",
   ]),
 ]);
 
