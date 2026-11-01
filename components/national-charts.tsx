@@ -77,8 +77,8 @@ export function NationalCharts({ chart }: NationalChartsProps) {
               Uganda national airplay chart
             </h2>
             <p className="mt-1 text-xs text-muted">
-              {chart.weekLabel} · ranked by captured spins in the connected FM panel
-              over the last seven reporting days.
+              {chart.weekLabel} · ranked by captured spins in the connected FM
+              panel over the last seven reporting days.
             </p>
           </div>
 
@@ -165,7 +165,9 @@ export function NationalCharts({ chart }: NationalChartsProps) {
 
         {rest.length === 0 ? (
           <p className="mt-4 rounded border border-dashed border-line px-4 py-8 text-center text-xs text-muted">
-            Only the podium charted this week.
+            {chart.entries.length
+              ? "Only the podium charted this week."
+              : "No captured plays are available to rank in this reporting window."}
           </p>
         ) : (
           <div className="mt-4 overflow-x-auto">

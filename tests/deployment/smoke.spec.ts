@@ -64,6 +64,9 @@ for (const route of [
   "playout",
   "monitoring",
   "cmo",
+  "cmo/master",
+  "east-sound",
+  "mix-parser",
   "charts",
   "analytics/regional",
   "royalties",
@@ -83,9 +86,14 @@ for (const route of [
         .getByRole("status")
         .filter({ hasText: "Read-only reference deployment" }),
     ).toBeVisible();
-    expect(await page.locator("body").innerText()).not.toMatch(
-      /Mukisa Collective|Ray Bwete|Nyege Nyege Tapes|Application error: a server-side exception/,
+    const body = await page.locator("body").innerText();
+    expect(body).not.toMatch(
+      /Mukisa Collective|Ray Bwete|Nyege Nyege Tapes|Application error: a server-side exception|New Unlicensed Broadcast Detected|Powered by UPRS|under UPRS tariff schedule/,
     );
+    if (["cmo", "cmo/master", "east-sound"].includes(route)) {
+      expect(body).toContain("0 captured rights-allocation rows");
+      expect(body).toContain("Account for every play.");
+    }
     expect(errors).toEqual([]);
   });
 }

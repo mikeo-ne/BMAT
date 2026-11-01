@@ -11,6 +11,8 @@ const headings = [
   ["/dashboard/artist", "Artist & Label Portal"],
   ["/dashboard/playout", "Broadcaster Playout Log"],
   ["/dashboard/cmo", "CMO & UPRS Regulatory Auditor"],
+  ["/dashboard/cmo/master", "CMO & UPRS Regulatory Auditor"],
+  ["/dashboard/east-sound", "CMO & UPRS Regulatory Auditor"],
   ["/dashboard/advertisers", "Advertiser Spot Tracker"],
   ["/dashboard/alerts", "Live Airplay Alerts & Webhooks"],
 ];

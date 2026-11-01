@@ -4,11 +4,11 @@
 # GitHub Pages serves only static files: no Node server, no API routes, no SSR.
 # So this script builds a throwaway copy that (a) drops app/api, (b) removes
 # `force-dynamic` so pages prerender at build time, and (c) sets `output: export`
-# with the repo's basePath. The primary server build (Vercel/Netlify/local) is
-# untouched and keeps uploads + persistence.
+# with the repo's basePath. The primary server build keeps its API routes;
+# deployment capability guards still reject unsupported Vercel master writes.
 #
 # Result: ./out/ ready to upload to GitHub Pages. Read-only: delivery/upload and
-# any mutation hit the (absent) API and surface a friendly error in the UI.
+# unsupported mutations are disabled rather than reported as successful.
 set -euo pipefail
 
 REPO="${GITHUB_REPOSITORY:-BMAT}"

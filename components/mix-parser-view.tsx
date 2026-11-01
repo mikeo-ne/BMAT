@@ -191,9 +191,10 @@ export function MixParserView({ catalogue }: MixParserViewProps) {
       ) : null}
 
       <p className="pb-2 text-center text-[11px] text-muted">
-        The hour is generated deterministically per station and the excerpt
-        audio is synthesised locally. No live broadcast capture or reference
-        index is wired up in this prototype.
+        No continuous-capture or matching integration is connected. The real
+        catalogue produces no generated station hours, matches, transitions or
+        evidence. An empty view is not proof that every broadcast was
+        identified.
       </p>
     </div>
   );
