@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { buildWeeklyChart } from "@/lib/charts";
-import { readTracks } from "@/lib/store";
+import { readWorkspaceData } from "@/lib/workspace-data";
+import { catalogueWithCapturedStats } from "@/lib/captured-airplay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,8 +14,13 @@ export const dynamic = "force-dynamic";
  * model the /dashboard/charts page renders on the server.
  */
 export async function GET() {
-  const catalogue = await readTracks();
-  const chart = buildWeeklyChart(catalogue, new Date());
+  const data = await readWorkspaceData();
+  const catalogue = catalogueWithCapturedStats(
+    data.catalogue,
+    data.history.filter((event) => event.medium === "FM"),
+    new Date(data.now),
+  );
+  const chart = buildWeeklyChart(catalogue, new Date(data.now));
 
   return NextResponse.json({ chart });
 }

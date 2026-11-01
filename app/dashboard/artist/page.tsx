@@ -1,8 +1,12 @@
+import {
+  capturePollingAvailable,
+  masterUploadsAvailable,
+} from "@/lib/runtime-storage";
 import type { Metadata } from "next";
 
 import { ArtistPortal } from "@/components/artist-portal";
 import { PANEL_SIZE } from "@/lib/catalog";
-import { readTracks } from "@/lib/store";
+import { readWorkspaceData } from "@/lib/workspace-data";
 
 export const metadata: Metadata = {
   title: "Artist & Label Portal",
@@ -12,8 +16,16 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function ArtistPortalPage() {
-  const tracks = await readTracks();
-
-  return <ArtistPortal initialTracks={tracks} panelSize={PANEL_SIZE} />;
+export default async function ArtistPage() {
+  const data = await readWorkspaceData();
+  return (
+    <ArtistPortal
+      initialTracks={data.catalogue}
+      panelSize={PANEL_SIZE}
+      initialEvents={data.history}
+      now={data.now}
+      canPoll={capturePollingAvailable()}
+      deliveryAvailable={masterUploadsAvailable()}
+    />
+  );
 }

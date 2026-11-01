@@ -32,7 +32,10 @@ export function SplitApprovals({ parties, title, isrc }: SplitApprovalsProps) {
     <section className="panel p-4" aria-labelledby="approvals-heading">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 id="approvals-heading" className="text-sm font-semibold tracking-tight">
+          <h2
+            id="approvals-heading"
+            className="text-sm font-semibold tracking-tight"
+          >
             Collaboration approvals
           </h2>
           <p className="mt-1 text-xs text-muted">
@@ -48,7 +51,9 @@ export function SplitApprovals({ parties, title, isrc }: SplitApprovalsProps) {
       <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
         <div
           className="h-full rounded-full bg-accent"
-          style={{ width: `${(signed.length / Math.max(parties.length, 1)) * 100}%` }}
+          style={{
+            width: `${(signed.length / Math.max(parties.length, 1)) * 100}%`,
+          }}
         />
       </div>
 
@@ -84,8 +89,14 @@ export function SplitApprovals({ parties, title, isrc }: SplitApprovalsProps) {
               ) : (
                 <span className="flex items-center gap-2">
                   <span className="chip text-brand">Outstanding</span>
-                  <button type="button" className="btn btn-ghost" onClick={() => remind(party.id)}>
-                    {reminded.has(party.id) ? "Reminder sent" : "Send reminder"}
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => remind(party.id)}
+                  >
+                    {reminded.has(party.id)
+                      ? "Reminder recorded"
+                      : "Record reminder"}
                   </button>
                 </span>
               )}
@@ -96,13 +107,15 @@ export function SplitApprovals({ parties, title, isrc }: SplitApprovalsProps) {
 
       {outstanding.length === 0 ? (
         <p className="mt-3 rounded border border-line bg-surface-2 px-3 py-2 text-xs text-accent">
-          Every collaborator has signed. The sheet is executable and can go into the next
-          distribution run.
+          Every collaborator has an approval recorded. Authenticate the parties
+          and review the agreement before any distribution; these demo records
+          are not legal executions.
         </p>
       ) : (
         <p className="mt-3 rounded border border-line bg-surface-2 px-3 py-2 text-xs text-muted">
-          {outstanding.length} signature{outstanding.length === 1 ? "" : "s"} outstanding. Royalties
-          on this recording are held until the sheet is fully executed.
+          {outstanding.length} approval{outstanding.length === 1 ? "" : "s"}{" "}
+          outstanding. Review and authenticate these before distribution. This
+          demo does not enforce royalty holds.
         </p>
       )}
     </section>

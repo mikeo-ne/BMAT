@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
-import { OUTCOME_LABEL, type AirtimeAlert, type SlotOutcome } from "@/lib/advertising";
+import {
+  OUTCOME_LABEL,
+  type AirtimeAlert,
+  type SlotOutcome,
+} from "@/lib/advertising";
 import { formatDate } from "@/lib/format";
 
 interface AirtimeAlertsProps {
@@ -33,9 +37,12 @@ const OUTCOME_TONE: Record<SlotOutcome, string> = {
  */
 export function AirtimeAlerts({ alerts }: AirtimeAlertsProps) {
   const [filter, setFilter] = useState<SeverityFilter>("all");
+  const [visibleCount, setVisibleCount] = useState(8);
+  const listId = useId();
 
   const visible = useMemo(
-    () => (filter === "all" ? alerts : alerts.filter((a) => a.severity === filter)),
+    () =>
+      filter === "all" ? alerts : alerts.filter((a) => a.severity === filter),
     [alerts, filter],
   );
 
@@ -45,22 +52,35 @@ export function AirtimeAlerts({ alerts }: AirtimeAlertsProps) {
     <section className="panel p-4" aria-labelledby="airtime-alerts-heading">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 id="airtime-alerts-heading" className="text-sm font-semibold tracking-tight">
+          <h2
+            id="airtime-alerts-heading"
+            className="text-sm font-semibold tracking-tight"
+          >
             Fraud &amp; missed airtime
           </h2>
           <p className="mt-1 text-xs text-muted">
-            {critical} booked spot{critical === 1 ? "" : "s"} never aired across all campaigns.
+            {critical} booked spot{critical === 1 ? "" : "s"} never aired across
+            all campaigns.
           </p>
         </div>
 
-        <div className="flex gap-1" role="group" aria-label="Filter breaches">
+        <div
+          className="flex flex-wrap gap-1"
+          role="group"
+          aria-label="Filter breaches"
+        >
           {FILTERS.map((option) => (
             <button
               key={option.id}
               type="button"
-              onClick={() => setFilter(option.id)}
+              onClick={() => {
+                setFilter(option.id);
+                setVisibleCount(8);
+              }}
               aria-pressed={filter === option.id}
-              className={filter === option.id ? "btn btn-primary" : "btn btn-ghost"}
+              className={
+                filter === option.id ? "btn btn-primary" : "btn btn-ghost"
+              }
             >
               {option.label}
               <span className="ml-1.5 font-mono text-[10px] opacity-80">
@@ -78,8 +98,8 @@ export function AirtimeAlerts({ alerts }: AirtimeAlertsProps) {
           No breaches in this view. Every contracted spot ran as booked.
         </p>
       ) : (
-        <ul className="mt-4 space-y-2">
-          {visible.map((alert) => (
+        <ul id={listId} className="mt-4 space-y-2">
+          {visible.slice(0, visibleCount).map((alert) => (
             <li
               key={alert.id}
               className="flex flex-wrap items-start gap-3 rounded-lg border border-line bg-surface-2 p-3"
@@ -88,7 +108,8 @@ export function AirtimeAlerts({ alerts }: AirtimeAlertsProps) {
                 aria-hidden
                 className="mt-0.5 h-8 w-1 shrink-0 rounded-full"
                 style={{
-                  background: alert.severity === "critical" ? "#f0544f" : "var(--brand)",
+                  background:
+                    alert.severity === "critical" ? "#f0544f" : "var(--brand)",
                 }}
               />
 
@@ -96,12 +117,15 @@ export function AirtimeAlerts({ alerts }: AirtimeAlertsProps) {
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <span className="text-sm font-medium">{alert.brand}</span>
                   <span className="text-xs text-muted">
-                    {alert.stationName} · {formatDate(`${alert.dayIso}T00:00:00Z`)} · slot{" "}
+                    {alert.stationName} ·{" "}
+                    {formatDate(`${alert.dayIso}T00:00:00Z`)} · slot{" "}
                     {alert.slotIndex}
                   </span>
                 </div>
 
-                <p className="mt-1 text-xs leading-relaxed text-muted">{alert.detail}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">
+                  {alert.detail}
+                </p>
               </div>
 
               <span className={`chip ${OUTCOME_TONE[alert.outcome]}`}>
@@ -110,6 +134,24 @@ export function AirtimeAlerts({ alerts }: AirtimeAlertsProps) {
             </li>
           ))}
         </ul>
+      )}
+      {visible.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+          <p role="status" className="text-[11px] text-muted">
+            Showing {Math.min(visibleCount, visible.length)} of {visible.length}{" "}
+            breaches
+          </p>
+          {visibleCount < visible.length && (
+            <button
+              type="button"
+              aria-controls={listId}
+              className="btn btn-ghost !text-xs"
+              onClick={() => setVisibleCount((count) => count + 8)}
+            >
+              Show more breaches
+            </button>
+          )}
+        </div>
       )}
     </section>
   );

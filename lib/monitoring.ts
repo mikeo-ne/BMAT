@@ -1,5 +1,9 @@
 import { createRandom, hashSeed } from "@/lib/airplay";
-import { stationById as panelStation, type Hub, type Region } from "@/lib/regions";
+import {
+  stationById as panelStation,
+  type Hub,
+  type Region,
+} from "@/lib/regions";
 import type { Track } from "@/lib/types";
 
 /**
@@ -70,7 +74,9 @@ export function stationById(id: string): MonitoredStation | undefined {
 }
 
 export function monitoredCount(medium?: Medium): number {
-  return medium ? MONITORED_STATIONS.filter((s) => s.medium === medium).length : MONITORED_STATIONS.length;
+  return medium
+    ? MONITORED_STATIONS.filter((s) => s.medium === medium).length
+    : MONITORED_STATIONS.length;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -98,11 +104,15 @@ export const LEVEL_HISTORY = 24;
  * consistently "the healthy one" or "the flaky one" across reloads, then drifted
  * by the client to feel live.
  */
-export function generateTelemetry(stationId: string, now: Date = new Date()): StationTelemetry {
+export function generateTelemetry(
+  stationId: string,
+  now: Date = new Date(),
+): StationTelemetry {
   const rand = createRandom(hashSeed(`monitor:${stationId}`));
   const roll = rand();
 
-  const status: StationStatus = roll > 0.9 ? "offline" : roll > 0.72 ? "degraded" : "online";
+  const status: StationStatus =
+    roll > 0.9 ? "offline" : roll > 0.72 ? "degraded" : "online";
 
   const uptime =
     status === "offline"
@@ -112,10 +122,19 @@ export function generateTelemetry(stationId: string, now: Date = new Date()): St
         : 0.985 + rand() * 0.014;
 
   const latencyMs = Math.round(
-    status === "offline" ? 0 : status === "degraded" ? 420 + rand() * 900 : 40 + rand() * 180,
+    status === "offline"
+      ? 0
+      : status === "degraded"
+        ? 420 + rand() * 900
+        : 40 + rand() * 180,
   );
 
-  const bufferHealth = status === "offline" ? 0 : status === "degraded" ? 0.28 + rand() * 0.3 : 0.78 + rand() * 0.2;
+  const bufferHealth =
+    status === "offline"
+      ? 0
+      : status === "degraded"
+        ? 0.28 + rand() * 0.3
+        : 0.78 + rand() * 0.2;
 
   const level = Array.from({ length: LEVEL_HISTORY }, () =>
     status === "offline" ? 0 : Math.min(1, Math.max(0.04, 0.35 + rand() * 0.6)),
@@ -169,17 +188,26 @@ export function driftTelemetry(
   const degraded = status === "degraded";
   const base = degraded ? 0.45 : 0.72;
   const lastLevel = current.level[current.level.length - 1] ?? base;
-  const nextLevel = Math.min(1, Math.max(0.05, lastLevel + (rand() - 0.5) * 0.34));
+  const nextLevel = Math.min(
+    1,
+    Math.max(0.05, lastLevel + (rand() - 0.5) * 0.34),
+  );
 
   const baseLatency = degraded ? 620 : 90;
-  const latencyMs = Math.max(18, Math.round(baseLatency + (rand() - 0.5) * (degraded ? 700 : 110)));
+  const latencyMs = Math.max(
+    18,
+    Math.round(baseLatency + (rand() - 0.5) * (degraded ? 700 : 110)),
+  );
 
   return {
     ...current,
     status,
     uptime: Math.min(1, current.uptime + (rand() - 0.4) * 0.0004),
     latencyMs,
-    bufferHealth: Math.min(1, Math.max(0.05, current.bufferHealth + (rand() - 0.5) * 0.06)),
+    bufferHealth: Math.min(
+      1,
+      Math.max(0.05, current.bufferHealth + (rand() - 0.5) * 0.06),
+    ),
     level: [...current.level.slice(1), nextLevel],
     lastHeartbeat: now.toISOString(),
   };
@@ -231,6 +259,8 @@ export function simulateScan(input: {
   /** Varies per scan so consecutive scans differ. */
   seed: string;
 }): Detection[] {
+  if (input.catalogue.some((track) => track.origin !== "test-fixture"))
+    return [];
   const rand = createRandom(hashSeed(`scan:${input.seed}`));
   const detections: Detection[] = [];
 
@@ -248,7 +278,12 @@ export function simulateScan(input: {
 
     const track = unmatched
       ? null
-      : input.catalogue[Math.min(input.catalogue.length - 1, Math.floor(rand() * input.catalogue.length))];
+      : input.catalogue[
+          Math.min(
+            input.catalogue.length - 1,
+            Math.floor(rand() * input.catalogue.length),
+          )
+        ];
 
     detections.push({
       id: `det_${hashSeed(`${input.seed}:${station.id}`).toString(36).slice(0, 8)}`,
@@ -257,11 +292,18 @@ export function simulateScan(input: {
       stationName: station.name,
       medium: station.medium,
       track: track
-        ? { title: track.title, primaryArtist: track.primaryArtist, isrc: track.isrc }
+        ? {
+            title: track.title,
+            primaryArtist: track.primaryArtist,
+            isrc: track.isrc,
+          }
         : null,
       confidence,
       matchedSeconds: Math.round(6 + rand() * 18),
-      method: station.medium === "TV" ? "Chromaprint v2 · video audio bus" : "Chromaprint v2 · spectral peak",
+      method:
+        station.medium === "TV"
+          ? "Chromaprint v2 · video audio bus"
+          : "Chromaprint v2 · spectral peak",
     });
   }
 
@@ -296,7 +338,9 @@ export function summariseMonitor(
     matched: matched.length,
     unmatched: detections.length - matched.length,
     averageConfidence:
-      detections.length === 0 ? 0 : detections.reduce((s, d) => s + d.confidence, 0) / detections.length,
+      detections.length === 0
+        ? 0
+        : detections.reduce((s, d) => s + d.confidence, 0) / detections.length,
     matchRate: detections.length === 0 ? 0 : matched.length / detections.length,
   };
 }

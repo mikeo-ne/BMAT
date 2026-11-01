@@ -1,18 +1,25 @@
+import { capturePollingAvailable } from "@/lib/runtime-storage";
 import type { Metadata } from "next";
 
-import { StationMonitor } from "@/components/station-monitor";
-import { readTracks } from "@/lib/store";
+import { LiveBroadcastMonitor } from "@/components/live-broadcast-monitor";
+import { readWorkspaceData } from "@/lib/workspace-data";
 
 export const metadata: Metadata = {
   title: "Live Station Monitor",
   description:
-    "Watch the monitored Ugandan radio and TV feeds, preview each station's audio, and run audio fingerprint scans against the delivered catalogue.",
+    "Configure authorized public station feeds for FM/TV playback and review authenticated captured records. Playback does not imply capture or fingerprinting.",
 };
 
 export const dynamic = "force-dynamic";
 
 export default async function LiveStationMonitorPage() {
-  const catalogue = await readTracks();
-
-  return <StationMonitor catalogue={catalogue} />;
+  const data = await readWorkspaceData();
+  return (
+    <LiveBroadcastMonitor
+      catalogue={data.catalogue}
+      initialEvents={data.history}
+      now={data.now}
+      canPoll={capturePollingAvailable()}
+    />
+  );
 }

@@ -21,10 +21,14 @@ echo "→ staging static build at ${TMP} (basePath=${BASE_PATH})"
 rm -rf "${TMP}"
 mkdir -p "${TMP}"
 
-# Copy source, skipping build artefacts, data, node_modules and VCS.
+# Copy application source, skipping build artefacts, data, dependencies and VCS.
+# API tests are checked in the primary build; their imports cannot resolve after
+# app/api is intentionally removed from this read-only staging copy.
 tar -C "${SRC}" \
   --exclude='./.git' --exclude='./.next' --exclude='./out' --exclude='./.data' \
-  --exclude='./node_modules' --exclude='./.static-build' --exclude='./.arena' \
+  --exclude='./.env*' --exclude='./node_modules' --exclude='./.static-build' --exclude='./.arena' \
+  --exclude='./tests' --exclude='./vitest*.config.mts' --exclude='./db' \
+  --exclude='./scripts/database.ts' --exclude='./scripts/notification-worker.ts' --exclude='./tsconfig.tsbuildinfo' \
   -cf - . | tar -C "${TMP}" -xf -
 
 # 1. No API routes in a static export.
@@ -40,6 +44,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "export",
+  serverExternalPackages: ["pg"],
   basePath: process.env.BASE_PATH || "${BASE_PATH}",
   trailingSlash: true,
   images: { unoptimized: true },
@@ -53,6 +58,6 @@ ln -s "${SRC}/node_modules" "${TMP}/node_modules"
 
 echo "→ building (this prerenders every dashboard)…"
 cd "${TMP}"
-BASE_PATH="${BASE_PATH}" npx next build
+EAST_SOUND_DATA_DIR="${TMP}/.data" EAST_SOUND_STATIC_EXPORT=1 BASE_PATH="${BASE_PATH}" npx next build
 
 echo "→ static site ready at ${TMP}/out"

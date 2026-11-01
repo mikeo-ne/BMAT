@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSeedTracks, buildTrack, nextDesignation, suggestIsrc } from "@/lib/catalog";
+import { buildTrack, nextDesignation, suggestIsrc } from "@/lib/catalog";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 import { REGIONS } from "@/lib/regions";
-import { dominantRegion, spinsFor, summariseCatalog, trendFor } from "@/lib/types";
+import {
+  dominantRegion,
+  spinsFor,
+  summariseCatalog,
+  trendFor,
+} from "@/lib/types";
 
 const NOW = new Date("2026-09-03T00:00:00Z");
 
@@ -39,7 +45,9 @@ describe("buildSeedTracks", () => {
   it("names a dominant region that actually leads", () => {
     for (const track of tracks) {
       const top = Math.max(...track.airplay.map((a) => a.spins));
-      expect(track.airplay.find((a) => a.region === dominantRegion(track))?.spins).toBe(top);
+      expect(
+        track.airplay.find((a) => a.region === dominantRegion(track))?.spins,
+      ).toBe(top);
     }
   });
 });
@@ -63,8 +71,8 @@ describe("buildTrack", () => {
     });
 
     expect(track.isrc).toBe("UG-ESD-26-00001");
-    expect(track.status).toBe("live");
-    expect(track.totalSpins).toBeGreaterThan(0);
+    expect(track.status).toBe("processing");
+    expect(track.totalSpins).toBe(0);
     expect(trendFor(track, "All")).toHaveLength(14);
   });
 });
@@ -86,8 +94,12 @@ describe("nextDesignation / suggestIsrc", () => {
   });
 
   it("suggests the next free ISRC for a registrant", () => {
-    expect(suggestIsrc(tracks, "Nyege Nyege Tapes", "2026-10-02")).toBe("UG-NNT-26-00001");
-    expect(suggestIsrc(tracks, "Ray Bwete", "2026-05-01")).toBe("UG-RAY-26-00001");
+    expect(suggestIsrc(tracks, "Quality Test Label", "2026-10-02")).toBe(
+      "UG-QTL-26-00001",
+    );
+    expect(suggestIsrc(tracks, "QA Artist Alpha", "2026-05-01")).toBe(
+      "UG-QAA-26-00001",
+    );
   });
 
   it("bumps the designation once that registrant already has a row", () => {
@@ -96,10 +108,10 @@ describe("nextDesignation / suggestIsrc", () => {
       buildTrack({
         id: "trk_new",
         title: "Fresh",
-        primaryArtist: "Ray Bwete",
+        primaryArtist: "QA Artist Alpha",
         featuredArtists: [],
         releaseDate: "2026-05-01",
-        isrc: "UG-RAY-26-00001",
+        isrc: "UG-QAA-26-00001",
         fileName: "fresh.mp3",
         format: "MP3",
         mimeType: "audio/mpeg",
@@ -110,7 +122,9 @@ describe("nextDesignation / suggestIsrc", () => {
       }),
     ];
 
-    expect(suggestIsrc(withRow, "Ray Bwete", "2026-05-01")).toBe("UG-RAY-26-00002");
+    expect(suggestIsrc(withRow, "QA Artist Alpha", "2026-05-01")).toBe(
+      "UG-QAA-26-00002",
+    );
   });
 });
 
@@ -120,10 +134,18 @@ describe("summariseCatalog", () => {
     const summary = summariseCatalog(tracks);
 
     expect(summary.totalTracks).toBe(tracks.length);
-    expect(summary.totalSpins).toBe(tracks.reduce((s, t) => s + t.totalSpins, 0));
-    expect(summary.averageSpinsPerTrack).toBeCloseTo(summary.totalSpins / tracks.length, 6);
+    expect(summary.totalSpins).toBe(
+      tracks.reduce((s, t) => s + t.totalSpins, 0),
+    );
+    expect(summary.averageSpinsPerTrack).toBeCloseTo(
+      summary.totalSpins / tracks.length,
+      6,
+    );
 
-    const regionTotal = REGIONS.reduce((s, r) => s + summary.byRegion[r].spins, 0);
+    const regionTotal = REGIONS.reduce(
+      (s, r) => s + summary.byRegion[r].spins,
+      0,
+    );
     expect(regionTotal).toBe(summary.totalSpins);
   });
 

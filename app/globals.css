@@ -1,20 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0b0f17;
-  --surface: #121826;
-  --surface-2: #1a2234;
-  --line: #24304a;
-  --foreground: #e6ecf7;
-  --muted: #8b9ab5;
-  --brand: #f5a524;
-  --brand-ink: #241803;
-  --accent: #35d0a5;
-
-  --region-central: #f59e0b;
-  --region-eastern: #10b981;
-  --region-western: #38bdf8;
-  --region-northern: #a78bfa;
+  --background: #f5f7f6;
+  --surface: #ffffff;
+  --surface-2: #f2f5f4;
+  --line: #e3e9e6;
+  --foreground: #182c29;
+  --muted: #62736e;
+  --brand: #137b61;
+  --brand-ink: #ffffff;
+  --accent: #137b61;
+  --region-central: #29977e;
+  --region-eastern: #d3a044;
+  --region-western: #6897c5;
+  --region-northern: #9b85c9;
+  --color-red-200: #9f3041;
+  --color-red-300: #b6404b;
+  --color-red-400: #c44552;
 }
 
 @theme inline {
@@ -32,7 +34,7 @@
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -67,15 +69,16 @@ body {
   .panel {
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 0.875rem;
+    border-radius: 1rem;
+    box-shadow: 0 2px 6px rgb(24 44 41 / 0.015);
   }
 
   .field {
     width: 100%;
-    border-radius: 0.5rem;
+    border-radius: 0.625rem;
     border: 1px solid var(--line);
     background: var(--surface-2);
-    padding: 0.5rem 0.75rem;
+    padding: 0.625rem 0.75rem;
     font-size: 0.875rem;
     color: var(--foreground);
     transition:
@@ -112,7 +115,7 @@ body {
     justify-content: center;
     gap: 0.5rem;
     border-radius: 0.5rem;
-    padding: 0.5rem 0.875rem;
+    padding: 0.625rem 1rem;
     font-size: 0.875rem;
     font-weight: 500;
     transition:
@@ -187,4 +190,137 @@ body {
 
 .animate-pulse-dot {
   animation: bmat-pulse 1.6s ease-in-out infinite;
+}
+
+.app-sidebar {
+  background: #12242b;
+  box-shadow: 4px 0 24px rgb(18 36 43 / 0.025);
+}
+.app-sidebar select {
+  color-scheme: dark;
+}
+.eyebrow {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+@layer components {
+  .icon-btn {
+    display: inline-flex;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    color: var(--muted);
+    cursor: pointer;
+    transition:
+      background 120ms,
+      color 120ms;
+  }
+  .icon-btn:hover {
+    background: var(--surface-2);
+    color: var(--foreground);
+  }
+  .icon-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+.east-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: calc(100% - 2rem);
+  max-height: 88dvh;
+  padding: 0;
+  overflow-y: auto;
+  background: var(--surface);
+  color: var(--foreground);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 32px 100px rgb(0 20 14 / 0.2);
+}
+.east-dialog::backdrop {
+  background: rgb(13 31 34 / 0.58);
+  backdrop-filter: blur(5px);
+}
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 100;
+  transform: translateY(-150%);
+  padding: 10px 16px;
+  background: var(--brand);
+  color: white;
+  border-radius: 8px;
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+.map-grid {
+  background-image: radial-gradient(#cedbd6 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+.map-region {
+  cursor: pointer;
+  transition:
+    fill-opacity 160ms,
+    filter 160ms,
+    stroke-width 160ms;
+}
+.map-region:hover,
+.map-region:focus-visible {
+  filter: brightness(1.08);
+  stroke-width: 3;
+  outline: none;
+}
+.map-region:focus-visible {
+  stroke: var(--foreground);
+  stroke-width: 3;
+}
+input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+button,
+a,
+select,
+input,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+button:not(:disabled),
+select {
+  touch-action: manipulation;
+}
+::selection {
+  background: #d5ef83;
+  color: #193d2d;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media print {
+  .app-sidebar,
+  header.sticky,
+  .skip-link,
+  button {
+    display: none !important;
+  }
+  body,
+  main {
+    background: white !important;
+  }
 }

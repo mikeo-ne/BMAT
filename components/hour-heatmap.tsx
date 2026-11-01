@@ -26,14 +26,17 @@ export function HourHeatmap({ rows, compact = false }: HourHeatmapProps) {
   const hours = Array.from({ length: 24 }, (_, h) => h);
 
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[720px] border-collapse text-[11px]">
         <caption className="sr-only">
           Aired ad spots by station and hour of day, East Africa Time
         </caption>
         <thead>
           <tr>
-            <th scope="col" className="sticky left-0 bg-surface px-2 py-1.5 text-left font-medium text-muted">
+            <th
+              scope="col"
+              className="sticky left-0 bg-surface px-2 py-1.5 text-left font-medium text-muted"
+            >
               Station
             </th>
             {hours.map((h) => (
@@ -45,7 +48,10 @@ export function HourHeatmap({ rows, compact = false }: HourHeatmapProps) {
                 {compact && h % 3 !== 0 ? "" : String(h).padStart(2, "0")}
               </th>
             ))}
-            <th scope="col" className="px-2 py-1.5 text-right font-medium text-muted">
+            <th
+              scope="col"
+              className="px-2 py-1.5 text-right font-medium text-muted"
+            >
               Peak
             </th>
           </tr>
@@ -67,8 +73,10 @@ export function HourHeatmap({ rows, compact = false }: HourHeatmapProps) {
                 </th>
 
                 {row.hours.map((count, h) => {
-                  const intensity = count === 0 ? 0 : Math.max(count / ceiling, 0.12);
-                  const inWindow = h >= row.windowStartHour && h < row.windowEndHour;
+                  const intensity =
+                    count === 0 ? 0 : Math.max(count / ceiling, 0.12);
+                  const inWindow =
+                    h >= row.windowStartHour && h < row.windowEndHour;
 
                   return (
                     <td
@@ -83,7 +91,9 @@ export function HourHeatmap({ rows, compact = false }: HourHeatmapProps) {
                             count === 0
                               ? "transparent"
                               : `color-mix(in srgb, ${inWindow ? "var(--accent)" : "var(--brand)"} ${Math.round(intensity * 100)}%, transparent)`,
-                          outline: inWindow ? "1px solid color-mix(in srgb, var(--line) 90%, transparent)" : "none",
+                          outline: inWindow
+                            ? "1px solid color-mix(in srgb, var(--line) 90%, transparent)"
+                            : "none",
                         }}
                         aria-hidden
                       />
@@ -94,7 +104,9 @@ export function HourHeatmap({ rows, compact = false }: HourHeatmapProps) {
                   );
                 })}
 
-                <td className="px-2 py-1 text-right font-mono text-muted">{peak.label}</td>
+                <td className="px-2 py-1 text-right font-mono text-muted">
+                  {peak.label}
+                </td>
               </tr>
             );
           })}
@@ -103,11 +115,17 @@ export function HourHeatmap({ rows, compact = false }: HourHeatmapProps) {
 
       <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-muted">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-sm bg-accent" aria-hidden />
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-sm bg-accent"
+            aria-hidden
+          />
           Inside the contracted window
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand" aria-hidden />
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-sm bg-brand"
+            aria-hidden
+          />
           Outside the contracted window
         </span>
         <span>Darker means more spots in that hour.</span>

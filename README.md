@@ -1,472 +1,161 @@
 # East Sound
 
-**East Sound** — measures music airplay across Uganda's FM panel and gives artists,
-labels and stations one shared source of truth for spins.
+A responsive **East Africa Airplay Analytics Platform**, with a Uganda-focused station directory, sourced Ugandan releases, master delivery, capture-backed reporting, and **Airplay Alerts & Webhooks**.
 
-Currently built:
+Built with Next.js 16, React 19, TypeScript and Tailwind CSS 4. This is an integration-ready prototype with a default single-process file backend and an opt-in PostgreSQL capture/outbox backend—not a connected national monitoring service, rights registry or certified BMAT/UPRS product.
 
-- **Artist & Label Portal** — [`/dashboard/artist`](app/dashboard/artist/page.tsx)
-- **Live Station Monitor** — [`/dashboard/monitoring`](app/dashboard/monitoring/page.tsx)
-- **CMO & Regulatory Audit** — [`/dashboard/cmo`](app/dashboard/cmo/page.tsx)
-- **Rights & Split-Sheet Management** — [`/dashboard/splits`](app/dashboard/splits/page.tsx)
-- **Ad Campaign Auditor** — [`/dashboard/advertisers`](app/dashboard/advertisers/page.tsx)
-- **Mix Parser** — [`/dashboard/mix-parser`](app/dashboard/mix-parser/page.tsx)
-- **Regional Analytics** — [`/dashboard/analytics/regional`](app/dashboard/analytics/regional/page.tsx)
-- **Airplay Alerts** — [`/dashboard/alerts`](app/dashboard/alerts/page.tsx)
-- **National Charts** — [`/dashboard/charts`](app/dashboard/charts/page.tsx)
-- **Royalties — Distribution & Payouts** — [`/dashboard/royalties`](app/dashboard/royalties/page.tsx)
-
----
-
-## CMO & Regulatory Audit
-
-An enterprise ledger for **UPRS** (Uganda Performing Right Society) built from the same catalogue and
-airplay model the artist portal uses. See [`lib/uprs.ts`](lib/uprs.ts).
-
-### The ledger
-
-`buildPlayLedger` expands the catalogue into aggregated **member × station × period** rows:
-
-1. each recording's regional 14-day spins are annualised to a month,
-2. scaled by the campaign factor for that month, so history peaks near release and decays as catalogue,
-3. split across each region's reporting stations in proportion to reach,
-4. then divided between the rights holders on the recording.
-
-Nothing accrues before a recording's release date. ~704 rows across 32 stations and 6 periods on the
-seeded catalogue — about 62,300 plays and a UGX 19.8m pool.
-
-**Distribution policy** — primary artist 60%, featured artists split the remaining 40% equally; a
-solo recording takes 100%.
-
-### Filters
-
-Four multi-select dropdowns, each with search, select-all and clear:
-
-- **Station** — every reporting station, hint shows its region and tariff tier
-- **Region** — Central / Eastern / Western / Northern
-- **Date range** — the reporting months present in the ledger
-- **Artist Membership ID** — every rights holder, with their work count
-
-Empty means "no constraint". Active filters appear as removable chips.
-
-### Distribution report
-
-**Generate Distribution Report** computes over the filtered rows and shows total play count, the
-estimated royalty pool in UGX and indicative USD, members payable, a flat-rate breakdown by station
-tier, a per-region split, and a per-member allocation table sorted by amount with each member's share
-of the pool.
-
-Two CSV downloads — the full ledger behind the report, and the summary plus per-member allocation.
-Both are generated client-side and prefixed with a UTF-8 BOM so Excel reads them correctly.
-
-> **The tariff is a placeholder.** `TARIFF`, `DISTRIBUTION_POLICY` and `UGX_PER_USD` in
-> [`lib/uprs.ts`](lib/uprs.ts) are invented to make the arithmetic visible end to end. They are **not**
-> the published UPRS schedule. The report says so on the page and in the CSV header. Replace them
-> before any figure reaches a member or a licensee.
-
----
-
-## Ad Campaign Auditor — `/dashboard/advertisers`
-
-Advertisers book airtime and East Sound audits it against fingerprinted playout.
-
-- **Campaign creation** — upload the jingle as an MP3 and set the contract in the
-  shape a media buyer writes it: *5x daily between 06:00 and 10:00 on Capital FM, for 14 days*.
-  Validated on MP3 type, a 12 MB ceiling, a window that closes after it opens, and 1-12 spots a day.
-- **Compliance gauge** — a 270° SVG dial of verified in-window spots against contracted spots, with
-  the breached and never-aired counts alongside. Pure SVG, so it is deterministic in SSR.
-- **Time-of-day heatmap** — station × hour grid in East Africa Time. Cells inside the contracted
-  window are tinted differently from cells outside it, so an off-window buy is visible at a glance.
-- **Fraud / missed-airtime queue** — three breach types, worst first. *Missed* is a hard breach (the
-  spot never aired); *off-window* and *unverified* ran but cannot be billed as booked.
-
-Slots are generated deterministically per campaign ([`lib/advertising.ts`](lib/advertising.ts)), so a
-campaign always audits the same way. Campaigns booked through the form live in component state —
-there is no server round-trip yet, so a refresh returns to the four seeded buys.
-
----
-
-## Unidentified Audio & DJ Mix Parser — `/dashboard/mix-parser`
-
-- **60-minute timeline** — a seekable SVG waveform over a downsampled amplitude envelope, with each
-  segment tinted by what the parser made of it. Click to seek, play to advance the playhead.
-- **Transition markers** — every music hand-over is marked and listed with both sides named, and any
-  gap over three seconds is flagged as dead air.
-- **Unidentified segment queue** — anything under the 60% confidence floor, with its confidence bar.
-  An unidentified play is a royalty nobody is being paid for, so the queue is a work list.
-- **A&R tagging modal** — listen to a 10-second excerpt, search the catalogue by title, artist or
-  ISRC, and link the clip. Each link keeps the confidence the parser originally returned, which is
-  what would let the matcher be retrained.
-
-> The hour is generated deterministically per station and the excerpt is synthesised locally through
-> the same `MonitorFeed` the station grid uses. There is no captured stream and no reference index,
-> so nothing here is a recognition result.
-
----
-
-## Rights & Split-Sheet Management — `/dashboard/splits`
-
-- **Ownership donut** — shares drawn against 100 rather than against the sheet total, so a sheet
-  that over-allocates visibly overflows instead of quietly renormalising. Hover a slice to isolate it.
-- **Collaboration approvals** — who has signed, by which channel and when, with per-party reminders.
-  A sheet is executable only when every collaborator has signed.
-- **Dispute resolution** — the CMO queue appears both here and inside
-  [`/dashboard/cmo`](app/dashboard/cmo/page.tsx), because a sheet cannot be executed while its
-  registration is contested. Three shapes: two parties each claiming the whole of one right, a sheet
-  totalling more than 100%, and a claim against an ISRC with no delivered recording — which cannot be
-  verified at all until the work is delivered and matched.
-
----
-
-## Airplay Geography & Hit Velocity — `/dashboard/analytics/regional`
-
-- **Hub map** — Kampala, Jinja, Mbarara, Gulu and Mbale plus Nairobi and Dar es Salaam, plotted by
-  longitude and latitude with marker radius tracking the week's spins. Click a hub to filter.
-- **Track velocity** — radio spin growth over 7 days against a streaming-search index. Radio leading
-  search usually means station push; search leading radio is the shape of an organic breakout.
-- **A&R hit predictor** — tracks over 50 spins this week in a *secondary* market while Kampala is
-  still quiet. That is the Ugandan break pattern: Gulu, Mbale or Mbarara first, Kampala two or three
-  weeks later.
-
-> Cross-border demand is **modelled, not measured** — East Sound has no Nairobi or Dar es Salaam panel. Hub
-> spins are apportioned from the domestic airplay model by reach, and the search index is a synthetic
-> proxy.
-
----
-
-## Live Airplay Alerts & Webhooks — `/dashboard/alerts`
-
-- **Notification triggers** — per track or per station, toggle WhatsApp, email and webhook
-  independently. A rule with no channels stays enabled but fires nowhere, which is how an operator
-  mutes one record without deleting the subscription.
-- **Simulated handset** — a phone frame showing the pushes as they land, revealed one at a time on a
-  timer rather than all at once, because the point is what an artist experiences. The copy comes from
-  `whatsappMessage` — the same function a real gateway would call:
-
-  > 🔥 AIRPLAY ALERT: Your track 'Katono' was just played on Capital FM (91.3 Kampala) at 15:42 EAT!
-  > Verified by the UPRS registry.
-
-- **Delivery log** — the same events as they would arrive over email and webhook, with the JSON body
-  a webhook subscriber receives.
-
-Times render in East Africa Time (UTC+3) via `formatEatClock`, even though the ledger stores UTC.
-
-> Play events are generated deterministically from the rule set. No WhatsApp Business API, SMTP or
-> webhook endpoint is connected, and nothing leaves the browser.
-
----
-
-## Live Station Monitor
-
-### Station grid
-
-Eleven monitored Ugandan feeds — Capital FM 91.3, CBS FM 89.2, Galaxy FM 100.2, NBS TV (Ch. 34 DTT),
-KFM, Bukedde FM, Better FM, Radio West, Mega FM, Upcountry FM and Radio Gaaki 89.7 (Jinja) — spanning
-all four regions. Defined in [`lib/monitoring.ts`](lib/monitoring.ts), where each entry derives its
-region and hub from the shared spin panel in [`lib/regions.ts`](lib/regions.ts) so the two lists
-cannot drift.
-
-Each card carries:
-
-- **Live status indicator** — `Live` / `Degraded` / `Offline` with feed latency and 24h uptime.
-  Telemetry is seeded per station and drifts every 2.5s, so the panel reads as live.
-- **Audio player widget** — transport, volume and a rolling signal-level history. One feed plays at
-  a time.
-- **Real-time waveform visualizer** — a canvas oscilloscope reading the `AnalyserNode` in the signal
-  path on every animation frame. It is the sound you hear, not an animation beside it; a paused
-  card settles to the baseline so idle cannot be mistaken for live.
-- **Last Detected Track badge** — title, artist, ISRC, confidence bar and detection time, or an
-  explicit "Unmatched audio — not in the catalogue" / "No detection yet".
-
-### Audio
-
-This environment cannot reach live broadcast streams, so the widget plays a locally synthesized
-stand-in for a station's feed ([`lib/monitor-audio.ts`](lib/monitor-audio.ts)): a pink-noise bed
-through a bandpass plus three LFO-modulated partials. Swapping in a real stream means pointing
-`start()` at a `<audio>` element via `createMediaElementSource` — nothing downstream changes.
-
-### Fingerprint scan
-
-**Run Audio Fingerprint Scan** walks the panel and appends detections to the live feed, one station
-at a time. Each entry carries a UTC timestamp, station name and frequency, track title, artist, ISRC,
-confidence, matched-window length and the matching method. Roughly one in eight falls below the 60%
-match threshold and is recorded as **unmatched** rather than dropped — unmatched audio is the signal
-that a delivery is missing from the catalogue. Stations whose feed is offline produce no detection.
-
-Matching is a pure, seeded function (`simulateScan`), so it is fully unit-tested.
-
-### Live fingerprint peak detector
-
-[`components/audio-fingerprint-visualizer.tsx`](components/audio-fingerprint-visualizer.tsx) is the
-one part of the monitor that reads *real* audio. It opens the operator's microphone through
-`getUserMedia`, runs it through a native `AnalyserNode`, and paints the magnitude spectrum with
-extracted spectral landmarks overlaid. No audio libraries — the Web Audio API only.
-
-Landmark extraction lives in [`lib/audio-fingerprint.ts`](lib/audio-fingerprint.ts) as a pure
-function so it is testable without a canvas or an `AudioContext`. It follows the constellation
-approach: a bin qualifies when it is a strict local maximum within a comparison window **and** clears
-a magnitude floor, with a minimum bin spacing so a harmonic comb collapses to its strongest member
-rather than firing on every partial. The DC and rumble bins are excluded.
-
-> **Not a recognition engine.** There is no reference index to match against, so the landmarks are a
-> measure of spectral salience, not identified works. The UI says so, and the recognition path stays
-> the simulated `simulateScan` above.
-
-Two operational notes:
-
-- `getUserMedia` needs a secure context, so the preview must be served over HTTPS.
-- Denied, missing-device and unsupported-browser cases each surface a distinct message in the panel
-  rather than failing to the console.
-
----
-
-## Artist & Label Portal
-
-### What's on the page
-
-**1. Delivery uploader** — a drag-and-drop dropzone for MP3/WAV masters.
-
-- Native HTML5 drag & drop, plus click-to-browse; multiple files stage a whole release at once.
-- Client-side validation before anything is sent: extension, non-audio rejection, empty files and
-  an 80 MB per-file ceiling. Rejections are listed with a reason instead of failing silently.
-- Each accepted file is probed in-browser for duration and gets a playable preview.
-- `Artist - Title (ft. Someone).mp3` file names are parsed to prefill the metadata form.
-
-**2. Metadata form** — Song Title, Primary Artist, Featured Artists, Release Date and ISRC.
-
-- Featured artists are split on `,` `;` `&` `and` `x` `/` into individual royalty participants.
-- **Generate ISRC** allocates the next free code in the registrant's year block rather than a random
-  one, so two deliveries from the same label in the same year never collide. Format is the IFPI
-  standard `CC-XXX-YY-NNNNN` with `CC = UG`. See [`lib/isrc.ts`](lib/isrc.ts).
-- ISRC is validated live; a valid code registered outside Uganda is accepted but flagged.
-- Delivery is blocked until an audio master is attached and every required field validates.
-
-**3. Active catalogue** — every uploaded track with its total spins across the Uganda FM panel.
-
-Rendered by [`components/airplay-table.tsx`](components/airplay-table.tsx), which is a reusable
-table rather than a portal-specific one. Every piece of chrome is opt-in: pass `onDelete` to get the
-remove action, `onFocusRegion` to get the region switcher, and `title`/`emptyHint` to reframe it.
-With none of them it degrades to a read-only read-out.
-
-- Columns: track + artists + genre, ISRC, release date, master format, reporting stations, total
-  spins with week-over-week change, a 14-day trend sparkline and the regional airplay split.
-- Sortable on track, release date, stations and spins; searchable across title, artist, genre and ISRC.
-- Selecting a region re-points the spin and station columns at that region and re-ranks the table.
-
-**4. Airplay by region** — Central, Eastern, Western and Northern.
-
-- Bar chart of spins per region, plus a stacked "top tracks × region" view.
-- Region cards show spins, share of total, reporting stations against panel size, and reach.
-- Clicking a bar or card filters the catalogue table to that region.
-
-### The airplay model
-
-Until station playout feeds are wired up, [`lib/airplay.ts`](lib/airplay.ts) derives a deterministic
-14-day panel read-out from the track's ISRC and release date:
-
-- regional totals are weighted by the reach of each region's station panel, so Central leads;
-- a **campaign factor** scales the total by release age — a launch ramp, a plateau, then catalogue decay;
-- per-day noise sits on top of the campaign curve, because rotation never repeats a day exactly;
-- the whole thing is seeded from a stable hash, so the catalogue never re-shuffles between requests.
-
-`sum(trend) === spins` holds for every region, and the tests assert it.
-
-## National Charts — `/dashboard/charts`
-
-The public weekly national airplay chart. [`lib/charts.ts`](lib/charts.ts) ranks every recording
-with spins in the last seven reporting days; last week's ranking comes from the seven days before
-that, so movement, debuts and the biggest climber are read straight off the airplay curve. Peak
-position is the one fixture element — the prototype keeps only fourteen days of history — and is
-bounded above by the current rank so a peak can never be worse than today's slot.
-
----
-
-## Database schema (migration target)
-
-[`prisma/schema.prisma`](prisma/schema.prisma) is the reviewed persistence artefact: `User`, `Track`,
-`RadioStation`, `AirplayMatch`, `RoyaltyReport` and `AdCampaign`, plus the supporting `AdSlot`,
-`SplitSheet`, `SplitParty`, `RoyaltyLine` and `UnidentifiedClip` tables. Every model maps to an
-in-memory counterpart that the test suite already exercises, so the field list is not aspirational.
-
-The running prototype keeps its catalogue in `.data/` behind [`lib/store.ts`](lib/store.ts); nothing
-imports the generated Prisma client yet. `tests/prisma-schema.test.ts` runs the Prisma wasm validator
-in-process (no database, no Rust-engine download), so `npm test` fails if the schema stops parsing or
-a relation dangles. `npm run db:validate` does the same via the CLI on a machine with normal egress.
-
----
-
-## Getting started
+## Run locally
 
 ```bash
-npm install
-npm run dev          # http://localhost:3000 → redirects to /dashboard/artist
+npm ci
+npm run dev -- --hostname 0.0.0.0
 ```
+
+Open `/dashboard/artist`. For a production server, use `npm run build` followed by `npm run start -- --hostname 0.0.0.0`.
 
 ```bash
-npm test             # vitest, 365 tests
-npm run typecheck    # next typegen && tsc --noEmit
-npm run lint         # eslint
-npm run build        # production build
+npm run typecheck
+npm run lint
+npm test
+# Disposable local PostgreSQL; no production connection or real provider sends:
+npm run test:postgres
+# With the application running and a Playwright Chromium installed:
+npx playwright install chromium
+npm run test:browser
 ```
 
-### API
+The browser suite exercises the UI, mobile overflow, master delivery and cleanup, notification configuration, PDF downloads, source setup and intercepted test-only evidence. It does not send provider messages or write simulated broadcasts into the capture store. Use a separate `EAST_SOUND_DATA_DIR` when testing deployments.
 
-| Method   | Path                            | Purpose                                                      |
-| -------- | ------------------------------- | ------------------------------------------------------------ |
-| `GET`    | `/api/catalogue`                | Catalogue rows, panel size and summary                       |
-| `GET`    | `/api/stations`                 | Spin panel + monitored flag, optional `?region=` filter      |
-| `GET`    | `/api/charts`                   | Weekly national airplay chart                                |
-| `GET`    | `/api/tracks`                   | Catalogue rows                                               |
-| `POST`   | `/api/tracks`                   | Deliver a master (`multipart/form-data`) — validates, stores, assigns airplay |
-| `PUT`    | `/api/tracks`                   | Allocate the next free ISRC for a registrant + release year   |
-| `DELETE` | `/api/tracks/:id`               | Withdraw a track and delete its stored master                |
-| `GET`    | `/api/royalties`                | Distribution report + member statements + payout batches     |
-| `GET`    | `/api/royalties/export`         | CSV download for `?kind=statements\|batches\|report`          |
+## Workspaces
 
-`POST` returns `422` with per-field errors (`title`, `primaryArtist`, `releaseDate`, `isrc`, `audio`)
-so the form can surface them inline.
+The shell offers **Artist & Label Portal**, **Broadcaster Playout Log**, **CMO & UPRS Regulatory Auditor**, and **Advertiser Spot Tracker**. These are browser-saved **view preferences, not authentication or authorization**.
 
-## Deployment
+| Route                           | Capabilities                                                                                                                         |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `/dashboard/artist`             | Overview; five KPIs; Uganda map; master delivery; real release catalogue; artist library                                             |
+| `/dashboard/artists`            | BARANGA, MR FALLBACK, SOUNDLYKBB and TAI DAI profiles, credited releases, citations, consent-based Apple Music player, reference CSV |
+| `/dashboard/playout`            | Captured FM/TV logs; search, match, station, region and period filters; ten-second evidence; logging-sheet CSV                       |
+| `/dashboard/monitoring`         | Authorized, user-configured native/HLS station playback, source management, captured activity and regional filtering                 |
+| `/dashboard/alerts`             | Subscriptions, WhatsApp binding and simulator, email/PDF digests, templates and signed webhook configuration                         |
+| `/dashboard/cmo`                | Captured rights allocations, multi-select filters, daypart policies and compliance-review exports                                    |
+| `/dashboard/splits`             | Supplied master splits and local collaborator acknowledgements                                                                       |
+| `/dashboard/analytics/regional` | Central, Eastern, Western and Northern Uganda filters, schematic map and capture-backed hub totals                                   |
+| `/dashboard/charts`             | Connected-panel rolling seven-day rankings and prior-period comparison; unknown historical peaks stay blank                          |
+| `/dashboard/royalties`          | Indicative captured-play statements; initially pending; settlement actions are explicitly local-only                                 |
+| `/dashboard/advertisers`        | Clearly labelled ad-contract/spot-audit **simulation**, not actual brand buys or detected spots                                      |
+| `/dashboard/mix-parser`         | Integration-required state; no generated real-artist identifications                                                                 |
 
-The app has two shapes, because GitHub Pages can only serve files.
+### Five shared KPIs
 
-### Full application — a Node host (Vercel, Netlify, Docker, `npm start`)
+- Total audited capture records, with matched and reporting-station counts.
+- Top performing station by matched plays.
+- Peak four-hour airplay window in East Africa Time.
+- Active notification subscriptions: enabled, valid rules with at least one locally configured, opted-in channel. **Not provider connectivity or delivery.**
+- Flagged unmatched audio, determined by catalogue match rather than by presence of an ISRC.
 
-`npm run build` + `npm start` runs the whole thing: the `/api/tracks` routes, the dynamically
-rendered pages, and the file-backed store behind [`lib/store.ts`](lib/store.ts). This is the
-production shape and the one to use when you need upload and persistence. Deploy it to any Node
-host — Vercel is the default target for Next 16.
+The Uganda country outline is public-domain Natural Earth geometry. The four regional divisions are schematic—not official administrative boundaries. Streaming/search, audience measurement, cross-border monitoring and hit predictions are not inferred from public artist metadata.
 
-### GitHub Pages — read-only static export
+## Real releases, not fictional artist activity
 
-GitHub Pages serves static files only; it cannot run the API routes, the server-side rendering, or
-the on-disk store. [`scripts/build-static.sh`](scripts/build-static.sh) therefore produces a
-**read-only snapshot**: it stages the source, removes `app/api`, drops the `force-dynamic` flags,
-sets `output: "export"` with the repo `basePath`, and emits `.static-build/out`. Every page is
-prerendered from the seed catalogue.
+The application now starts with **12 sourced public-release references** from the four requested artist profiles. Exact co-leads, featured credits, edition dates, genres and durations are retained. The provenance registry contains 15 Apple Music sources, reviewed on **1 November 2026**; see [artist research](docs/artist-research.md).
 
-[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) runs that script on push
-to `main` (and the working branch) and publishes the `out` directory with `actions/deploy-pages`.
-The site lands at `https://mikeo-ne.github.io/BMAT/`.
+- Unknown ISRCs remain empty; reference records have no master file, format, ownership, approved signatures, spins or royalties.
+- The old seven asset-less demo catalogue rows are migrated on read. Matching legacy IDs and local tags identify those rows; genuinely stored masters and unrelated deliveries are retained. The migration is idempotent and never resets corrupt data.
+- Reference links and published ℗ credits are **not licences, endorsement or proof of ownership**. No music is downloaded or rehosted. Apple playback loads only after explicit consent; availability and playback length depend on Apple and the user's account/region.
+- Generic algorithm fixtures live only under `tests/fixtures/`. Production data paths do not generate artist airplay, default rights shares or fabricated society membership.
 
-Because there is no server behind it, the static site cannot accept deliveries: the artist portal
-loads, but submitting the upload form posts to an API that does not exist there, so it fails with
-the inline error toast rather than saving. Treat the GitHub Pages build as a demonstration of the
-dashboards, not the working product.
+## Delivery and rights
+
+Stage multiple **WAV/MP3 files up to 80 MiB each** (80 × 1024 × 1024 bytes). The workflow validates extensions/MIME, audio signatures and browser decoding, previews staged audio, and reserves unique local `UG-ESD-YY-XXXXX` tags. These allocations are **local identifiers, not authorized registry assignments**. Supply an existing verified ISRC when applicable.
+
+Master, performance and mechanical ownership pools must each total 100%. Add collaborators, co-writers, producers and publishers; record matching typed-name approvals after the agreement is valid. Changes clear approvals. The server revalidates files, metadata, shares and approvals before storing a master. These are local acknowledgements—not independently authenticated collaborator signatures or proof of rights.
+
+New deliveries start **processing, with zero observed spins**. Uploading a master does not capture a station, generate airplay or earn a royalty. Focusable tooltips and onboarding explain ISRC versus ISWC and performance versus mechanical rights.
+
+## Captures, playback and evidence
+
+The dashboard reads an initially empty captured-event store. A protected `POST /api/playout` accepts validated, explicitly `source: "captured"` integration records; `GET /api/playout` exposes the captured feed. See [integration contracts](docs/notifications-and-capture.md).
+
+Activity views use **the current EAT day and thirteen prior days** and poll every 15 seconds in visible tabs. Invalid/unavailable responses retain the last good snapshot with a stale-data notice. Missing data is never replaced with demo activity.
+
+Station sources are public HTTPS native/HLS URLs entered by an authorized operator and saved in their browser. No default broadcaster stream, false uptime/latency or fabricated "online" status is provided. Opening a source allows browser playback; **playback is not recording, matching or fingerprint recognition**. Provider CORS, transport format and browser support still apply.
+
+A capture can include a ten-second evidence URL and SHA-256. Missing clips disable evidence actions. The player validates the supplied duration and stops at ten seconds. An explicit, CORS-based verification downloads at most 16 MiB within 15 seconds, compares SHA-256, and plays the verified downloaded bytes when successful. A matching hash proves byte integrity only—not provenance, recognition, ownership or broadcaster attribution. Real captures never receive synthesized fallback audio.
+
+## CMO review and illustrative allocations
+
+Captured, deduplicated plays enter the allocation ledger only with a supplied valid ISRC and complete locally approved ownership. Local `ES-...` holder IDs are not verified UPRS membership. Integer remainder allocation conserves the modelled UGX pool.
+
+The default time policy is **prime 1.5× / standard 1× / night 0.8×**:
+
+- Prime: 06–10 and 16–20 EAT.
+- Standard: 10–16 and 20–22 EAT.
+- Night: 22–06 EAT.
+
+These are configurable illustrative windows/weights, not verified programme schedules or published UPRS tariffs. The monthly allocation view includes the current and five previous EAT calendar months, using actual capture timestamps rather than a synthetic monthly daypart mix. Incomplete rights/identifiers remain unallocated.
+
+Logging-sheet CSV exports include EAT times, identifiers, supplied metadata, confidence, evidence status, daypart and illustrative amounts. Unknown ISWCs, composition and programme fields remain blank for review. Exports are formula-safe, **not official UPRS filing templates, certified audit reports, payment instructions or amounts owed**. Royalty approval/"paid" marks are page-memory simulations; no bank transfer or persisted settlement is performed.
+
+## Airplay Alerts & Webhooks
+
+The dedicated notification center and global configuration modal support:
+
+- Validated international WhatsApp recipients, including **+256 plus nine subscriber digits**, explicit opt-in and customizable message templates.
+- First captured FM play, exact lifetime FM milestones (100/1,000 by default), and morning/drive-time drops on **Capital FM, CBS FM and Galaxy FM**.
+- Per-recording, station and regional scopes; create/edit/pause/resume/delete subscriptions; local persistence and cross-tab synchronization.
+- A **Test WhatsApp Notification** phone preview, clearly labelled simulated and excluded from metrics, captures and live dispatch.
+- Completed-EAT-day morning recaps and completed-seven-day regional trends, with genuine selectable-text **PDF exports** and configurable email scheduling.
+- Label webhook destinations for JSON backends, Discord and Telegram **relays**, payload previews and consented private worker-configuration downloads.
+- Server-only Meta WhatsApp template messages, Resend email/PDF attachments and signed webhook adapters, protected by explicit environment configuration and a private worker token.
+
+Saving preferences does **not** send messages, register a phone with Meta, connect a provider, or provision a scheduler. Subscriptions start at activation; pre-activation captures inform counters without retrospective sends. Editing/resuming starts a new activation window. Provider acceptance is not handset/email delivery or a read receipt.
+
+Read [notification/capture setup, environment variables, API examples, signing and retry semantics](docs/notifications-and-capture.md) before enabling any outbound integration.
+
+## Vercel deployment and release verification
+
+The repository includes a Next.js `vercel.json` and pins Node 22. Link `mikeo-ne/BMAT` to your Vercel project with `main` as the production branch. GitHub Pages remains a separate `/BMAT` static showcase.
+
+**Vercel has no durable local filesystem.** Without explicitly configured PostgreSQL, the Vercel app serves the 12 public references directly in read-only mode—no `.data` writes, fake captures or `/tmp` upload success. The dashboard displays this boundary, disables capture polling and master delivery/tag allocation, and keeps browser-local channel settings, simulations, source previews and PDF exports available. `GET /api/health` reports the deployed commit, storage mode and actual supported capabilities without secrets. Selecting PostgreSQL with bad/missing configuration fails closed instead of reverting to references.
+
+Even with PostgreSQL, Vercel master catalogue mutations stay disabled: the 80 MiB master workflow needs authenticated direct-to-object-storage uploads (Vercel function request-body limits apply), not ephemeral function disk. The existing 80 MiB workflow remains available on a properly authenticated Node host with durable storage. Do not enable live messages or import/migrate a production database merely to pass a deployment check.
+
+After a deployment, run the **Verify Vercel deployment** GitHub Actions workflow with its approved HTTPS origin and exact commit SHA, or locally with an installed Chromium:
 
 ```bash
-npm run build:static   # local equivalent of what the workflow does → .static-build/out
+EAST_SOUND_TEST_URL=https://<your-deployment>.vercel.app \
+EAST_SOUND_EXPECT_COMMIT=<deployed-40-character-sha> npm run test:deployment
 ```
 
-## Storage
+This read-only-cloud smoke suite checks health/commit identity, eleven dashboard routes, the honest catalogue/empty capture feed, rejected mutations, browser notification controls/simulator/PDF downloads and mobile delivery safeguards. It does not create a master, reserve a tag, inject a capture or send a real notification. It does not bypass deployment protection; a protected site needs authorized access before anonymous verification can pass.
 
-There is no database yet. Track rows live in `.data/tracks.json` and delivered masters in
-`.data/uploads/` — both gitignored, both created on first read. The first read seeds six demo tracks.
+## Persistence, deployment and boundaries
 
-[`lib/store.ts`](lib/store.ts) is the only module that touches the filesystem and deliberately exposes
-the shape a real repository would, so moving to Postgres later is a one-file change.
+By default the live Node server uses `EAST_SOUND_DATA_DIR` (default `.data/`, ignored by Git) for:
 
-[`prisma/schema.prisma`](prisma/schema.prisma) is the reviewed persistence target and already models
-the catalogue, airplay matches, royalty reports and statements, payout batches, ad campaigns and
-split sheets. It is validated in-process by `npm test` so the schema stays in step with the code
-without needing a Postgres server.
+- `tracks.json`, `uploads/` and `isrc-reservations.json`.
+- `broadcasts.json`—captured records only, immutable by provider event ID.
+- `notification-attempts.json`—bounded delivery metadata without recipient addresses, message bodies, destination URLs or secrets.
 
-> **Demo data.** The seeded catalogue, the station panel in [`lib/regions.ts`](lib/regions.ts) and
-> every spin count are synthetic fixtures. Artist names are invented, and while the station names and
-> hubs are drawn from real Ugandan radio, the name/hub/reach pairing is illustrative — this is not a
-> verified UPRS station registry and no figure here is real reporting for a real recording.
->
-> **Changing the seed data?** Rows persist to `.data/tracks.json` (gitignored) on first run, so edit
-> [`lib/catalog.ts`](lib/catalog.ts) and delete `.data/` to re-seed.
+JSON mutations are atomic and serialised **within one Node process**. Corrupt files are not reset. Serverless/ephemeral filesystems and multiple replicas do not provide safe shared file persistence.
 
-## Layout
+### Optional PostgreSQL and polling worker
 
-```
-app/
-  dashboard/
-    artist/page.tsx        the portal (server component, reads the catalogue)
-    monitoring/page.tsx    live station monitor
-    cmo/page.tsx           UPRS audit ledger
-    splits/page.tsx        ownership, sign-off, disputes
-    advertisers/page.tsx   airtime audit
-    mix-parser/page.tsx    transitions & unknown audio
-    analytics/regional/page.tsx  geography, velocity, predictor
-    alerts/page.tsx        alert rules + webhook log
-    charts/page.tsx        weekly national chart
-    royalties/page.tsx     member statements + payout batches
-    layout.tsx             sidebar + topbar shell
-  api/
-    tracks/                delivery routes
-    royalties/             royalty report + CSV export
-    catalogue/             catalogue + summary
-    stations/              panel registry
-    charts/                weekly chart
-components/
-  artist-portal.tsx        client state: staging, delivery, filtering
-  upload-dropzone.tsx      drag & drop, validation, staged file list
-  track-metadata-form.tsx  the five metadata fields + ISRC generator
-  airplay-table.tsx        reusable sortable/searchable airplay table
-  region-airplay-chart.tsx regional breakdown
-  station-monitor.tsx      monitor grid, telemetry drift, scan orchestration
-  station-card.tsx         status, player, waveform, last-detected badge
-  waveform.tsx             canvas oscilloscope driven by the AnalyserNode
-  audio-fingerprint-visualizer.tsx  live mic spectrum + landmark overlay
-  detection-feed.tsx       timestamped fingerprint matches
-  cmo-audit.tsx            filter state, report generation, CSV export
-  cmo-table.tsx            sortable/paginated enterprise ledger table
-  dispute-alerts.tsx       overlapping ISRC registrations (splits + CMO)
-  ad-auditor.tsx           campaign state, gauge, heatmap, breach queue
-  campaign-form.tsx        jingle upload + contract terms
-  compliance-gauge.tsx     contracted vs verified dial
-  hour-heatmap.tsx         station x hour airtime grid
-  airtime-alerts.tsx       missed and breached slots
-  mix-parser-view.tsx      station, playhead, tagging state
-  mix-timeline.tsx         60-minute seekable SVG waveform
-  unidentified-queue.tsx   sub-threshold segments
-  tagging-modal.tsx        10s excerpt + catalogue search + link
-  split-manager.tsx        sheet selector, pie, approvals
-  split-pie.tsx            ownership donut
-  split-approvals.tsx      sign-off status and reminders
-  regional-analytics.tsx   hub selection, velocity, predictor
-  hub-map.tsx              lon/lat hub plot
-  velocity-chart.tsx       spins vs search index
-  hit-predictor.tsx        emerging secondary-market tracks
-  alerts-view.tsx          rules, events, webhook log
-  alert-settings.tsx       per-target channel toggles
-  whatsapp-simulator.tsx   simulated handset
-  multi-select.tsx         searchable multi-select + filter chips
-  distribution-report.tsx  royalty pool, tier breakdown, member allocation
-  royalties-dashboard.tsx  statements, batches, approval/payment state, CSV
-lib/
-  isrc.ts                  ISRC generation, validation, parsing
-  airplay.ts               seeded airplay model
-  catalog.ts               track construction, seed rows, designation allocation
-  store.ts                 file-backed catalogue store (server-only)
-  regions.ts               Uganda regions, hubs and FM station panel
-  charts.ts                weekly national chart, movement, debuts
-  monitoring.ts            monitored panel, telemetry, fingerprint matching
-  monitor-audio.ts         synthesized monitor feed (Web Audio)
-  audio-fingerprint.ts     pure spectral landmark extraction
-  royalties.ts             statements, payout batches, CSV export
-  uprs.ts                  memberships, tariff, ledger, report, CSV
-  advertising.ts           contracts, slots, compliance, heatmap, breaches
-  mix-parser.ts            timeline, transitions, queue, waveform, search
-  splits.ts                split sheets, sign-off, rights disputes
-  geography.ts             hubs, hub metrics, velocity, hit predictor
-  alerts.ts                channels, rules, events, push copy
-  format.ts  types.ts  upload.ts
+Set `EAST_SOUND_STORAGE_BACKEND=postgres`, a verified-TLS `DATABASE_URL` and a non-nil `EAST_SOUND_TENANT_ID`, then explicitly run:
 
-prisma/
-  schema.prisma            persistence target (validated by tests)
-tests/                     vitest unit + component tests
+```bash
+npm run db:migrate
+npm run db:seed
+# Only after real provider configuration, consented rules and explicit live enable:
+npm run worker:notifications
 ```
 
-## Stack
+The dedicated SQL migration/repositories persist catalogue, tenant-scoped captures, local ISRC reservations and a transactional notification outbox. Monthly partitions, global provider-event deduplication, atomic FM counters and complete partition-key foreign keys avoid the sample's first-spin count race. Workers use `FOR UPDATE SKIP LOCKED`, renewable/fenced leases, bounded backoff/dead letters and the existing approved-template/Resend/signed-webhook adapters. Daily/weekly HTTP digests retain their scheduler contract with shared PostgreSQL attempt leases. No mock send is recorded as success.
 
-Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS 4 · Recharts · Vitest
+Browser settings must be privately registered through authenticated `/api/notifications/rules`; PostgreSQL instant HTTP dispatch consumes committed jobs rather than rescan-and-send. This is opt-in: no database is provisioned, private JSON imported, capture fabricated or real message sent automatically. Existing genuine files require a reviewed import before switching. Static export remains public-reference-only.
 
-Geist is self-hosted via the `geist` package (`next/font/local`) so builds do not depend on
-`fonts.googleapis.com` being reachable.
+Read **[PostgreSQL setup, migration, rules, worker, retention and security boundaries](docs/postgres-and-worker.md)** before enabling it. `prisma/schema.prisma` remains an unwired historical draft, not this active SQL schema. Master bytes still require durable filesystem/object storage. Database tenant columns and worker tokens are **not end-user authentication or RLS**. Add actual access controls, authenticated approvals, licensed capture, provider callbacks, monitoring and tested backup/retention before production.
 
-`next.config.ts` sets `allowedDevOrigins: ["*.e2b.app"]` so the sandboxed live preview can reach
-Next's dev-only resources; without it Next 16 blocks them as cross-origin with a 403.
+`npm run build:static` creates `.static-build/out/` with the `/BMAT` base path by default. It excludes environment files, API routes and private runtime data; disables capture polling/provider readiness; and seeds only public reference metadata. Set `BASE_PATH` if needed. Static hosting cannot ingest captures, reserve server tags, store masters or dispatch messages; browser-local configuration, reference browsing and PDF export remain available.
+
+**Do not expose this prototype's catalogue/upload mutation APIs publicly without gateway authentication and tenant/access controls.** Role-view switching is not security. Before a public launch, add operational monitoring, retention policies, encrypted secret/config storage, backup/recovery and provider delivery callbacks. No real broadcaster capture, authenticated artist signature, provider account, official tariff, BMAT certification or UPRS endorsement is implied by this checkout.

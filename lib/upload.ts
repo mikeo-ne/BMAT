@@ -1,6 +1,9 @@
 export const MAX_UPLOAD_BYTES = 80 * 1024 * 1024;
 
-export const ACCEPTED_AUDIO: Record<string, { format: "MP3" | "WAV"; mime: string }> = {
+export const ACCEPTED_AUDIO: Record<
+  string,
+  { format: "MP3" | "WAV"; mime: string }
+> = {
   mp3: { format: "MP3", mime: "audio/mpeg" },
   wav: { format: "WAV", mime: "audio/wav" },
 };
@@ -32,7 +35,11 @@ export function extensionOf(fileName: string): string {
  * Guards the dropzone: only MP3/WAV, and nothing absurdly large.
  * Returns a reason string when the file must be rejected, null when accepted.
  */
-export function validateAudioFile(file: { name: string; size: number; type?: string }): string | null {
+export function validateAudioFile(file: {
+  name: string;
+  size: number;
+  type?: string;
+}): string | null {
   const ext = extensionOf(file.name);
   const accepted = ACCEPTED_AUDIO[ext];
 
@@ -51,17 +58,53 @@ export function validateAudioFile(file: { name: string; size: number; type?: str
     return `"${file.name}" is ${(file.size / 1048576).toFixed(1)} MB — the 80 MB ceiling is exceeded.`;
   }
 
+  const mime = file.type?.toLowerCase().split(";")[0].trim() ?? "";
+  const allowed =
+    ext === "mp3"
+      ? ["audio/mpeg", "audio/mp3", "audio/x-mp3", "audio/mpg"]
+      : ["audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave"];
+  if (mime && mime !== "application/octet-stream" && !allowed.includes(mime)) {
+    return `"${file.name}" has a MIME type that does not match its ${accepted.format} extension.`;
+  }
   return null;
+}
+
+/** Lightweight container check, shared by browser staging and server delivery. */
+export function hasAudioSignature(
+  header: Uint8Array,
+  format: "MP3" | "WAV",
+): boolean {
+  if (format === "WAV") {
+    const text = String.fromCharCode(...header.slice(0, 12));
+    return (
+      header.length >= 12 &&
+      (text.startsWith("RIFF") || text.startsWith("RF64")) &&
+      text.slice(8, 12) === "WAVE"
+    );
+  }
+  return (
+    header.length >= 3 &&
+    (String.fromCharCode(...header.slice(0, 3)) === "ID3" ||
+      (header[0] === 0xff &&
+        (header[1] & 0xe0) === 0xe0 &&
+        (header[1] & 0x06) !== 0 &&
+        (header[2] & 0xf0) !== 0xf0))
+  );
 }
 
 /**
  * Best-effort "Artist - Title.mp3" parse used to prefill the metadata form when
  * a file is dropped. Returns empty strings when the name carries no separator.
  */
-export function parseFileName(
-  fileName: string,
-): { title: string; primaryArtist: string; featuredArtists: string[] } {
-  const stem = fileName.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").trim();
+export function parseFileName(fileName: string): {
+  title: string;
+  primaryArtist: string;
+  featuredArtists: string[];
+} {
+  const stem = fileName
+    .replace(/\.[^.]+$/, "")
+    .replace(/[_]+/g, " ")
+    .trim();
 
   const sep = stem.split(/\s+[-–—]\s+/);
   if (sep.length >= 2) {
@@ -69,7 +112,9 @@ export function parseFileName(
     let title = rest.join(" - ").trim();
     let featured: string[] = [];
 
-    const featMatch = title.match(/\s*[\[(]\s*(?:ft\.?|feat\.?|featuring)\s+([^)\]]+)\s*[\])]\s*$/i);
+    const featMatch = title.match(
+      /\s*[\[(]\s*(?:ft\.?|feat\.?|featuring)\s+([^)\]]+)\s*[\])]\s*$/i,
+    );
     if (featMatch) {
       featured = splitArtists(featMatch[1]);
       title = title.slice(0, featMatch.index).trim();
@@ -78,7 +123,9 @@ export function parseFileName(
     return { title, primaryArtist: artist.trim(), featuredArtists: featured };
   }
 
-  const bracket = stem.match(/\s*[\[(]\s*(?:ft\.?|feat\.?|featuring)\s+([^)\]]+)\s*[\])]\s*$/i);
+  const bracket = stem.match(
+    /\s*[\[(]\s*(?:ft\.?|feat\.?|featuring)\s+([^)\]]+)\s*[\])]\s*$/i,
+  );
   if (bracket) {
     return {
       title: stem.slice(0, bracket.index).trim(),

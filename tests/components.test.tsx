@@ -1,13 +1,23 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { AirplayTable } from "@/components/airplay-table";
 import { RegionAirplayChart } from "@/components/region-airplay-chart";
 import { Sparkline } from "@/components/sparkline";
 import { StatCards } from "@/components/stat-cards";
-import { TrackMetadataForm, type MetadataValues } from "@/components/track-metadata-form";
-import { buildSeedTracks } from "@/lib/catalog";
+import {
+  TrackMetadataForm,
+  type MetadataValues,
+} from "@/components/track-metadata-form";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 import { summariseCatalog } from "@/lib/types";
 
 const NOW = new Date("2026-09-03T00:00:00Z");
@@ -32,7 +42,9 @@ describe("StatCards", () => {
     render(<StatCards summary={summary} />);
 
     expect(screen.getByText("Total stream spins")).toBeTruthy();
-    expect(screen.getByText(summary.totalSpins.toLocaleString("en-US"))).toBeTruthy();
+    expect(
+      screen.getByText(summary.totalSpins.toLocaleString("en-US")),
+    ).toBeTruthy();
   });
 });
 
@@ -50,7 +62,11 @@ describe("RegionAirplayChart", () => {
 
     for (const region of ["Central", "Eastern", "Western", "Northern"]) {
       const card = screen.getAllByText(region).at(-1)!.closest("button")!;
-      expect(within(card).getByText(summary.byRegion[region as "Central"].spins.toLocaleString("en-US"))).toBeTruthy();
+      expect(
+        within(card).getByText(
+          summary.byRegion[region as "Central"].spins.toLocaleString("en-US"),
+        ),
+      ).toBeTruthy();
     }
   });
 
@@ -84,7 +100,9 @@ describe("RegionAirplayChart", () => {
     );
 
     expect(
-      screen.getByText(/Regional airplay appears here once your first master is delivered/i),
+      screen.getByText(
+        /Regional airplay appears here once your first master is delivered/i,
+      ),
     ).toBeTruthy();
   });
 });
@@ -104,7 +122,9 @@ describe("AirplayTable", () => {
     for (const track of TRACKS) {
       expect(screen.getByText(track.title)).toBeTruthy();
       expect(screen.getByText(track.isrc)).toBeTruthy();
-      expect(screen.getByText(track.totalSpins.toLocaleString("en-US"))).toBeTruthy();
+      expect(
+        screen.getByText(track.totalSpins.toLocaleString("en-US")),
+      ).toBeTruthy();
     }
   });
 
@@ -125,8 +145,12 @@ describe("AirplayTable", () => {
     // Scope to the track's own row — the footer total repeats the same number.
     const row = screen.getByText(track.title).closest("tr")!;
 
-    expect(within(row).getByText(northern.toLocaleString("en-US"))).toBeTruthy();
-    expect(within(row).queryByText(track.totalSpins.toLocaleString("en-US"))).toBeNull();
+    expect(
+      within(row).getByText(northern.toLocaleString("en-US")),
+    ).toBeTruthy();
+    expect(
+      within(row).queryByText(track.totalSpins.toLocaleString("en-US")),
+    ).toBeNull();
   });
 
   it("filters by search text", () => {
@@ -141,11 +165,11 @@ describe("AirplayTable", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Search the catalogue"), {
-      target: { value: "Ggwe" },
+      target: { value: "gamma" },
     });
 
-    expect(screen.getByText("Ggwe Ondabika")).toBeTruthy();
-    expect(screen.queryByText("Nkwagala")).toBeNull();
+    expect(screen.getByText("Fixture D")).toBeTruthy();
+    expect(screen.queryByText("Fixture A")).toBeNull();
   });
 
   it("asks the parent to remove a track", () => {
@@ -160,7 +184,9 @@ describe("AirplayTable", () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText(`Remove ${TRACKS[0].title} from the catalogue`));
+    fireEvent.click(
+      screen.getByLabelText(`Remove ${TRACKS[0].title} from the catalogue`),
+    );
     expect(onDelete).toHaveBeenCalledWith(TRACKS[0].id);
   });
 });
@@ -171,17 +197,19 @@ describe("Sparkline", () => {
     const paths = container.querySelectorAll("path");
 
     expect(paths.length).toBe(2); // area + line
-    expect(container.querySelector("svg")!.getAttribute("aria-label")).toMatch(/5 reporting days/);
+    expect(container.querySelector("svg")!.getAttribute("aria-label")).toMatch(
+      /5 reporting days/,
+    );
   });
 });
 
 describe("TrackMetadataForm", () => {
   const values: MetadataValues = {
-    title: "Nkwagala",
-    primaryArtist: "Ray Bwete",
-    featuredArtists: "Aisha Nakato",
+    title: "Fixture A",
+    primaryArtist: "QA Artist Alpha",
+    featuredArtists: "QA Guest One",
     releaseDate: "2026-09-10",
-    isrc: "UG-NNT-26-00001",
+    isrc: "UG-QTL-26-00001",
   };
 
   it("renders all five delivery fields", () => {
@@ -224,7 +252,11 @@ describe("TrackMetadataForm", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /Attach audio to deliver/ }).hasAttribute("disabled")).toBe(true);
+    expect(
+      screen
+        .getByRole("button", { name: /Attach audio to deliver/ })
+        .hasAttribute("disabled"),
+    ).toBe(true);
 
     rerender(
       <TrackMetadataForm
@@ -250,31 +282,37 @@ describe("TrackMetadataForm", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /Deliver to catalogue/ }).hasAttribute("disabled")).toBe(false);
+    expect(
+      screen
+        .getByRole("button", { name: /Deliver to catalogue/ })
+        .hasAttribute("disabled"),
+    ).toBe(false);
   });
 
   it("rejects an invalid ISRC before submit", () => {
     const onSubmit = vi.fn();
 
     render(
-      <form>
-        <TrackMetadataForm
-          values={{ ...values, isrc: "UG-NNT-26-001" }}
-          errors={{}}
-          onChange={() => {}}
-          onGenerateIsrc={() => {}}
-          generatingIsrc={false}
-          staged={null}
-          submitting={false}
-          onSubmit={onSubmit}
-          onClear={() => {}}
-          today="2026-09-03"
-        />
-      </form>,
+      <TrackMetadataForm
+        values={{ ...values, isrc: "UG-QTL-26-001" }}
+        errors={{}}
+        onChange={() => {}}
+        onGenerateIsrc={() => {}}
+        generatingIsrc={false}
+        staged={null}
+        submitting={false}
+        onSubmit={onSubmit}
+        onClear={() => {}}
+        today="2026-09-03"
+      />,
     );
 
     act(() => {
-      fireEvent.submit(screen.getByRole("button", { name: /Attach audio to deliver/ }).closest("form")!);
+      fireEvent.submit(
+        screen
+          .getByRole("button", { name: /Attach audio to deliver/ })
+          .closest("form")!,
+      );
     });
 
     expect(screen.getByText(/Expected CC-XXX-YY-NNNNN/)).toBeTruthy();
@@ -285,7 +323,9 @@ describe("AirplayTable reusability", () => {
   it("hides the remove action when no onDelete is passed", () => {
     render(<AirplayTable tracks={TRACKS} />);
 
-    expect(screen.queryByRole("button", { name: /Remove .* from the catalogue/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Remove .* from the catalogue/ }),
+    ).toBeNull();
     expect(screen.getAllByRole("row").length).toBe(TRACKS.length + 2);
   });
 

@@ -23,12 +23,13 @@ export interface SplitParty {
   /** Digital sign-off timestamp, null while outstanding. */
   signedAt: string | null;
   /** How the party signs, shown in the approval list. */
-  channel: "OTP" | "Email" | "Pending invite" | null;
+  channel: "OTP" | "Email" | "Pending invite" | "Local approval" | null;
 }
 
 export type SheetStatus = "complete" | "awaiting-signatures" | "disputed";
 
 export interface SplitSheet {
+  origin?: Track["origin"];
   isrc: string;
   trackId: string;
   title: string;
@@ -40,8 +41,17 @@ export interface SplitSheet {
   totalPct: number;
 }
 
-const PRODUCERS = ["DJ Ssebbi", "Nessim Beats", "Hans Room", "Kampala Beat Lab"];
-const PUBLISHERS = ["East Sound Publishing", "Mekono Music", "Pearl Rights Admin"];
+const PRODUCERS = [
+  "DJ Ssebbi",
+  "Nessim Beats",
+  "Hans Room",
+  "Kampala Beat Lab",
+];
+const PUBLISHERS = [
+  "East Sound Publishing",
+  "Mekono Music",
+  "Pearl Rights Admin",
+];
 
 function memberIdFor(name: string): string {
   const slug = name
@@ -49,7 +59,7 @@ function memberIdFor(name: string): string {
     .replace(/[^a-z]+/g, "")
     .slice(0, 3)
     .toUpperCase();
-  const n = hashSeed(name) % 9000 + 1000;
+  const n = (hashSeed(name) % 9000) + 1000;
   return `UPRS-${slug}-${n}`;
 }
 
@@ -60,19 +70,67 @@ function memberIdFor(name: string): string {
  * split their block equally, and producer / publisher take fixed points. The
  * primary artist absorbs the remainder so the sheet always totals 100.
  */
-export function buildSplitSheet(track: Track, now: Date = new Date()): SplitSheet {
+export function buildSplitSheet(
+  track: Track,
+  now: Date = new Date(),
+): SplitSheet {
+  if (track.origin !== "test-fixture" && !track.ownership)
+    return {
+      origin: track.origin,
+      isrc: track.isrc,
+      trackId: track.id,
+      title: track.title,
+      primaryArtist: track.primaryArtist,
+      parties: [],
+      status: "awaiting-signatures",
+      raisedAt: track.uploadedAt,
+      totalPct: 0,
+    };
+  if (track.ownership) {
+    const parties: SplitParty[] = track.ownership.parties.map((party) => ({
+      id: party.id,
+      name: party.name,
+      role: party.role === "Co-writer" ? "Songwriter" : party.role,
+      sharePct: party.shares.master,
+      memberId: null,
+      signedAt: party.signature?.signedAt ?? null,
+      channel: party.signature ? "Local approval" : null,
+    }));
+    const totalPct = parties.reduce((sum, party) => sum + party.sharePct, 0);
+    return {
+      origin: track.origin,
+      isrc: track.isrc,
+      trackId: track.id,
+      title: track.title,
+      primaryArtist: track.primaryArtist,
+      parties,
+      totalPct,
+      status:
+        parties.every((party) => party.signedAt) &&
+        Math.abs(totalPct - 100) < 0.001
+          ? "complete"
+          : "awaiting-signatures",
+      raisedAt: track.uploadedAt,
+    };
+  }
   const rand = createRandom(hashSeed(`split:${track.isrc}`));
 
   const featuredCount = track.featuredArtists.length;
   const producer = PRODUCERS[hashSeed(`${track.isrc}:prod`) % PRODUCERS.length];
-  const publisher = PUBLISHERS[hashSeed(`${track.isrc}:pub`) % PUBLISHERS.length];
+  const publisher =
+    PUBLISHERS[hashSeed(`${track.isrc}:pub`) % PUBLISHERS.length];
 
   const producerPct = 15 + (hashSeed(`${track.isrc}:ppct`) % 10); // 15-24
   const publisherPct = 10;
-  const featuredBlockPct = featuredCount === 0 ? 0 : 20 + (featuredCount - 1) * 5;
+  const featuredBlockPct =
+    featuredCount === 0 ? 0 : 20 + (featuredCount - 1) * 5;
 
-  const primaryPct = Math.max(100 - producerPct - publisherPct - featuredBlockPct, 0);
-  const featuredEach = featuredCount === 0 ? 0 : Math.floor(featuredBlockPct / featuredCount);
+  const primaryPct = Math.max(
+    100 - producerPct - publisherPct - featuredBlockPct,
+    0,
+  );
+  const featuredEach =
+    featuredCount === 0 ? 0 : Math.floor(featuredBlockPct / featuredCount);
 
   const parties: SplitParty[] = [
     {
@@ -91,7 +149,10 @@ export function buildSplitSheet(track: Track, now: Date = new Date()): SplitShee
 
   for (const [i, name] of track.featuredArtists.entries()) {
     // The first featured artist picks up any rounding remainder.
-    const share = i === 0 ? featuredBlockPct - featuredEach * (featuredCount - 1) : featuredEach;
+    const share =
+      i === 0
+        ? featuredBlockPct - featuredEach * (featuredCount - 1)
+        : featuredEach;
     const signed = rand() < 0.55;
     parties.push({
       id: `${track.id}:featured-${i}`,
@@ -99,7 +160,9 @@ export function buildSplitSheet(track: Track, now: Date = new Date()): SplitShee
       role: "Featured artist",
       sharePct: share,
       memberId: memberIdFor(name),
-      signedAt: signed ? new Date(now.getTime() - 86_400_000 * (1 + i)).toISOString() : null,
+      signedAt: signed
+        ? new Date(now.getTime() - 86_400_000 * (1 + i)).toISOString()
+        : null,
       channel: signed ? "Email" : "Pending invite",
     });
   }
@@ -111,7 +174,9 @@ export function buildSplitSheet(track: Track, now: Date = new Date()): SplitShee
     role: "Producer",
     sharePct: producerPct,
     memberId: memberIdFor(producer),
-    signedAt: producerSigned ? new Date(now.getTime() - 86_400_000 * 2).toISOString() : null,
+    signedAt: producerSigned
+      ? new Date(now.getTime() - 86_400_000 * 2).toISOString()
+      : null,
     channel: producerSigned ? "OTP" : "Pending invite",
   });
 
@@ -129,6 +194,7 @@ export function buildSplitSheet(track: Track, now: Date = new Date()): SplitShee
   const allSigned = parties.every((p) => p.signedAt !== null);
 
   return {
+    origin: track.origin,
     isrc: track.isrc,
     trackId: track.id,
     title: track.title,
@@ -140,12 +206,17 @@ export function buildSplitSheet(track: Track, now: Date = new Date()): SplitShee
   };
 }
 
-export function buildSplitSheets(catalogue: Track[], now: Date = new Date()): SplitSheet[] {
-  return catalogue.map((track) => buildSplitSheet(track, now));
+export function buildSplitSheets(
+  catalogue: Track[],
+  now: Date = new Date(),
+): SplitSheet[] {
+  return catalogue
+    .filter((track) => track.origin !== "public-reference")
+    .map((track) => buildSplitSheet(track, now));
 }
 
 export const SHEET_STATUS_LABEL: Record<SheetStatus, string> = {
-  complete: "Fully executed",
+  complete: "Approvals recorded",
   "awaiting-signatures": "Awaiting signatures",
   disputed: "Under dispute",
 };
@@ -154,7 +225,10 @@ export const SHEET_STATUS_LABEL: Record<SheetStatus, string> = {
 /* Disputes                                                                    */
 /* -------------------------------------------------------------------------- */
 
-export type DisputeKind = "overlapping-rights" | "share-overflow" | "unmatched-registration";
+export type DisputeKind =
+  | "overlapping-rights"
+  | "share-overflow"
+  | "unmatched-registration";
 
 export interface DisputeClaimant {
   name: string;
@@ -185,7 +259,9 @@ const RIGHT_LABEL: Record<DisputeClaimant["rightType"], string> = {
   master: "master rights",
 };
 
-export function rightTypeLabel(rightType: DisputeClaimant["rightType"]): string {
+export function rightTypeLabel(
+  rightType: DisputeClaimant["rightType"],
+): string {
   return RIGHT_LABEL[rightType];
 }
 
@@ -196,8 +272,14 @@ export function rightTypeLabel(rightType: DisputeClaimant["rightType"]): string 
  * two parties each claiming the whole of the same right, a split sheet whose
  * shares total more than 100, and a claim against an ISRC East Sound has no record of.
  */
-export function buildDisputes(sheets: SplitSheet[], now: Date = new Date()): RightsDispute[] {
+export function buildDisputes(
+  sheets: SplitSheet[],
+  now: Date = new Date(),
+): RightsDispute[] {
   const disputes: RightsDispute[] = [];
+  // Synthetic claims must never be attached to real artists or real deliveries.
+  sheets = sheets.filter((sheet) => sheet.origin === "test-fixture");
+  if (!sheets.length) return disputes;
 
   // 1. Overlapping rights on a catalogued recording.
   const first = sheets[0];
@@ -277,7 +359,8 @@ export function buildDisputes(sheets: SplitSheet[], now: Date = new Date()): Rig
       },
     ],
     overlapPct: 100,
-    headline: "Two publishers claiming 100% mechanical rights for ISRC UG-A01-26-00012",
+    headline:
+      "Two publishers claiming 100% mechanical rights for ISRC UG-A01-26-00012",
     detail:
       "Both A01 Records and Pearl Rights Admin assert the whole mechanical right, and East Sound holds no delivered master under this ISRC. With no reference recording to fingerprint against, neither claim can be verified — the work has to be delivered and matched before either party is paid.",
     raisedAt: new Date(now.getTime() - 86_400_000 * 1).toISOString(),

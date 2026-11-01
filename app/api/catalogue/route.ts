@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { PANEL_SIZE } from "@/lib/catalog";
-import { readTracks } from "@/lib/store";
+import { readAnalyticsTracks as readTracks } from "@/lib/workspace-data";
 import { summariseCatalog } from "@/lib/types";
 
 export const runtime = "nodejs";

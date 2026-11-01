@@ -4,9 +4,21 @@ import { useMemo, useState } from "react";
 
 import { RegionSplit } from "@/components/region-split";
 import { Sparkline } from "@/components/sparkline";
-import { formatCompact, formatDate, formatNumber, formatPercent, initials } from "@/lib/format";
+import {
+  formatCompact,
+  formatDate,
+  formatNumber,
+  formatPercent,
+  initials,
+} from "@/lib/format";
 import { REGION_META, REGIONS, type Region } from "@/lib/regions";
-import { dominantRegion, spinsFor, stationsFor, trendFor, type Track } from "@/lib/types";
+import {
+  dominantRegion,
+  spinsFor,
+  stationsFor,
+  trendFor,
+  type Track,
+} from "@/lib/types";
 
 type SortKey = "title" | "releaseDate" | "totalSpins" | "stations";
 type SortDir = "asc" | "desc";
@@ -99,7 +111,10 @@ export function AirplayTable({
   };
 
   const total = rows.reduce((sum, t) => sum + spinsFor(t, focusRegion), 0);
-  const stationTotal = rows.reduce((sum, t) => sum + stationsFor(t, focusRegion), 0);
+  const stationTotal = rows.reduce(
+    (sum, t) => sum + stationsFor(t, focusRegion),
+    0,
+  );
 
   const columns: { key: SortKey | null; label: string; align?: "right" }[] = [
     { key: "title", label: "Track" },
@@ -114,17 +129,26 @@ export function AirplayTable({
   ];
 
   return (
-    <section className="panel overflow-hidden" aria-labelledby="airplay-table-heading">
+    <section
+      className="panel overflow-hidden"
+      aria-labelledby="airplay-table-heading"
+    >
       <header className="flex flex-wrap items-end justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
         <div>
-          <h2 id="airplay-table-heading" className="text-sm font-semibold tracking-tight">
+          <h2
+            id="airplay-table-heading"
+            className="text-sm font-semibold tracking-tight"
+          >
             {title}
           </h2>
           <p className="text-xs text-muted">
             {description ?? (
               <>
                 {rows.length} of {tracks.length} tracks ·{" "}
-                <span className="tabular-nums text-foreground">{formatNumber(total)}</span> spins
+                <span className="tabular-nums text-foreground">
+                  {formatNumber(total)}
+                </span>{" "}
+                spins
                 {focusRegion !== "All" ? ` in ${focusRegion}` : " nationwide"}
               </>
             )}
@@ -143,7 +167,13 @@ export function AirplayTable({
                   aria-hidden
                   className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
                 >
-                  <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.7" />
+                  <circle
+                    cx="11"
+                    cy="11"
+                    r="7"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                  />
                   <path
                     d="M20 20l-3.2-3.2"
                     stroke="currentColor"
@@ -180,10 +210,14 @@ export function AirplayTable({
                   <button
                     key={region}
                     type="button"
-                    onClick={() => onFocusRegion?.(focusRegion === region ? "All" : region)}
+                    onClick={() =>
+                      onFocusRegion?.(focusRegion === region ? "All" : region)
+                    }
                     className={[
                       "rounded px-2 py-1 text-[11px] transition-colors",
-                      focusRegion === region ? "text-brand-ink" : "text-muted hover:text-foreground",
+                      focusRegion === region
+                        ? "text-brand-ink"
+                        : "text-muted hover:text-foreground",
                     ].join(" ")}
                     style={
                       focusRegion === region
@@ -211,10 +245,11 @@ export function AirplayTable({
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[980px] border-collapse text-left text-sm">
             <caption className="sr-only">
-              Uploaded tracks with total spins across Uganda FM stations and regional airplay split
+              Uploaded tracks with total spins across Uganda FM stations and
+              regional airplay split
             </caption>
             <thead>
               <tr className="border-b border-line bg-surface-2/60 text-[11px] uppercase tracking-wider text-muted">
@@ -243,7 +278,9 @@ export function AirplayTable({
                         {col.label}
                         <span
                           aria-hidden
-                          className={sortKey === col.key ? "text-brand" : "opacity-30"}
+                          className={
+                            sortKey === col.key ? "text-brand" : "opacity-30"
+                          }
                         >
                           {sortKey === col.key && sortDir === "asc" ? "▲" : "▼"}
                         </span>
@@ -286,7 +323,9 @@ export function AirplayTable({
                           {initials(track.title)}
                         </span>
                         <span className="min-w-0">
-                          <span className="block truncate font-medium">{track.title}</span>
+                          <span className="block truncate font-medium">
+                            {track.title}
+                          </span>
                           <span className="block truncate text-xs text-muted">
                             {track.primaryArtist}
                             {track.featuredArtists.length > 0 &&
@@ -301,19 +340,27 @@ export function AirplayTable({
                       </div>
                     </td>
 
-                    <td className="px-3 py-3 font-mono text-xs text-muted">{track.isrc}</td>
+                    <td className="px-3 py-3 font-mono text-xs text-muted">
+                      {track.isrc || "Not verified"}
+                    </td>
                     <td className="px-3 py-3 text-xs tabular-nums text-muted">
                       {formatDate(track.releaseDate)}
                     </td>
 
                     <td className="px-3 py-3">
-                      <span className="chip font-mono">{track.audio.format}</span>
+                      <span className="chip font-mono">
+                        {track.audio.format ?? "No master"}
+                      </span>
                     </td>
 
-                    <td className="px-3 py-3 text-right tabular-nums">{stations}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">
+                      {stations}
+                    </td>
 
                     <td className="px-3 py-3 text-right">
-                      <span className="block font-semibold tabular-nums">{formatNumber(spins)}</span>
+                      <span className="block font-semibold tabular-nums">
+                        {formatNumber(spins)}
+                      </span>
                       <span
                         className={[
                           "block text-[11px] tabular-nums",
@@ -324,7 +371,9 @@ export function AirplayTable({
                               : "text-red-300",
                         ].join(" ")}
                       >
-                        {wow === null ? "new this week" : `${formatPercent(wow, 0)} w/w`}
+                        {wow === null
+                          ? "new this week"
+                          : `${formatPercent(wow, 0)} w/w`}
                       </span>
                     </td>
 
@@ -332,15 +381,24 @@ export function AirplayTable({
                       <Sparkline
                         values={trend}
                         stroke={
-                          focusRegion === "All" ? "var(--brand)" : REGION_META[focusRegion].accent
+                          focusRegion === "All"
+                            ? "var(--brand)"
+                            : REGION_META[focusRegion].accent
                         }
                         label={`${track.title} spins over 14 days`}
                       />
                     </td>
 
-                    <td className={["px-3 py-3", onDelete ? "pr-2" : "pr-5"].join(" ")}>
+                    <td
+                      className={["px-3 py-3", onDelete ? "pr-2" : "pr-5"].join(
+                        " ",
+                      )}
+                    >
                       <div className="w-40">
-                        <RegionSplit airplay={track.airplay} focus={focusRegion} />
+                        <RegionSplit
+                          airplay={track.airplay}
+                          focus={focusRegion}
+                        />
                       </div>
                     </td>
 
@@ -353,7 +411,9 @@ export function AirplayTable({
                           disabled={pendingDeleteId === track.id}
                           aria-label={`Remove ${track.title} from the catalogue`}
                         >
-                          {pendingDeleteId === track.id ? "Removing…" : "Remove"}
+                          {pendingDeleteId === track.id
+                            ? "Removing…"
+                            : "Remove"}
                         </button>
                       </td>
                     )}
@@ -367,13 +427,18 @@ export function AirplayTable({
                 <td className="px-3 py-2.5 pl-5" colSpan={4}>
                   Panel total · {formatCompact(total)} spins
                 </td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{stationTotal}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">
+                  {stationTotal}
+                </td>
                 <td className="px-3 py-2.5 text-right font-medium tabular-nums text-foreground">
                   {formatNumber(total)}
                 </td>
                 <td
                   colSpan={onDelete ? 3 : 2}
-                  className={["px-3 py-2.5 text-right", onDelete ? "pr-5" : "pr-5"].join(" ")}
+                  className={[
+                    "px-3 py-2.5 text-right",
+                    onDelete ? "pr-5" : "pr-5",
+                  ].join(" ")}
                 >
                   Reporting window: last 14 days
                 </td>

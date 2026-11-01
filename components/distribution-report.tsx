@@ -1,7 +1,17 @@
 "use client";
 
-import { formatCompact, formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
-import { DISTRIBUTION_POLICY, TARIFF, UGX_PER_USD, type DistributionReport as Report } from "@/lib/uprs";
+import { TIME_BAND_META } from "@/lib/dayparts";
+import {
+  formatCompact,
+  formatCurrency,
+  formatDateTime,
+  formatNumber,
+} from "@/lib/format";
+import {
+  TARIFF,
+  UGX_PER_USD,
+  type DistributionReport as Report,
+} from "@/lib/uprs";
 
 interface DistributionReportProps {
   report: Report;
@@ -24,7 +34,10 @@ export function DistributionReport({
     <section className="panel overflow-hidden" aria-labelledby="report-heading">
       <header className="flex flex-wrap items-end justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
         <div>
-          <h2 id="report-heading" className="text-sm font-semibold tracking-tight">
+          <h2
+            id="report-heading"
+            className="text-sm font-semibold tracking-tight"
+          >
             Distribution report
           </h2>
           <p className="text-xs text-muted">
@@ -47,7 +60,13 @@ export function DistributionReport({
             disabled={empty}
             title="Download every ledger row behind this report"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden
+            >
               <path
                 d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"
                 stroke="currentColor"
@@ -65,7 +84,13 @@ export function DistributionReport({
             disabled={empty}
             title="Download the summary and per-member allocation"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden
+            >
               <path
                 d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"
                 stroke="currentColor"
@@ -83,7 +108,11 @@ export function DistributionReport({
         <div className="px-5 py-14 text-center">
           <p className="text-sm font-medium">No report generated</p>
           <p className="mt-1 text-xs text-muted">
-            Adjust the filters and press <span className="text-foreground">Generate Distribution Report</span>.
+            Adjust the filters and press{" "}
+            <span className="text-foreground">
+              Generate Distribution Report
+            </span>
+            .
           </p>
         </div>
       ) : (
@@ -99,7 +128,7 @@ export function DistributionReport({
               {
                 label: "Royalty pool (est.)",
                 value: `UGX ${formatCompact(report.royaltyPoolUgx)}`,
-                hint: `UGX ${formatCurrency(report.royaltyPoolUgx)} at flat per-play rates`,
+                hint: `UGX ${formatCurrency(report.royaltyPoolUgx)} ${report.timeWeighting ? "with time-of-day weights" : "at flat per-play rates"}`,
               },
               {
                 label: "Indicative USD",
@@ -109,24 +138,59 @@ export function DistributionReport({
               {
                 label: "Members payable",
                 value: formatNumber(report.memberCount),
-                hint: `${report.workCount} recordings · split ${DISTRIBUTION_POLICY.primaryShare * 100}/${DISTRIBUTION_POLICY.featuredShare * 100}`,
+                hint: `${report.workCount} recordings · per-recording rights shares`,
               },
             ].map((card) => (
-              <div key={card.label} className="rounded-lg border border-line bg-surface-2/60 p-3.5">
+              <div
+                key={card.label}
+                className="rounded-lg border border-line bg-surface-2/60 p-3.5"
+              >
                 <dt className="text-[11px] text-muted">{card.label}</dt>
                 <dd className="mt-1 text-xl font-semibold tracking-tight tabular-nums">
                   {card.value}
                 </dd>
-                <p className="mt-1 text-[11px] leading-snug text-muted">{card.hint}</p>
+                <p className="mt-1 text-[11px] leading-snug text-muted">
+                  {card.hint}
+                </p>
               </div>
             ))}
           </dl>
 
+          {report.timeWeighting && (
+            <div className="rounded-xl border border-brand/20 bg-brand/5 p-4">
+              <h3 className="text-xs font-semibold">
+                Time-of-day weighted estimate
+              </h3>
+              <p className="mt-1 text-[10px] leading-relaxed text-muted">
+                Base pool UGX {formatCurrency(report.timeWeighting.basePoolUgx)}
+                . Monthly totals are modelled as 45% prime, 40% standard and the
+                remainder night; these are not captured timestamps. Rates and
+                multipliers are illustrative, not UPRS policy.
+              </p>
+              <dl className="mt-3 grid grid-cols-3 gap-2">
+                {report.timeWeighting.bands.map((band) => (
+                  <div key={band.band}>
+                    <dt className="text-[10px] text-muted">
+                      {TIME_BAND_META[band.band].label} ×{band.multiplier}
+                    </dt>
+                    <dd className="mt-1 text-xs font-medium">
+                      UGX {formatCurrency(band.amountUgx)}
+                    </dd>
+                    <p className="mt-0.5 text-[9px] text-muted">
+                      {formatNumber(band.plays)} allocated plays
+                    </p>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            {/* Flat-rate basis */}
+            {/* Base-rate breakdown */}
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-                Royalty estimation — flat rate basis
+                {report.timeWeighting
+                  ? "Royalty estimation — base tariffs × time weights"
+                  : "Royalty estimation — flat rate basis"}
               </h3>
               <table className="w-full border-collapse text-left text-xs">
                 <thead>
@@ -147,12 +211,17 @@ export function DistributionReport({
                 </thead>
                 <tbody>
                   {report.byRate.map((rate) => (
-                    <tr key={rate.tier} className="border-b border-line/50 last:border-0">
+                    <tr
+                      key={rate.tier}
+                      className="border-b border-line/50 last:border-0"
+                    >
                       <td className="py-1.5">{rate.label}</td>
                       <td className="py-1.5 text-right font-mono text-muted tabular-nums">
                         {formatNumber(rate.ugxPerPlay)}
                       </td>
-                      <td className="py-1.5 text-right tabular-nums">{formatNumber(rate.plays)}</td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        {formatNumber(rate.plays)}
+                      </td>
                       <td className="py-1.5 text-right font-medium tabular-nums">
                         {formatCurrency(rate.amountUgx)}
                       </td>
@@ -179,12 +248,19 @@ export function DistributionReport({
               </h3>
               <ul className="flex flex-col gap-1.5">
                 {report.byRegion.map((entry) => (
-                  <li key={entry.region} className="flex items-center gap-2.5 text-xs">
-                    <span className="w-20 shrink-0 text-muted">{entry.region}</span>
+                  <li
+                    key={entry.region}
+                    className="flex items-center gap-2.5 text-xs"
+                  >
+                    <span className="w-20 shrink-0 text-muted">
+                      {entry.region}
+                    </span>
                     <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
                       <span
                         className="block h-full rounded-full bg-brand/70"
-                        style={{ width: `${(entry.amountUgx / maxRegion) * 100}%` }}
+                        style={{
+                          width: `${(entry.amountUgx / maxRegion) * 100}%`,
+                        }}
                       />
                     </span>
                     <span className="w-24 shrink-0 text-right tabular-nums">
@@ -207,13 +283,22 @@ export function DistributionReport({
                       <th scope="col" className="px-2.5 py-1.5 font-medium">
                         Member
                       </th>
-                      <th scope="col" className="px-2.5 py-1.5 text-right font-medium">
+                      <th
+                        scope="col"
+                        className="px-2.5 py-1.5 text-right font-medium"
+                      >
                         Plays
                       </th>
-                      <th scope="col" className="px-2.5 py-1.5 text-right font-medium">
+                      <th
+                        scope="col"
+                        className="px-2.5 py-1.5 text-right font-medium"
+                      >
                         Share
                       </th>
-                      <th scope="col" className="px-2.5 py-1.5 text-right font-medium">
+                      <th
+                        scope="col"
+                        className="px-2.5 py-1.5 text-right font-medium"
+                      >
                         UGX
                       </th>
                     </tr>
@@ -225,10 +310,13 @@ export function DistributionReport({
                         className="border-b border-line/50 last:border-0 hover:bg-surface-2/50"
                       >
                         <td className="px-2.5 py-1.5">
-                          <span className="block truncate font-medium">{allocation.artist}</span>
+                          <span className="block truncate font-medium">
+                            {allocation.artist}
+                          </span>
                           <span className="block font-mono text-[10px] text-muted">
                             {allocation.memberId} · {allocation.works} work
-                            {allocation.works === 1 ? "" : "s"} · {allocation.stations} stations
+                            {allocation.works === 1 ? "" : "s"} ·{" "}
+                            {allocation.stations} stations
                           </span>
                         </td>
                         <td className="px-2.5 py-1.5 text-right tabular-nums">
@@ -249,11 +337,12 @@ export function DistributionReport({
           </div>
 
           <p className="rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 text-[11px] leading-relaxed text-brand">
-            <strong className="font-semibold">Estimate only.</strong> Figures apply a placeholder flat
-            tariff ({tariffSummary} UGX/play) and an indicative UGX {formatNumber(UGX_PER_USD)}/USD
-            rate. Neither is the published UPRS schedule — swap the constants in{" "}
-            <code className="font-mono">lib/uprs.ts</code> before circulating to members or
-            licensees.
+            <strong className="font-semibold">Estimate only.</strong> Figures
+            apply a placeholder flat tariff ({tariffSummary} UGX/play) and an
+            indicative UGX {formatNumber(UGX_PER_USD)}/USD rate. Neither is the
+            published UPRS schedule — swap the constants in{" "}
+            <code className="font-mono">lib/uprs.ts</code> before circulating to
+            members or licensees.
           </p>
         </div>
       )}

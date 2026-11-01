@@ -1,19 +1,48 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { buildBroadcastLog } from "@/lib/playout";
+import { createDeliveryParties } from "@/lib/delivery-splits";
 import { CmoAudit } from "@/components/cmo-audit";
 import { CmoTable } from "@/components/cmo-table";
 import { DistributionReport } from "@/components/distribution-report";
 import { ActiveFilterChips, MultiSelect } from "@/components/multi-select";
-import { buildSeedTracks } from "@/lib/catalog";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 import { formatPeriod } from "@/lib/format";
-import { applyFilters, buildPlayLedger, buildReport, EMPTY_FILTERS } from "@/lib/uprs";
+import {
+  applyFilters,
+  buildPlayLedger,
+  buildReport,
+  EMPTY_FILTERS,
+} from "@/lib/uprs";
 
 const NOW = new Date("2026-09-03T00:00:00Z");
 const CATALOGUE = buildSeedTracks(NOW);
 const LEDGER = buildPlayLedger({ catalogue: CATALOGUE, now: NOW, months: 6 });
 
+const CAPTURE_CATALOGUE = CATALOGUE.map((track) => ({
+  ...track,
+  ownership: {
+    version: 1 as const,
+    approvalMethod: "local-acknowledgement" as const,
+    parties: createDeliveryParties(track.primaryArtist).map((party) => ({
+      ...party,
+      signature: { typedName: party.name, signedAt: NOW.toISOString() },
+    })),
+  },
+}));
+const CAPTURES = buildBroadcastLog(CATALOGUE, NOW).map((spin) => ({
+  ...spin,
+  source: "captured" as const,
+}));
 afterEach(cleanup);
 
 describe("MultiSelect", () => {
@@ -58,7 +87,13 @@ describe("MultiSelect", () => {
   it("adds a value", () => {
     const onChange = vi.fn();
     render(
-      <MultiSelect label="Station" options={options} selected={[]} onChange={onChange} allLabel="All" />,
+      <MultiSelect
+        label="Station"
+        options={options}
+        selected={[]}
+        onChange={onChange}
+        allLabel="All"
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /All/ }));
@@ -70,7 +105,13 @@ describe("MultiSelect", () => {
   it("removes an already-selected value", () => {
     const onChange = vi.fn();
     render(
-      <MultiSelect label="Station" options={options} selected={["a"]} onChange={onChange} allLabel="All" />,
+      <MultiSelect
+        label="Station"
+        options={options}
+        selected={["a"]}
+        onChange={onChange}
+        allLabel="All"
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Capital FM/ }));
@@ -82,7 +123,13 @@ describe("MultiSelect", () => {
   it("selects all visible and clears", () => {
     const onChange = vi.fn();
     render(
-      <MultiSelect label="Station" options={options} selected={[]} onChange={onChange} allLabel="All" />,
+      <MultiSelect
+        label="Station"
+        options={options}
+        selected={[]}
+        onChange={onChange}
+        allLabel="All"
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /All/ }));
@@ -110,11 +157,19 @@ describe("MultiSelect", () => {
 
   it("narrows the list by search", () => {
     render(
-      <MultiSelect label="Station" options={options} selected={[]} onChange={() => {}} allLabel="All" />,
+      <MultiSelect
+        label="Station"
+        options={options}
+        selected={[]}
+        onChange={() => {}}
+        allLabel="All"
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /All/ }));
-    fireEvent.change(screen.getByPlaceholderText(/Search station/i), { target: { value: "west" } });
+    fireEvent.change(screen.getByPlaceholderText(/Search station/i), {
+      target: { value: "west" },
+    });
 
     expect(screen.getByLabelText(/Radio West/)).toBeTruthy();
     expect(screen.queryByLabelText(/Capital FM/)).toBeNull();
@@ -122,7 +177,13 @@ describe("MultiSelect", () => {
 
   it("closes on Escape", () => {
     render(
-      <MultiSelect label="Station" options={options} selected={[]} onChange={() => {}} allLabel="All" />,
+      <MultiSelect
+        label="Station"
+        options={options}
+        selected={[]}
+        onChange={() => {}}
+        allLabel="All"
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /All/ }));
@@ -155,7 +216,13 @@ describe("ActiveFilterChips", () => {
 
   it("renders a removable chip per filter", () => {
     const onRemove = vi.fn();
-    render(<ActiveFilterChips chips={chips} onRemove={onRemove} onClearAll={() => {}} />);
+    render(
+      <ActiveFilterChips
+        chips={chips}
+        onRemove={onRemove}
+        onClearAll={() => {}}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /Capital FM/ }));
     expect(onRemove).toHaveBeenCalledWith("station:capital-kla");
@@ -163,14 +230,26 @@ describe("ActiveFilterChips", () => {
 
   it("clears everything at once", () => {
     const onClearAll = vi.fn();
-    render(<ActiveFilterChips chips={chips} onRemove={() => {}} onClearAll={onClearAll} />);
+    render(
+      <ActiveFilterChips
+        chips={chips}
+        onRemove={() => {}}
+        onClearAll={onClearAll}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
     expect(onClearAll).toHaveBeenCalledTimes(1);
   });
 
   it("explains the unfiltered state", () => {
-    render(<ActiveFilterChips chips={[]} onRemove={() => {}} onClearAll={() => {}} />);
+    render(
+      <ActiveFilterChips
+        chips={[]}
+        onRemove={() => {}}
+        onClearAll={() => {}}
+      />,
+    );
 
     expect(screen.getByText(/No filters applied/)).toBeTruthy();
   });
@@ -228,32 +307,52 @@ describe("DistributionReport", () => {
     );
 
     expect(screen.getByText("No report generated")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Export report CSV/ }).hasAttribute("disabled")).toBe(true);
+    expect(
+      screen
+        .getByRole("button", { name: /Export report CSV/ })
+        .hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("reports total plays and the estimated pool", () => {
     render(
-      <DistributionReport report={report} onExportLedger={() => {}} onExportReport={() => {}} />,
+      <DistributionReport
+        report={report}
+        onExportLedger={() => {}}
+        onExportReport={() => {}}
+      />,
     );
 
     const card = screen.getByText("Total play count").closest("div")!;
-    expect(within(card).getByText(report.totalPlays.toLocaleString("en-US"))).toBeTruthy();
+    expect(
+      within(card).getByText(report.totalPlays.toLocaleString("en-US")),
+    ).toBeTruthy();
     expect(screen.getByText("Royalty pool (est.)")).toBeTruthy();
     expect(screen.getByText(/Members payable/)).toBeTruthy();
   });
 
   it("shows the flat-rate basis it priced on", () => {
     render(
-      <DistributionReport report={report} onExportLedger={() => {}} onExportReport={() => {}} />,
+      <DistributionReport
+        report={report}
+        onExportLedger={() => {}}
+        onExportReport={() => {}}
+      />,
     );
 
-    expect(screen.getByText("Royalty estimation — flat rate basis")).toBeTruthy();
+    expect(
+      screen.getByText("Royalty estimation — flat rate basis"),
+    ).toBeTruthy();
     expect(screen.getByText("National FM")).toBeTruthy();
   });
 
   it("flags that the tariff is a placeholder", () => {
     render(
-      <DistributionReport report={report} onExportLedger={() => {}} onExportReport={() => {}} />,
+      <DistributionReport
+        report={report}
+        onExportLedger={() => {}}
+        onExportReport={() => {}}
+      />,
     );
 
     expect(screen.getByText(/Estimate only/)).toBeTruthy();
@@ -265,7 +364,11 @@ describe("DistributionReport", () => {
     const onExportReport = vi.fn();
 
     render(
-      <DistributionReport report={report} onExportLedger={onExportLedger} onExportReport={onExportReport} />,
+      <DistributionReport
+        report={report}
+        onExportLedger={onExportLedger}
+        onExportReport={onExportReport}
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Export ledger CSV/ }));
@@ -278,47 +381,90 @@ describe("DistributionReport", () => {
 
 describe("CmoAudit", () => {
   it("renders the four filter groups and the ledger", () => {
-    render(<CmoAudit catalogue={CATALOGUE} now={NOW.toISOString()} />);
+    render(
+      <CmoAudit
+        catalogue={CAPTURE_CATALOGUE}
+        now={NOW.toISOString()}
+        initialEvents={CAPTURES}
+      />,
+    );
 
     const filters = screen.getByText("Audit filters").closest("section")!;
-    for (const label of ["Station", "Region", "Date range", "Artist Membership ID"]) {
+    for (const label of [
+      "Station",
+      "Region",
+      "Date range",
+      "Local rights-holder ID",
+    ]) {
       expect(within(filters).getByText(label)).toBeTruthy();
     }
 
-    expect(screen.getByRole("button", { name: /Generate Distribution Report/ })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Generate Distribution Report/ }),
+    ).toBeTruthy();
     expect(screen.getByText("Radio play ledger")).toBeTruthy();
     expect(screen.getByText(/No filters applied/)).toBeTruthy();
   });
 
   it("has no report until one is generated", () => {
-    render(<CmoAudit catalogue={CATALOGUE} now={NOW.toISOString()} />);
+    render(
+      <CmoAudit
+        catalogue={CAPTURE_CATALOGUE}
+        now={NOW.toISOString()}
+        initialEvents={CAPTURES}
+      />,
+    );
 
     expect(screen.queryByText("Distribution report")).toBeNull();
   });
 
   it("generates a report over the filtered ledger", async () => {
-    render(<CmoAudit catalogue={CATALOGUE} now={NOW.toISOString()} />);
+    render(
+      <CmoAudit
+        catalogue={CAPTURE_CATALOGUE}
+        now={NOW.toISOString()}
+        initialEvents={CAPTURES}
+      />,
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: /Generate Distribution Report/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Generate Distribution Report/ }),
+    );
 
     await waitFor(() => {
       expect(screen.getByText("Distribution report")).toBeTruthy();
     });
 
     expect(screen.getByText("Total play count")).toBeTruthy();
-    expect(screen.getByText(/Report generated over [\d,]+ ledger rows/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Export report CSV/ }).hasAttribute("disabled")).toBe(false);
+    expect(
+      screen.getByText(/Report generated over [\d,]+ ledger rows/),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: /Export report CSV/ })
+        .hasAttribute("disabled"),
+    ).toBe(false);
   });
 
   it("narrows the ledger when a region filter is applied", () => {
-    render(<CmoAudit catalogue={CATALOGUE} now={NOW.toISOString()} />);
+    render(
+      <CmoAudit
+        catalogue={CAPTURE_CATALOGUE}
+        now={NOW.toISOString()}
+        initialEvents={CAPTURES}
+      />,
+    );
 
-    const before = screen.getByText(/aggregated member × station × period rows/).textContent ?? "";
+    const before =
+      screen.getByText(/aggregated member × station × period rows/)
+        .textContent ?? "";
 
     fireEvent.click(screen.getByRole("button", { name: /All regions/ }));
     fireEvent.click(screen.getByLabelText(/^Northern/));
 
-    const after = screen.getByText(/aggregated member × station × period rows/).textContent ?? "";
+    const after =
+      screen.getByText(/aggregated member × station × period rows/)
+        .textContent ?? "";
     expect(after).not.toBe(before);
 
     // The chip summary reflects the selection (the select button says it too).
@@ -326,13 +472,22 @@ describe("CmoAudit", () => {
     expect(chip.textContent).toContain("Northern");
 
     // And the filtered set really is Northern-only.
-    const filtered = applyFilters(LEDGER, { ...EMPTY_FILTERS, regions: ["Northern"] });
+    const filtered = applyFilters(LEDGER, {
+      ...EMPTY_FILTERS,
+      regions: ["Northern"],
+    });
     expect(filtered.every((r) => r.region === "Northern")).toBe(true);
     expect(filtered.length).toBeLessThan(LEDGER.length);
   });
 
   it("clears all filters from the chip row", () => {
-    render(<CmoAudit catalogue={CATALOGUE} now={NOW.toISOString()} />);
+    render(
+      <CmoAudit
+        catalogue={CAPTURE_CATALOGUE}
+        now={NOW.toISOString()}
+        initialEvents={CAPTURES}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /All regions/ }));
     fireEvent.click(screen.getByLabelText(/^Northern/));

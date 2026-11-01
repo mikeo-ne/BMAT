@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSeedTracks } from "@/lib/catalog";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 import {
   applyFilters,
   buildMembers,
@@ -26,12 +26,14 @@ const LEDGER = buildPlayLedger({ catalogue: CATALOGUE, now: NOW, months: 6 });
 
 describe("memberIdFor", () => {
   it("is stable and case-insensitive", () => {
-    expect(memberIdFor("Ray Bwete")).toBe(memberIdFor("ray bwete"));
-    expect(memberIdFor("Ray Bwete")).toMatch(/^UPRS-\d{5}$/);
+    expect(memberIdFor("QA Artist Alpha")).toBe(memberIdFor("qa artist alpha"));
+    expect(memberIdFor("QA Artist Alpha")).toMatch(/^ES-\d{5}$/);
   });
 
   it("gives different people different ids", () => {
-    expect(memberIdFor("Ray Bwete")).not.toBe(memberIdFor("Peter Okoth"));
+    expect(memberIdFor("QA Artist Alpha")).not.toBe(
+      memberIdFor("QA Guest Two"),
+    );
   });
 });
 
@@ -40,15 +42,17 @@ describe("buildMembers", () => {
 
   it("includes primary and featured artists", () => {
     const names = members.map((m) => m.name);
-    expect(names).toContain("Ray Bwete"); // primary on one, feature on another
-    expect(names).toContain("Aisha Nakato"); // feature only
-    expect(names).toContain("Lillian Kyomukama");
+    expect(names).toContain("QA Artist Alpha"); // primary on one, feature on another
+    expect(names).toContain("QA Guest One"); // feature only
+    expect(names).toContain("QA Guest Three");
   });
 
   it("counts the works each member appears on", () => {
-    const ray = members.find((m) => m.name === "Ray Bwete")!;
+    const ray = members.find((m) => m.name === "QA Artist Alpha")!;
     const expected = CATALOGUE.filter(
-      (t) => t.primaryArtist === "Ray Bwete" || t.featuredArtists.includes("Ray Bwete"),
+      (t) =>
+        t.primaryArtist === "QA Artist Alpha" ||
+        t.featuredArtists.includes("QA Artist Alpha"),
     ).length;
 
     expect(ray.works).toBe(expected);
@@ -84,7 +88,10 @@ describe("sharesFor", () => {
 
     expect(shares).toHaveLength(3);
     expect(shares[1].share).toBe(shares[2].share);
-    expect(shares[1].share).toBeCloseTo(DISTRIBUTION_POLICY.featuredShare / 2, 10);
+    expect(shares[1].share).toBeCloseTo(
+      DISTRIBUTION_POLICY.featuredShare / 2,
+      10,
+    );
     expect(shares.reduce((s, h) => s + h.share, 0)).toBeCloseTo(1, 10);
   });
 });
@@ -99,12 +106,18 @@ describe("tariff", () => {
 
   it("prices television above radio regardless of reach", () => {
     expect(tierFor(5_000_000, "TV")).toBe("television");
-    expect(rateFor(5_000_000, "TV").ugxPerPlay).toBe(TARIFF.television.ugxPerPlay);
+    expect(rateFor(5_000_000, "TV").ugxPerPlay).toBe(
+      TARIFF.television.ugxPerPlay,
+    );
   });
 
   it("orders the flat rates national > regional > community", () => {
-    expect(TARIFF.national.ugxPerPlay).toBeGreaterThan(TARIFF.regional.ugxPerPlay);
-    expect(TARIFF.regional.ugxPerPlay).toBeGreaterThan(TARIFF.community.ugxPerPlay);
+    expect(TARIFF.national.ugxPerPlay).toBeGreaterThan(
+      TARIFF.regional.ugxPerPlay,
+    );
+    expect(TARIFF.regional.ugxPerPlay).toBeGreaterThan(
+      TARIFF.community.ugxPerPlay,
+    );
   });
 });
 
@@ -122,9 +135,11 @@ describe("buildPlayLedger", () => {
   });
 
   it("never bills a period before the recording was released", () => {
-    // "Boda Boda Anthem" shipped 2026-08-28, inside the 6-month window.
-    const late = CATALOGUE.find((t) => t.title === "Boda Boda Anthem")!;
-    const periods = new Set(LEDGER.filter((r) => r.isrc === late.isrc).map((r) => r.period));
+    // "Fixture E" shipped 2026-08-28, inside the 6-month window.
+    const late = CATALOGUE.find((t) => t.title === "Fixture E")!;
+    const periods = new Set(
+      LEDGER.filter((r) => r.isrc === late.isrc).map((r) => r.period),
+    );
 
     for (const period of periods) {
       expect(period >= "2026-08").toBe(true);
@@ -141,7 +156,9 @@ describe("buildPlayLedger", () => {
   });
 
   it("is deterministic", () => {
-    expect(buildPlayLedger({ catalogue: CATALOGUE, now: NOW, months: 6 })).toEqual(LEDGER);
+    expect(
+      buildPlayLedger({ catalogue: CATALOGUE, now: NOW, months: 6 }),
+    ).toEqual(LEDGER);
   });
 
   it("returns nothing for an empty catalogue", () => {
@@ -149,7 +166,11 @@ describe("buildPlayLedger", () => {
   });
 
   it("produces more history for a wider window", () => {
-    const three = buildPlayLedger({ catalogue: CATALOGUE, now: NOW, months: 3 });
+    const three = buildPlayLedger({
+      catalogue: CATALOGUE,
+      now: NOW,
+      months: 3,
+    });
     expect(LEDGER.length).toBeGreaterThan(three.length);
   });
 });
@@ -161,7 +182,10 @@ describe("applyFilters", () => {
 
   it("filters by station", () => {
     const target = LEDGER[0].stationId;
-    const result = applyFilters(LEDGER, { ...EMPTY_FILTERS, stations: [target] });
+    const result = applyFilters(LEDGER, {
+      ...EMPTY_FILTERS,
+      stations: [target],
+    });
 
     expect(result.length).toBeGreaterThan(0);
     expect(result.every((r) => r.stationId === target)).toBe(true);
@@ -175,7 +199,10 @@ describe("applyFilters", () => {
   });
 
   it("filters by region", () => {
-    const result = applyFilters(LEDGER, { ...EMPTY_FILTERS, regions: ["Northern"] });
+    const result = applyFilters(LEDGER, {
+      ...EMPTY_FILTERS,
+      regions: ["Northern"],
+    });
 
     expect(result.length).toBeGreaterThan(0);
     expect(result.every((r) => r.region === "Northern")).toBe(true);
@@ -183,14 +210,20 @@ describe("applyFilters", () => {
 
   it("filters by period", () => {
     const period = LEDGER[0].period;
-    const result = applyFilters(LEDGER, { ...EMPTY_FILTERS, periods: [period] });
+    const result = applyFilters(LEDGER, {
+      ...EMPTY_FILTERS,
+      periods: [period],
+    });
 
     expect(result.every((r) => r.period === period)).toBe(true);
   });
 
   it("filters by membership id", () => {
     const member = LEDGER[0].memberId;
-    const result = applyFilters(LEDGER, { ...EMPTY_FILTERS, members: [member] });
+    const result = applyFilters(LEDGER, {
+      ...EMPTY_FILTERS,
+      members: [member],
+    });
 
     expect(result.every((r) => r.memberId === member)).toBe(true);
   });
@@ -236,9 +269,21 @@ describe("applyFilters", () => {
 
   it("counts active filter groups", () => {
     expect(countActiveFilters(EMPTY_FILTERS)).toBe(0);
-    expect(countActiveFilters({ stations: ["a"], regions: [], periods: [], members: [] })).toBe(1);
     expect(
-      countActiveFilters({ stations: ["a"], regions: ["Central"], periods: ["2026-08"], members: ["x"] }),
+      countActiveFilters({
+        stations: ["a"],
+        regions: [],
+        periods: [],
+        members: [],
+      }),
+    ).toBe(1);
+    expect(
+      countActiveFilters({
+        stations: ["a"],
+        regions: ["Central"],
+        periods: ["2026-08"],
+        members: ["x"],
+      }),
     ).toBe(4);
   });
 });
@@ -248,20 +293,32 @@ describe("buildReport", () => {
 
   it("totals plays and royalty exactly from the rows", () => {
     expect(report.totalPlays).toBe(LEDGER.reduce((s, r) => s + r.plays, 0));
-    expect(report.royaltyPoolUgx).toBe(LEDGER.reduce((s, r) => s + r.allocationUgx, 0));
-    expect(report.royaltyPoolUsd).toBeCloseTo(report.royaltyPoolUgx / UGX_PER_USD, 6);
+    expect(report.royaltyPoolUgx).toBe(
+      LEDGER.reduce((s, r) => s + r.allocationUgx, 0),
+    );
+    expect(report.royaltyPoolUsd).toBeCloseTo(
+      report.royaltyPoolUgx / UGX_PER_USD,
+      6,
+    );
     expect(report.rowCount).toBe(LEDGER.length);
   });
 
   it("counts distinct stations and recordings", () => {
-    expect(report.stationCount).toBe(new Set(LEDGER.map((r) => r.stationId)).size);
+    expect(report.stationCount).toBe(
+      new Set(LEDGER.map((r) => r.stationId)).size,
+    );
     expect(report.workCount).toBe(new Set(LEDGER.map((r) => r.isrc)).size);
   });
 
   it("allocates the whole pool across members", () => {
-    const allocated = report.allocations.reduce((s, a) => s + a.allocationUgx, 0);
+    const allocated = report.allocations.reduce(
+      (s, a) => s + a.allocationUgx,
+      0,
+    );
     expect(allocated).toBe(report.royaltyPoolUgx);
-    expect(report.allocations.reduce((s, a) => s + a.shareOfPool, 0)).toBeCloseTo(1, 6);
+    expect(
+      report.allocations.reduce((s, a) => s + a.shareOfPool, 0),
+    ).toBeCloseTo(1, 6);
   });
 
   it("sorts members by allocation, largest first", () => {
@@ -273,8 +330,12 @@ describe("buildReport", () => {
   });
 
   it("breaks the pool down by rate tier and region", () => {
-    expect(report.byRate.reduce((s, r) => s + r.amountUgx, 0)).toBe(report.royaltyPoolUgx);
-    expect(report.byRegion.reduce((s, r) => s + r.amountUgx, 0)).toBe(report.royaltyPoolUgx);
+    expect(report.byRate.reduce((s, r) => s + r.amountUgx, 0)).toBe(
+      report.royaltyPoolUgx,
+    );
+    expect(report.byRegion.reduce((s, r) => s + r.amountUgx, 0)).toBe(
+      report.royaltyPoolUgx,
+    );
     expect(report.byRegion).toHaveLength(4);
   });
 
@@ -315,12 +376,12 @@ describe("CSV export", () => {
     const csv = ledgerToCsv([
       {
         ...LEDGER[0],
-        artist: 'Okoth, Peter "PK"',
+        artist: 'Tester, Quinn "PK"',
         title: "One, Two",
       },
     ]);
 
-    expect(csv).toContain('"Okoth, Peter ""PK"""');
+    expect(csv).toContain('"Tester, Quinn ""PK"""');
     expect(csv).toContain('"One, Two"');
   });
 
@@ -335,7 +396,9 @@ describe("CSV export", () => {
     expect(csv).toContain("Allocation by member");
 
     const memberLines = csv.split("\r\n");
-    expect(memberLines).toContain(`Member ID,Artist,Plays,Stations,Recordings,Allocation (UGX),Allocation (USD),Share of pool`);
+    expect(memberLines).toContain(
+      `Member ID,Artist,Plays,Stations,Recordings,Allocation (UGX),Allocation (USD),Share of pool`,
+    );
   });
 
   it("exports an empty ledger as a header only", () => {

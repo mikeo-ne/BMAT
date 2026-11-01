@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSeedTracks } from "@/lib/catalog";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 import {
   buildMixTimeline,
   buildMixWaveform,
@@ -133,14 +133,16 @@ describe("formatTimeline", () => {
 
 describe("searchCatalogue", () => {
   it("matches on title, artist and ISRC", () => {
-    expect(searchCatalogue(CATALOGUE, "Nkwagala").length).toBeGreaterThan(0);
-    expect(searchCatalogue(CATALOGUE, "Ray Bwete").length).toBeGreaterThan(0);
+    expect(searchCatalogue(CATALOGUE, "Fixture A").length).toBeGreaterThan(0);
+    expect(
+      searchCatalogue(CATALOGUE, "QA Artist Alpha").length,
+    ).toBeGreaterThan(0);
     expect(searchCatalogue(CATALOGUE, "UG-ESD-26-00007").length).toBe(1);
   });
 
   it("is case-insensitive and trims", () => {
-    expect(searchCatalogue(CATALOGUE, "  nkwagala  ")).toEqual(
-      searchCatalogue(CATALOGUE, "Nkwagala"),
+    expect(searchCatalogue(CATALOGUE, "  fixture a  ")).toEqual(
+      searchCatalogue(CATALOGUE, "Fixture A"),
     );
   });
 

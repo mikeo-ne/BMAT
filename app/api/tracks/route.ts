@@ -1,119 +1,167 @@
+import {
+  masterUploadsAvailable,
+  MASTER_STORAGE_NOTICE,
+} from "@/lib/runtime-storage";
+import { readAnalyticsTracks } from "@/lib/workspace-data";
 import { NextResponse } from "next/server";
-
-import { suggestIsrc } from "@/lib/catalog";
 import { checkIsrc } from "@/lib/isrc";
 import { isValidIsoDate } from "@/lib/format";
+import { parseDeliveryOwnership } from "@/lib/delivery-splits";
 import {
   ACCEPTED_AUDIO,
-  MAX_UPLOAD_BYTES,
   extensionOf,
+  hasAudioSignature,
   splitArtists,
+  validateAudioFile,
 } from "@/lib/upload";
-import { addTrack, readTracks, saveUpload } from "@/lib/store";
+import {
+  addTrack,
+  DuplicateIsrcError,
+  removeUpload,
+  reserveIsrc,
+  saveUpload,
+} from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
 export async function GET() {
-  const tracks = await readTracks();
-  return NextResponse.json({ tracks });
-}
-
-interface FieldErrors {
-  title?: string;
-  primaryArtist?: string;
-  releaseDate?: string;
-  isrc?: string;
-  audio?: string;
+  return NextResponse.json({ tracks: await readAnalyticsTracks() });
 }
 
 export async function POST(request: Request) {
+  if (!masterUploadsAvailable())
+    return NextResponse.json({ error: MASTER_STORAGE_NOTICE }, { status: 503 });
   let form: FormData;
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.json({ error: "Expected a multipart/form-data request." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Expected a multipart/form-data request." },
+      { status: 400 },
+    );
   }
-
   const title = String(form.get("title") ?? "").trim();
   const primaryArtist = String(form.get("primaryArtist") ?? "").trim();
   const releaseDate = String(form.get("releaseDate") ?? "").trim();
-  const rawIsrc = String(form.get("isrc") ?? "").trim();
+  const isrcCheck = checkIsrc(String(form.get("isrc") ?? ""));
   const featured = splitArtists(String(form.get("featuredArtists") ?? ""));
-  const durationRaw = form.get("durationSec");
+  const rawDuration = Number(form.get("durationSec"));
   const durationSec =
-    durationRaw === null || durationRaw === "" || Number.isNaN(Number(durationRaw))
-      ? null
-      : Math.max(0, Number(durationRaw));
-
+    Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : null;
+  const errors: Record<string, string> = {};
+  if (!title || title.length > 200)
+    errors.title = "Enter a song title (up to 200 characters).";
+  if (!primaryArtist || primaryArtist.length > 120)
+    errors.primaryArtist = "Enter a primary artist (up to 120 characters).";
+  if (!isValidIsoDate(releaseDate))
+    errors.releaseDate = "Use a valid release date (YYYY-MM-DD).";
+  if (!isrcCheck.valid || !isrcCheck.canonical) errors.isrc = isrcCheck.message;
   const file = form.get("audio");
-  const errors: FieldErrors = {};
-
-  if (title.length < 1) errors.title = "Song title is required.";
-  if (primaryArtist.length < 1) errors.primaryArtist = "Primary artist is required.";
-  if (!isValidIsoDate(releaseDate)) errors.releaseDate = "Use a valid release date (YYYY-MM-DD).";
-
-  const isrcCheck = checkIsrc(rawIsrc);
-  if (!isrcCheck.valid || !isrcCheck.canonical) {
-    errors.isrc = isrcCheck.message;
+  if (!(file instanceof File)) errors.audio = "Attach an MP3 or WAV master.";
+  else {
+    const issue = validateAudioFile(file);
+    if (issue) errors.audio = issue;
   }
-
-  if (!(file instanceof File)) {
-    errors.audio = "Attach an MP3 or WAV master.";
-  } else {
-    const ext = extensionOf(file.name);
-    if (!ACCEPTED_AUDIO[ext]) {
-      errors.audio = "Only MP3 and WAV masters are accepted.";
-    } else if (file.size === 0) {
-      errors.audio = "The file is empty.";
-    } else if (file.size > MAX_UPLOAD_BYTES) {
-      errors.audio = `File exceeds the ${MAX_UPLOAD_BYTES / 1048576} MB ceiling.`;
-    }
+  let splitInput: unknown;
+  try {
+    splitInput = JSON.parse(String(form.get("ownership") ?? "null"));
+  } catch {
+    errors.ownership = "Send a valid ownership split sheet.";
   }
-
-  if (Object.keys(errors).length > 0) {
-    return NextResponse.json({ error: "Delivery rejected.", errors }, { status: 422 });
-  }
-
+  const { ownership, issues } = parseDeliveryOwnership(splitInput);
+  if (issues.length) errors.ownership = issues.join(" ");
+  if (
+    ownership &&
+    !ownership.parties.some(
+      (party) =>
+        party.role === "Primary artist" &&
+        party.name.trim().toLowerCase() === primaryArtist.toLowerCase(),
+    )
+  )
+    errors.ownership =
+      "The split sheet must include the credited primary artist.";
+  if (Object.keys(errors).length)
+    return NextResponse.json(
+      { error: "Delivery rejected.", errors },
+      { status: 422 },
+    );
   const audioFile = file as File;
-  const ext = extensionOf(audioFile.name) as "mp3" | "wav";
-  const meta = ACCEPTED_AUDIO[ext];
-  const buffer = Buffer.from(await audioFile.arrayBuffer());
-  const storedName = await saveUpload(buffer, audioFile.name);
-
-  const track = await addTrack({
-    title,
-    primaryArtist,
-    featuredArtists: featured,
-    releaseDate,
-    isrc: isrcCheck.canonical as string,
-    fileName: audioFile.name,
-    format: meta.format,
-    mimeType: audioFile.type || meta.mime,
-    sizeBytes: audioFile.size,
-    durationSec,
-    storedName,
-  });
-
-  return NextResponse.json({ track }, { status: 201 });
+  const info = ACCEPTED_AUDIO[extensionOf(audioFile.name)];
+  const header = new Uint8Array(await audioFile.slice(0, 12).arrayBuffer());
+  if (!hasAudioSignature(header, info.format))
+    return NextResponse.json(
+      {
+        error: "The audio content does not match the file extension.",
+        errors: { audio: "Use a valid WAV or MP3 audio container." },
+      },
+      { status: 422 },
+    );
+  let storedName: string | null = null;
+  try {
+    storedName = await saveUpload(
+      new Uint8Array(await audioFile.arrayBuffer()),
+      audioFile.name,
+    );
+    const track = await addTrack({
+      title,
+      primaryArtist,
+      featuredArtists: featured,
+      releaseDate,
+      isrc: isrcCheck.canonical!,
+      fileName: audioFile.name,
+      format: info.format,
+      mimeType: info.mime,
+      sizeBytes: audioFile.size,
+      durationSec,
+      storedName,
+      ownership: ownership!,
+    });
+    return NextResponse.json({ track }, { status: 201 });
+  } catch (error) {
+    if (storedName) await removeUpload(storedName);
+    if (error instanceof DuplicateIsrcError)
+      return NextResponse.json(
+        { error: error.message, errors: { isrc: error.message } },
+        { status: 409 },
+      );
+    console.error("Master delivery failed", error);
+    return NextResponse.json(
+      {
+        error:
+          "The master could not be saved. Your staged file is still available; please retry.",
+      },
+      { status: 500 },
+    );
+  }
 }
 
-/** Next free ISRC in a registrant's year block — backs the generator button. */
+/** Unique local demo reservation, not an official IFPI registration. */
 export async function PUT(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const registrant = searchParams.get("registrant") ?? "";
-  const releaseDate = searchParams.get("releaseDate") ?? "";
-
-  if (releaseDate && !isValidIsoDate(releaseDate)) {
-    return NextResponse.json({ error: "Invalid release date." }, { status: 400 });
+  if (!masterUploadsAvailable())
+    return NextResponse.json({ error: MASTER_STORAGE_NOTICE }, { status: 503 });
+  const releaseDate =
+    new URL(request.url).searchParams.get("releaseDate") ||
+    new Date().toISOString().slice(0, 10);
+  if (!isValidIsoDate(releaseDate))
+    return NextResponse.json(
+      { error: "Invalid release date." },
+      { status: 400 },
+    );
+  try {
+    return NextResponse.json({
+      isrc: await reserveIsrc(releaseDate),
+      registration: "local-demo-only",
+    });
+  } catch (error) {
+    if (error instanceof RangeError)
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    console.error("ISRC reservation failed", error);
+    return NextResponse.json(
+      {
+        error:
+          "Could not reserve a local tag. Retry or enter your existing ISRC.",
+      },
+      { status: 500 },
+    );
   }
-
-  const existing = await readTracks();
-  const isrc = suggestIsrc(
-    existing,
-    registrant,
-    isValidIsoDate(releaseDate) ? releaseDate : new Date().toISOString().slice(0, 10),
-  );
-
-  return NextResponse.json({ isrc });
 }

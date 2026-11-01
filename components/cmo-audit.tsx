@@ -1,7 +1,19 @@
 "use client";
 
+import { CapturedFeedNotice } from "@/components/captured-feed-notice";
 import { useCallback, useMemo, useState } from "react";
 
+import { PageIntro } from "@/components/page-intro";
+import { ComplianceExport } from "@/components/compliance-export";
+import { WeightingControls } from "@/components/weighting-controls";
+import {
+  DEFAULT_WEIGHTING,
+  FLAT_WEIGHTING,
+  type WeightingPolicy,
+} from "@/lib/dayparts";
+import { downloadCsv } from "@/lib/csv";
+import { capturedPlayLedger } from "@/lib/compliance";
+import { eatDate, type BroadcastSpin } from "@/lib/playout";
 import { CmoTable } from "@/components/cmo-table";
 import { DisputeAlerts } from "@/components/dispute-alerts";
 import { DistributionReport } from "@/components/distribution-report";
@@ -11,8 +23,6 @@ import { REGIONS } from "@/lib/regions";
 import type { RightsDispute } from "@/lib/splits";
 import {
   applyFilters,
-  buildMembers,
-  buildPlayLedger,
   buildReport,
   countActiveFilters,
   EMPTY_FILTERS,
@@ -20,52 +30,118 @@ import {
   rateFor,
   reportToCsv,
   TARIFF,
+  type PlayRow,
   type CmoFilters,
   type DistributionReport as Report,
 } from "@/lib/uprs";
+import { currentCapturedWindow } from "@/lib/captured-airplay";
+import { useCapturedFeed } from "@/lib/use-captured-feed";
 import type { Track } from "@/lib/types";
 
 interface CmoAuditProps {
   catalogue: Track[];
   now: string;
+  initialEvents?: BroadcastSpin[];
+  canPoll?: boolean;
   /** Open rights disputes for the CMO to clear before paying. */
   disputes?: RightsDispute[];
 }
 
-/** Triggers a browser download for a generated CSV string. */
-function downloadCsv(fileName: string, csv: string): void {
-  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  URL.revokeObjectURL(url);
-}
-
 const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
 
-export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
-  const referenceDate = useMemo(() => new Date(now), [now]);
-
-  const ledger = useMemo(
-    () => buildPlayLedger({ catalogue, now: referenceDate, months: 6 }),
-    [catalogue, referenceDate],
+export function CmoAudit({
+  catalogue,
+  now,
+  disputes,
+  initialEvents = [],
+  canPoll = false,
+}: CmoAuditProps) {
+  const feed = useCapturedFeed(initialEvents, now, canPoll);
+  const referenceDate = useMemo(
+    () => new Date(`${eatDate(feed.now)}T12:00:00Z`),
+    [feed.now],
   );
 
-  const members = useMemo(() => buildMembers(catalogue), [catalogue]);
   const periods = useMemo(() => lastNMonths(6, referenceDate), [referenceDate]);
 
   const [filters, setFilters] = useState<CmoFilters>(EMPTY_FILTERS);
   const [report, setReport] = useState<Report | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const [reportRows, setReportRows] = useState<PlayRow[]>([]);
+  const [weightingEnabled, setWeightingEnabled] = useState(true);
+  const [policy, setPolicy] = useState<WeightingPolicy>(DEFAULT_WEIGHTING);
+  const generating = false;
   const [notice, setNotice] = useState<string | null>(null);
 
-  const filtered = useMemo(() => applyFilters(ledger, filters), [ledger, filters]);
+  const effectivePolicy = weightingEnabled ? policy : FLAT_WEIGHTING;
+  const ledger = useMemo(
+    () =>
+      capturedPlayLedger(
+        feed.events.filter(
+          (event) =>
+            periods.includes(eatDate(event.detectedAt).slice(0, 7)) &&
+            Date.parse(event.detectedAt) <= Date.parse(feed.now),
+        ),
+        catalogue,
+        effectivePolicy,
+      ),
+    [feed.events, catalogue, effectivePolicy, periods, feed.now],
+  );
+  const members = useMemo(
+    () => [
+      ...new Map(
+        ledger.map((row) => [
+          row.memberId,
+          {
+            memberId: row.memberId,
+            name: row.artist,
+            works: new Set(
+              ledger
+                .filter((entry) => entry.memberId === row.memberId)
+                .map((entry) => entry.isrc),
+            ).size,
+          },
+        ]),
+      ).values(),
+    ],
+    [ledger],
+  );
+  const eventLog = useMemo(
+    () => currentCapturedWindow(feed.events, new Date(feed.now)),
+    [feed.events, feed.now],
+  );
+  const filteredEvents = useMemo(
+    () =>
+      eventLog.filter((event) => {
+        if (
+          filters.stations.length &&
+          !filters.stations.includes(event.stationId)
+        )
+          return false;
+        if (filters.regions.length && !filters.regions.includes(event.region))
+          return false;
+        if (
+          filters.periods.length &&
+          !filters.periods.includes(eatDate(event.detectedAt).slice(0, 7))
+        )
+          return false;
+        if (filters.members.length) {
+          const track = catalogue.find((entry) => entry.id === event.trackId);
+          if (
+            !track ||
+            !track.ownership?.parties.some((party) =>
+              filters.members.includes(`ES-${party.id}`),
+            )
+          )
+            return false;
+        }
+        return true;
+      }),
+    [eventLog, filters, catalogue],
+  );
+  const filtered = useMemo(
+    () => applyFilters(ledger, filters),
+    [ledger, filters],
+  );
 
   const stationOptions = useMemo(() => {
     const counts = new Map<string, number>();
@@ -96,7 +172,9 @@ export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
           value: period,
           label: formatPeriod(period),
           hint: `Reporting month`,
-          count: ledger.filter((row) => row.period === period).reduce((s, r) => s + r.plays, 0),
+          count: ledger
+            .filter((row) => row.period === period)
+            .reduce((s, r) => s + r.plays, 0),
         }))
         .reverse(),
     [ledger, periods],
@@ -123,6 +201,8 @@ export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
   );
 
   const patch = useCallback((key: keyof CmoFilters, next: string[]) => {
+    setReport(null);
+    setNotice(null);
     setFilters((prev) => ({ ...prev, [key]: next }));
   }, []);
 
@@ -130,7 +210,10 @@ export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
     const list: { key: string; label: string }[] = [];
 
     for (const id of filters.stations) {
-      list.push({ key: `station:${id}`, label: stationOptions.find((o) => o.value === id)?.label ?? id });
+      list.push({
+        key: `station:${id}`,
+        label: stationOptions.find((o) => o.value === id)?.label ?? id,
+      });
     }
     for (const region of filters.regions) {
       list.push({ key: `region:${region}`, label: region });
@@ -139,34 +222,40 @@ export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
       list.push({ key: `period:${period}`, label: formatPeriod(period) });
     }
     for (const id of filters.members) {
-      list.push({ key: `member:${id}`, label: memberOptions.find((o) => o.value === id)?.label ?? id });
+      list.push({
+        key: `member:${id}`,
+        label: memberOptions.find((o) => o.value === id)?.label ?? id,
+      });
     }
 
     return list;
   }, [filters, stationOptions, memberOptions]);
 
   const removeChip = useCallback((key: string) => {
+    setReport(null);
+    setNotice(null);
     const [kind, ...rest] = key.split(":");
     const value = rest.join(":");
 
     setFilters((prev) => {
-      if (kind === "station") return { ...prev, stations: prev.stations.filter((v) => v !== value) };
+      if (kind === "station")
+        return { ...prev, stations: prev.stations.filter((v) => v !== value) };
       if (kind === "region")
-        return { ...prev, regions: prev.regions.filter((v) => v !== value) as CmoFilters["regions"] };
-      if (kind === "period") return { ...prev, periods: prev.periods.filter((v) => v !== value) };
+        return {
+          ...prev,
+          regions: prev.regions.filter(
+            (v) => v !== value,
+          ) as CmoFilters["regions"],
+        };
+      if (kind === "period")
+        return { ...prev, periods: prev.periods.filter((v) => v !== value) };
       return { ...prev, members: prev.members.filter((v) => v !== value) };
     });
   }, []);
 
-  const generate = useCallback(async () => {
-    setGenerating(true);
-    setNotice(null);
-
-    // Brief pause so the action reads as a computed job rather than an instant swap.
-    await new Promise<void>((resolve) => setTimeout(resolve, 350));
-
+  const generate = useCallback(() => {
     setReport(buildReport(filtered, filters));
-    setGenerating(false);
+    setReportRows(filtered);
     setNotice(
       filtered.length === 0
         ? "Report generated over an empty selection — widen the filters."
@@ -175,9 +264,12 @@ export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
   }, [filtered, filters]);
 
   const exportLedger = useCallback(() => {
-    downloadCsv(`uprs-radio-play-ledger-${stamp()}.csv`, ledgerToCsv(filtered));
+    downloadCsv(
+      `uprs-radio-play-ledger-${stamp()}.csv`,
+      ledgerToCsv(report ? reportRows : filtered),
+    );
     setNotice(`Ledger CSV downloaded — ${formatNumber(filtered.length)} rows.`);
-  }, [filtered]);
+  }, [filtered, report, reportRows]);
 
   const exportReport = useCallback(() => {
     if (!report) return;
@@ -186,25 +278,75 @@ export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
   }, [report]);
 
   const activeCount = countActiveFilters(filters);
+  const preview = useMemo(
+    () => buildReport(filtered, filters, referenceDate),
+    [filtered, filters, referenceDate],
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
+      <PageIntro
+        eyebrow="CMO & UPRS REGULATORY AUDITOR"
+        title="Account for every play."
+        description="From station logs to transparent allocations. Review rights, model your tariff, and prepare a logging sheet without the spreadsheet work."
+      />
+      <dl className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[
+          {
+            label: "Allocated play units",
+            value: formatNumber(preview.totalPlays),
+            hint: "Member shares, across selected months",
+          },
+          {
+            label: "Estimated royalty pool",
+            value: `UGX ${new Intl.NumberFormat("en", { notation: "compact" }).format(preview.royaltyPoolUgx)}`,
+            hint: weightingEnabled
+              ? "Illustrative tariffs × captured EAT dayparts"
+              : "Illustrative flat-rate basis",
+          },
+          {
+            label: "Members in scope",
+            value: formatNumber(preview.memberCount),
+            hint: `${preview.workCount} recordings in the ledger`,
+          },
+          {
+            label: "Stations covered",
+            value: formatNumber(preview.stationCount),
+            hint: preview.periodLabel,
+          },
+        ].map((card) => (
+          <div key={card.label} className="panel p-5">
+            <dt className="text-[10px] text-muted">{card.label}</dt>
+            <dd className="mt-3 text-2xl font-semibold tracking-tight tabular-nums">
+              {card.value}
+            </dd>
+            <p className="mt-2 text-[10px] leading-relaxed text-muted">
+              {card.hint}
+            </p>
+          </div>
+        ))}
+      </dl>
       <section className="panel p-4 sm:p-5" aria-labelledby="filters-heading">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 id="filters-heading" className="text-sm font-semibold tracking-tight">
+            <h2
+              id="filters-heading"
+              className="text-sm font-semibold tracking-tight"
+            >
               Audit filters
             </h2>
             <p className="text-xs text-muted">
-              {formatNumber(ledger.length)} aggregated UPRS ledger rows across{" "}
-              {new Set(ledger.map((r) => r.stationId)).size} reporting stations and{" "}
-              {periodOptions.length} periods.
+              {formatNumber(ledger.length)} captured rights-allocation rows
+              across {new Set(ledger.map((r) => r.stationId)).size} reporting
+              stations and {periodOptions.length} periods.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             {activeCount > 0 && (
-              <span className="chip text-brand">{activeCount} filter group(s) active</span>
+              <span className="chip text-brand">
+                {activeCount} filter group(s) active
+              </span>
             )}
             <button
               type="button"
@@ -219,7 +361,13 @@ export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
                 </>
               ) : (
                 <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden
+                  >
                     <path
                       d="M4 5h16M4 12h16M4 19h9"
                       stroke="currentColor"
@@ -258,7 +406,7 @@ export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
             allLabel="All reporting periods"
           />
           <MultiSelect
-            label="Artist Membership ID"
+            label="Local rights-holder ID"
             options={memberOptions}
             selected={filters.members}
             onChange={(next) => patch("members", next)}
@@ -270,7 +418,11 @@ export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
           <ActiveFilterChips
             chips={chips}
             onRemove={removeChip}
-            onClearAll={() => setFilters(EMPTY_FILTERS)}
+            onClearAll={() => {
+              setFilters(EMPTY_FILTERS);
+              setReport(null);
+              setNotice(null);
+            }}
           />
         </div>
 
@@ -284,6 +436,44 @@ export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
         )}
       </section>
 
+      <CapturedFeedNotice unavailable={feed.unavailable} now={feed.now} />
+      <WeightingControls
+        policy={policy}
+        enabled={weightingEnabled}
+        onChange={(next) => {
+          setPolicy(next);
+          setReport(null);
+          setNotice(null);
+        }}
+        onEnabled={(enabled) => {
+          setWeightingEnabled(enabled);
+          setReport(null);
+          setNotice(null);
+        }}
+      />
+      <p className="-mt-2 text-[10px] leading-relaxed text-muted">
+        Allocations use captured EAT timestamps and supplied ISRCs with signed,
+        100%-declared performance ownership. Captures without complete
+        identifiers or ownership remain unallocated; local holder IDs are not
+        UPRS membership verification. Rates and multipliers are illustrative,
+        not official UPRS tariffs or a payment instruction.
+      </p>
+      <ComplianceExport
+        events={filteredEvents}
+        catalogue={catalogue}
+        policy={effectivePolicy}
+        onExport={() =>
+          setNotice(
+            "Recent event logging sheet downloaded. Review missing composition and programme metadata before filing.",
+          )
+        }
+      />
+      <p className="-mt-2 text-[10px] text-muted">
+        Event export: current EAT day and 13 prior days, intersected with the
+        station, region, period and member filters above. The monthly
+        distribution ledger includes captured records in the current and five
+        prior EAT calendar months; no missing months are inferred.
+      </p>
       {report && (
         <DistributionReport
           report={report}
@@ -293,22 +483,36 @@ export function CmoAudit({ catalogue, now, disputes }: CmoAuditProps) {
       )}
 
       {/* Keyed on the filters so a new selection starts back on page one. */}
-      <CmoTable rows={filtered} key={JSON.stringify(filters)} />
+      <details className="rounded-xl border border-line bg-surface p-2">
+        <summary className="cursor-pointer px-3 py-3 text-xs font-medium">
+          Inspect detailed monthly ledger{" "}
+          <span className="ml-2 text-[10px] font-normal text-muted">
+            {formatNumber(filtered.length)} allocation rows
+          </span>
+        </summary>
+        <CmoTable
+          rows={filtered}
+          key={JSON.stringify(filters) + JSON.stringify(effectivePolicy)}
+        />
+      </details>
 
       {disputes ? (
         <DisputeAlerts
           disputes={disputes}
           heading="Dispute resolution"
-          intro="Overlapping ISRC registrations and unexecutable split sheets. Royalties on an affected recording are held until the claim is cleared."
+          intro="Illustrative overlapping registrations and incomplete split sheets. Review and clear claims before any payment; this demo does not enforce royalty holds."
         />
       ) : null}
 
       <p className="pb-2 text-center text-[11px] text-muted">
-        Flat rates applied: {Object.values(TARIFF).map((t) => `${t.label} ${t.ugxPerPlay}`).join(" · ")}{" "}
-        UGX/play · tier by station reach ({rateFor(1_200_000).label} ≥ 1M, {rateFor(500_000).label} ≥
-        400k, {rateFor(100_000).label} below). Placeholder tariff — see lib/uprs.ts.
+        Base placeholder rates:{" "}
+        {Object.values(TARIFF)
+          .map((t) => `${t.label} ${t.ugxPerPlay}`)
+          .join(" · ")}{" "}
+        UGX/play · tier by station reach ({rateFor(1_200_000).label} ≥ 1M,{" "}
+        {rateFor(500_000).label} ≥ 400k, {rateFor(100_000).label} below).
+        Placeholder tariff — see lib/uprs.ts.
       </p>
     </div>
   );
 }
-

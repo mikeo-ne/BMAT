@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { DetectionFeed } from "@/components/detection-feed";
 import { StationCard } from "@/components/station-card";
 import { StationMonitor } from "@/components/station-monitor";
-import { buildSeedTracks } from "@/lib/catalog";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 import {
   generateTelemetry,
   MONITORED_STATIONS,
@@ -17,7 +23,9 @@ import {
 const NOW = new Date("2026-09-03T12:00:00Z");
 const CATALOGUE = buildSeedTracks(NOW);
 
-function onlineTelemetry(overrides: Partial<StationTelemetry> = {}): StationTelemetry {
+function onlineTelemetry(
+  overrides: Partial<StationTelemetry> = {},
+): StationTelemetry {
   return {
     status: "online",
     uptime: 0.995,
@@ -36,7 +44,11 @@ const DETECTIONS: Detection[] = [
     stationId: "capital-kla",
     stationName: "Capital FM",
     medium: "FM",
-    track: { title: "Nkwagala", primaryArtist: "Ray Bwete", isrc: "UG-ESD-26-00001" },
+    track: {
+      title: "Fixture A",
+      primaryArtist: "QA Artist Alpha",
+      isrc: "UG-ESD-26-00001",
+    },
     confidence: 0.943,
     matchedSeconds: 18,
     method: "Chromaprint v2 · spectral peak",
@@ -56,7 +68,9 @@ const DETECTIONS: Detection[] = [
 
 beforeAll(() => {
   // jsdom ships no 2D canvas; the visualizer must degrade rather than throw.
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null as never);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+    null as never,
+  );
 });
 
 afterEach(cleanup);
@@ -117,7 +131,9 @@ describe("StationCard", () => {
     );
 
     expect(screen.getByText("Offline")).toBeTruthy();
-    expect(screen.getByLabelText(/Monitor Capital FM feed/).hasAttribute("disabled")).toBe(true);
+    expect(
+      screen.getByLabelText(/Monitor Capital FM feed/).hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("asks the parent to play when the transport is pressed", () => {
@@ -178,8 +194,8 @@ describe("StationCard", () => {
     );
 
     expect(screen.getByText("Last detected track")).toBeTruthy();
-    expect(screen.getByText("Nkwagala")).toBeTruthy();
-    expect(screen.getByText(/Ray Bwete/)).toBeTruthy();
+    expect(screen.getByText("Fixture A")).toBeTruthy();
+    expect(screen.getByText(/QA Artist Alpha/)).toBeTruthy();
     expect(screen.getByText("94.3%")).toBeTruthy();
     expect(screen.getByText("12:00:05")).toBeTruthy();
   });
@@ -198,7 +214,9 @@ describe("StationCard", () => {
       />,
     );
 
-    expect(screen.getByText("Unmatched audio — not in the catalogue")).toBeTruthy();
+    expect(
+      screen.getByText("Unmatched audio — not in the catalogue"),
+    ).toBeTruthy();
     expect(screen.getByText("31.0%")).toBeTruthy();
   });
 
@@ -224,7 +242,7 @@ describe("DetectionFeed", () => {
   it("lists each detection with timestamp, station, title and confidence", () => {
     render(<DetectionFeed detections={DETECTIONS} onClear={() => {}} />);
 
-    expect(screen.getByText("Nkwagala")).toBeTruthy();
+    expect(screen.getByText("Fixture A")).toBeTruthy();
     expect(screen.getByText(/Capital FM/)).toBeTruthy();
     expect(screen.getByText("94.3%")).toBeTruthy();
     expect(screen.getByText("Unidentified audio")).toBeTruthy();
@@ -247,7 +265,7 @@ describe("DetectionFeed", () => {
     fireEvent.click(screen.getByRole("button", { name: /Unmatched/ }));
 
     expect(screen.getByText("Unidentified audio")).toBeTruthy();
-    expect(screen.queryByText("Nkwagala")).toBeNull();
+    expect(screen.queryByText("Fixture A")).toBeNull();
   });
 
   it("asks the parent to clear", () => {
@@ -274,7 +292,9 @@ describe("StationMonitor", () => {
       expect(screen.getByText(station.name)).toBeTruthy();
     }
 
-    expect(screen.getByRole("button", { name: /Run Audio Fingerprint Scan/ })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Run Audio Fingerprint Scan/ }),
+    ).toBeTruthy();
     expect(screen.getByText("No scan has run this session.")).toBeTruthy();
   });
 
@@ -283,7 +303,9 @@ describe("StationMonitor", () => {
 
     expect(screen.getByText("No detections yet")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: /Run Audio Fingerprint Scan/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Run Audio Fingerprint Scan/ }),
+    );
 
     // The scan walks the panel one station at a time.
     await waitFor(
@@ -295,28 +317,36 @@ describe("StationMonitor", () => {
 
     await waitFor(
       () => {
-        expect(screen.getByRole("button", { name: /All\s*[1-9]\d*/ })).toBeTruthy();
+        expect(
+          screen.getByRole("button", { name: /All\s*[1-9]\d*/ }),
+        ).toBeTruthy();
       },
       { timeout: 10_000 },
     );
 
     // Every listed detection names a station from the monitored panel.
     const stationNames = MONITORED_STATIONS.map((s) => s.name);
-    const listed = screen.getAllByText((_, element) =>
-      element?.tagName === "P" && stationNames.includes(element.textContent?.split(" · ")[0] ?? ""),
+    const listed = screen.getAllByText(
+      (_, element) =>
+        element?.tagName === "P" &&
+        stationNames.includes(element.textContent?.split(" · ")[0] ?? ""),
     );
     expect(listed.length).toBeGreaterThan(0);
 
     // The button re-arms once the whole panel has been walked.
     await waitFor(
       () => {
-        expect(screen.getByRole("button", { name: /Run Audio Fingerprint Scan/ })).toBeTruthy();
+        expect(
+          screen.getByRole("button", { name: /Run Audio Fingerprint Scan/ }),
+        ).toBeTruthy();
       },
       { timeout: 10_000 },
     );
 
     expect(
-      screen.getByRole("button", { name: /Run Audio Fingerprint Scan/ }).hasAttribute("disabled"),
+      screen
+        .getByRole("button", { name: /Run Audio Fingerprint Scan/ })
+        .hasAttribute("disabled"),
     ).toBe(false);
     expect(screen.getByText(/Last scan/)).toBeTruthy();
   }, 20_000);
@@ -324,7 +354,9 @@ describe("StationMonitor", () => {
   it("matches scanned audio against the delivered catalogue", async () => {
     render(<StationMonitor catalogue={CATALOGUE} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Run Audio Fingerprint Scan/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Run Audio Fingerprint Scan/ }),
+    );
 
     await waitFor(
       () => {
@@ -338,8 +370,12 @@ describe("StationMonitor", () => {
       .getAllByText((_, element) => element?.tagName === "P")
       .map((element) => element.textContent ?? "");
 
-    const matchedRows = rendered.filter((text) => catalogueTitles.includes(text));
-    const unmatchedRows = rendered.filter((text) => text === "Unidentified audio");
+    const matchedRows = rendered.filter((text) =>
+      catalogueTitles.includes(text),
+    );
+    const unmatchedRows = rendered.filter(
+      (text) => text === "Unidentified audio",
+    );
 
     expect(matchedRows.length + unmatchedRows.length).toBeGreaterThan(0);
   }, 20_000);
@@ -349,14 +385,18 @@ describe("StationMonitor", () => {
 
     // jsdom has no AudioContext, so the fallback path is the one under test.
     // Scope to buttons: the waveform canvas carries a similar aria-label.
-    const playButtons = screen.getAllByRole("button", { name: /^Monitor .* feed$/ });
+    const playButtons = screen.getAllByRole("button", {
+      name: /^Monitor .* feed$/,
+    });
     expect(playButtons.length).toBe(MONITORED_STATIONS.length);
 
     fireEvent.click(playButtons[0]);
 
     await waitFor(
       () => {
-        expect(screen.getByText(/cannot be previewed|blocked the monitor feed/i)).toBeTruthy();
+        expect(
+          screen.getByText(/cannot be previewed|blocked the monitor feed/i),
+        ).toBeTruthy();
       },
       { timeout: 4_000 },
     );
@@ -377,7 +417,9 @@ describe("scan/telemetry integration", () => {
       seed: "integration",
     });
 
-    const { container } = render(<DetectionFeed detections={detections} onClear={() => {}} />);
+    const { container } = render(
+      <DetectionFeed detections={detections} onClear={() => {}} />,
+    );
 
     expect(container.querySelectorAll("li").length).toBe(detections.length);
   });

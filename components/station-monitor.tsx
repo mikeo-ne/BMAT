@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { PageIntro } from "@/components/page-intro";
+import { REGIONS, type Region } from "@/lib/regions";
+import { Radio, Search } from "lucide-react";
 import { AudioFingerprintVisualizer } from "@/components/audio-fingerprint-visualizer";
 import { DetectionFeed } from "@/components/detection-feed";
 import { StationCard } from "@/components/station-card";
@@ -30,20 +33,29 @@ const DEFAULT_VOLUME = 0.12;
 
 function seedTelemetry(): Record<string, StationTelemetry> {
   return Object.fromEntries(
-    MONITORED_STATIONS.map((station) => [station.id, generateTelemetry(station.id)]),
+    MONITORED_STATIONS.map((station) => [
+      station.id,
+      generateTelemetry(station.id),
+    ]),
   );
 }
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export function StationMonitor({ catalogue }: StationMonitorProps) {
-  const [telemetry, setTelemetry] = useState<Record<string, StationTelemetry>>(seedTelemetry);
+  const [telemetry, setTelemetry] =
+    useState<Record<string, StationTelemetry>>(seedTelemetry);
   const [detections, setDetections] = useState<Detection[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [volumes, setVolumes] = useState<Record<string, number>>({});
   const [scanning, setScanning] = useState(false);
   const [lastScanAt, setLastScanAt] = useState<string | null>(null);
+  const [region, setRegion] = useState<Region | "All">("All");
+  const [medium, setMedium] = useState("All");
+  const [query, setQuery] = useState("");
+  const playbackRequest = useRef(0);
   const [audioError, setAudioError] = useState<string | null>(null);
 
   const feedRef = useRef<MonitorFeed | null>(null);
@@ -53,6 +65,7 @@ export function StationMonitor({ catalogue }: StationMonitorProps) {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      playbackRequest.current += 1;
       feedRef.current?.stop();
       feedRef.current = null;
     };
@@ -76,6 +89,7 @@ export function StationMonitor({ catalogue }: StationMonitorProps) {
   }, []);
 
   const stopFeed = useCallback(() => {
+    playbackRequest.current += 1;
     feedRef.current?.stop();
     feedRef.current = null;
     setAnalyser(null);
@@ -89,9 +103,11 @@ export function StationMonitor({ catalogue }: StationMonitorProps) {
         return;
       }
 
+      const request = ++playbackRequest.current;
       feedRef.current?.stop();
       feedRef.current = null;
       setAnalyser(null);
+      setActiveId(null);
 
       const index = MONITORED_STATIONS.findIndex((s) => s.id === stationId);
       const feed = new MonitorFeed({
@@ -100,6 +116,10 @@ export function StationMonitor({ catalogue }: StationMonitorProps) {
       });
 
       const started = await feed.start();
+      if (!mounted.current || playbackRequest.current !== request) {
+        feed.stop();
+        return;
+      }
       if (!started) {
         setAudioError(
           audioContextAvailable()
@@ -145,7 +165,7 @@ export function StationMonitor({ catalogue }: StationMonitorProps) {
     for (const detection of results) {
       await sleep(REVEAL_MS);
       if (!mounted.current) return;
-      setDetections((prev) => [detection, ...prev]);
+      setDetections((prev) => [detection, ...prev].slice(0, 500));
     }
 
     if (!mounted.current) return;
@@ -153,26 +173,66 @@ export function StationMonitor({ catalogue }: StationMonitorProps) {
     setScanning(false);
   }, [catalogue, scanning, telemetry]);
 
-  const summary = useMemo(() => summariseMonitor(telemetry, detections), [telemetry, detections]);
-  const lastByStation = useMemo(() => lastDetectionByStation(detections), [detections]);
+  const summary = useMemo(
+    () => summariseMonitor(telemetry, detections),
+    [telemetry, detections],
+  );
+  const lastByStation = useMemo(
+    () => lastDetectionByStation(detections),
+    [detections],
+  );
 
   const cards = [
-    { label: "Feeds monitored", value: `${summary.online}/${summary.stations}`, hint: `${monitoredCount("TV")} TV · ${monitoredCount("FM")} FM` },
-    { label: "Panel health", value: formatRatio(summary.online / Math.max(1, summary.stations), 0), hint: `${summary.degraded} degraded · ${summary.offline} offline` },
-    { label: "Detections", value: String(summary.detections), hint: `${summary.matched} matched · ${summary.unmatched} unmatched` },
-    { label: "Match rate", value: summary.detections === 0 ? "—" : formatRatio(summary.matchRate, 0), hint: `avg confidence ${summary.detections === 0 ? "—" : formatRatio(summary.averageConfidence, 0)}` },
+    {
+      label: "Feeds monitored",
+      value: `${summary.online}/${summary.stations}`,
+      hint: `${monitoredCount("TV")} TV · ${monitoredCount("FM")} FM`,
+    },
+    {
+      label: "Panel health",
+      value: formatRatio(summary.online / Math.max(1, summary.stations), 0),
+      hint: `${summary.degraded} degraded · ${summary.offline} offline`,
+    },
+    {
+      label: "Detections",
+      value: String(summary.detections),
+      hint: `${summary.matched} matched · ${summary.unmatched} unmatched`,
+    },
+    {
+      label: "Match rate",
+      value: summary.detections === 0 ? "—" : formatRatio(summary.matchRate, 0),
+      hint: `avg confidence ${summary.detections === 0 ? "—" : formatRatio(summary.averageConfidence, 0)}`,
+    },
   ];
 
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
+      <PageIntro
+        eyebrow="LIVE STATION MONITOR"
+        title="A closer listen to the panel."
+        description="FM and TV streams, signal health and catalogue matches in one view. These are demo feeds: the waveform follows the synthesized audio you actually hear, not a captured broadcast."
+      />
+      <div className="flex items-center gap-2 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[11px] text-brand">
+        <Radio size={15} />
+        <span>
+          Simulation mode · {MONITORED_STATIONS.length} monitored Ugandan FM /
+          TV feeds · select Play to activate a real Web Audio waveform.
+        </span>
+      </div>
       {/* Control bar */}
       <section className="panel flex flex-wrap items-center justify-between gap-4 p-4">
         <div>
-          <h2 className="text-sm font-semibold tracking-tight">Fingerprint ingest</h2>
+          <h2 className="text-sm font-semibold tracking-tight">
+            Fingerprint ingest
+          </h2>
           <p className="text-xs text-muted">
-            {lastScanAt
-              ? <>Last scan {formatClock(lastScanAt)} · {timeAgo(lastScanAt)}</>
-              : "No scan has run this session."}
+            {lastScanAt ? (
+              <>
+                Last scan {formatClock(lastScanAt)} · {timeAgo(lastScanAt)}
+              </>
+            ) : (
+              "No scan has run this session."
+            )}
           </p>
         </div>
 
@@ -190,14 +250,26 @@ export function StationMonitor({ catalogue }: StationMonitorProps) {
             className="btn btn-primary"
           >
             {!scanning && (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden
+              >
                 <path
                   d="M3 12h2.5M18.5 12H21M12 3v2.5M12 18.5V21M6.1 6.1l1.8 1.8M16.1 16.1l1.8 1.8M17.9 6.1l-1.8 1.8M7.9 16.1l-1.8 1.8"
                   stroke="currentColor"
                   strokeWidth="1.8"
                   strokeLinecap="round"
                 />
-                <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="3.2"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
               </svg>
             )}
             {scanning ? "Scanning…" : "Run Audio Fingerprint Scan"}
@@ -239,11 +311,15 @@ export function StationMonitor({ catalogue }: StationMonitorProps) {
       <section aria-labelledby="stations-heading">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 id="stations-heading" className="text-sm font-semibold tracking-tight">
+            <h2
+              id="stations-heading"
+              className="text-sm font-semibold tracking-tight"
+            >
               Monitored stations
             </h2>
             <p className="text-xs text-muted">
-              {summary.stations} feeds across Central, Eastern, Western and Northern Uganda.
+              {summary.stations} feeds across Central, Eastern, Western and
+              Northern Uganda.
             </p>
           </div>
           <p className="text-[11px] text-muted">
@@ -253,8 +329,66 @@ export function StationMonitor({ catalogue }: StationMonitorProps) {
           </p>
         </div>
 
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <label className="relative col-span-2 sm:flex-1">
+            <span className="sr-only">Search monitored stations</span>
+            <Search size={14} className="absolute left-3 top-3 text-muted" />
+            <input
+              className="field !bg-surface !pl-9 !text-xs"
+              value={query}
+              placeholder="Find a station or location…"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <label>
+            <span className="sr-only">Monitored region</span>
+            <select
+              className="field !bg-surface !text-xs"
+              value={region}
+              onChange={(event) =>
+                setRegion(event.target.value as Region | "All")
+              }
+            >
+              <option value="All">All regions</option>
+              {REGIONS.map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="sr-only">Monitored medium</span>
+            <select
+              className="field !bg-surface !text-xs"
+              value={medium}
+              onChange={(event) => setMedium(event.target.value)}
+            >
+              <option value="All">FM + TV</option>
+              <option value="FM">FM radio</option>
+              <option value="TV">Television</option>
+            </select>
+          </label>
+        </div>
+        {MONITORED_STATIONS.filter(
+          (station) =>
+            (region === "All" || station.region === region) &&
+            (medium === "All" || station.medium === medium) &&
+            `${station.name} ${station.location}`
+              .toLowerCase()
+              .includes(query.toLowerCase()),
+        ).length === 0 && (
+          <p className="panel p-10 text-center text-xs text-muted">
+            No monitored feeds match these filters.
+          </p>
+        )}
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {MONITORED_STATIONS.map((station) => (
+          {MONITORED_STATIONS.filter(
+            (station) =>
+              (region === "All" || station.region === region) &&
+              (medium === "All" || station.medium === medium) &&
+              `${station.name} ${station.location}`
+                .toLowerCase()
+                .includes(query.toLowerCase()),
+          ).map((station) => (
             <StationCard
               key={station.id}
               station={station}
@@ -270,13 +404,18 @@ export function StationMonitor({ catalogue }: StationMonitorProps) {
         </div>
       </section>
 
-      <DetectionFeed detections={detections} onClear={() => setDetections([])} />
+      <DetectionFeed
+        detections={detections}
+        onClear={() => setDetections([])}
+        onOpenEvidence={stopFeed}
+      />
 
       <AudioFingerprintVisualizer />
 
       <p className="pb-2 text-center text-[11px] text-muted">
-        Station list, telemetry and detection outcomes are simulated for this prototype. Audio
-        previews are locally synthesized stand-ins for the broadcast feeds.
+        Station list, telemetry and detection outcomes are simulated for this
+        prototype. Audio previews are locally synthesized stand-ins for the
+        broadcast feeds.
       </p>
     </div>
   );

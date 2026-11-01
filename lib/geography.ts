@@ -1,4 +1,6 @@
 import { createRandom, hashSeed } from "@/lib/airplay";
+import { FM_STATIONS } from "@/lib/regions";
+import { eatDate, type BroadcastSpin } from "@/lib/playout";
 import type { Hub, Region } from "@/lib/regions";
 import type { Track } from "@/lib/types";
 
@@ -30,13 +32,83 @@ export interface GeoHub {
  * worked to, plus the two cross-border markets Ugandan records break into first.
  */
 export const GEO_HUBS: GeoHub[] = [
-  { id: "kla", name: "Kampala", country: "Uganda", region: "Central", tier: "primary", stations: 14, reach: 3_500_000, lon: 32.58, lat: 0.31 },
-  { id: "jin", name: "Jinja", country: "Uganda", region: "Eastern", tier: "secondary", stations: 2, reach: 320_000, lon: 33.2, lat: 0.44 },
-  { id: "mbr", name: "Mbarara", country: "Uganda", region: "Western", tier: "secondary", stations: 3, reach: 410_000, lon: 30.66, lat: -0.61 },
-  { id: "gul", name: "Gulu", country: "Uganda", region: "Northern", tier: "secondary", stations: 3, reach: 290_000, lon: 32.3, lat: 2.77 },
-  { id: "mba", name: "Mbale", country: "Uganda", region: "Eastern", tier: "secondary", stations: 2, reach: 260_000, lon: 34.18, lat: 1.08 },
-  { id: "nbo", name: "Nairobi", country: "Kenya", region: null, tier: "cross-border", stations: 4, reach: 5_100_000, lon: 36.82, lat: -1.29 },
-  { id: "dar", name: "Dar es Salaam", country: "Tanzania", region: null, tier: "cross-border", stations: 3, reach: 6_700_000, lon: 39.28, lat: -6.79 },
+  {
+    id: "kla",
+    name: "Kampala",
+    country: "Uganda",
+    region: "Central",
+    tier: "primary",
+    stations: 14,
+    reach: 3_500_000,
+    lon: 32.58,
+    lat: 0.31,
+  },
+  {
+    id: "jin",
+    name: "Jinja",
+    country: "Uganda",
+    region: "Eastern",
+    tier: "secondary",
+    stations: 2,
+    reach: 320_000,
+    lon: 33.2,
+    lat: 0.44,
+  },
+  {
+    id: "mbr",
+    name: "Mbarara",
+    country: "Uganda",
+    region: "Western",
+    tier: "secondary",
+    stations: 3,
+    reach: 410_000,
+    lon: 30.66,
+    lat: -0.61,
+  },
+  {
+    id: "gul",
+    name: "Gulu",
+    country: "Uganda",
+    region: "Northern",
+    tier: "secondary",
+    stations: 3,
+    reach: 290_000,
+    lon: 32.3,
+    lat: 2.77,
+  },
+  {
+    id: "mba",
+    name: "Mbale",
+    country: "Uganda",
+    region: "Eastern",
+    tier: "secondary",
+    stations: 2,
+    reach: 260_000,
+    lon: 34.18,
+    lat: 1.08,
+  },
+  {
+    id: "nbo",
+    name: "Nairobi",
+    country: "Kenya",
+    region: null,
+    tier: "cross-border",
+    stations: 4,
+    reach: 5_100_000,
+    lon: 36.82,
+    lat: -1.29,
+  },
+  {
+    id: "dar",
+    name: "Dar es Salaam",
+    country: "Tanzania",
+    region: null,
+    tier: "cross-border",
+    stations: 3,
+    reach: 6_700_000,
+    lon: 39.28,
+    lat: -6.79,
+  },
 ];
 
 export const UGANDA_HUBS = GEO_HUBS.filter((h) => h.country === "Uganda");
@@ -84,7 +156,57 @@ function hubWeight(hub: GeoHub): number {
   return 0.12 + 0.1 * (hub.reach / kampala.reach);
 }
 
-export function buildHubMetrics(catalogue: Track[]): HubMetric[] {
+export function buildHubMetrics(
+  catalogue: Track[],
+  captures: BroadcastSpin[] = [],
+  now = new Date(),
+): HubMetric[] {
+  if (
+    !catalogue.length ||
+    catalogue.some((track) => track.origin !== "test-fixture")
+  ) {
+    const end =
+      Date.parse(`${eatDate(now.toISOString())}T00:00:00+03:00`) + 86400000;
+    const unique = [
+      ...new Map(captures.map((spin) => [spin.id, spin])).values(),
+    ];
+    return GEO_HUBS.map((hub) => {
+      const rows = unique.filter(
+        (spin) =>
+          spin.source === "captured" &&
+          spin.trackId &&
+          catalogue.some((track) => track.id === spin.trackId) &&
+          (FM_STATIONS.find((station) => station.id === spin.stationId)
+            ?.location ??
+            (spin.stationId === "nbs-tv-kla" ? "Kampala" : null)) ===
+            hub.name &&
+          Date.parse(spin.detectedAt) <= now.getTime(),
+      );
+      const recent = rows.filter(
+        (spin) => Date.parse(spin.detectedAt) >= end - 7 * 86400000,
+      );
+      const prior = rows.filter(
+        (spin) =>
+          Date.parse(spin.detectedAt) >= end - 14 * 86400000 &&
+          Date.parse(spin.detectedAt) < end - 7 * 86400000,
+      );
+      return {
+        hub: {
+          ...hub,
+          stations: new Set(recent.map((spin) => spin.stationId)).size,
+          reach: 0,
+        },
+        spins7d: recent.length,
+        spinsPrev7d: prior.length,
+        growthRate: prior.length
+          ? (recent.length - prior.length) / prior.length
+          : null,
+        searchIndex: 0,
+        searchGrowth: null,
+        tracks: new Set(recent.map((spin) => spin.trackId)).size,
+      };
+    });
+  }
   return GEO_HUBS.map((hub) => {
     const rand = createRandom(hashSeed(`hub:${hub.id}`));
     const regionEntry = hub.region;
@@ -98,7 +220,10 @@ export function buildHubMetrics(catalogue: Track[]): HubMetric[] {
         ? track.airplay.find((a) => a.region === regionEntry)
         : track.airplay.reduce(
             (best, a) => (a.spins > best.spins ? a : best),
-            track.airplay[0] ?? { spins: 0, trend: Array.from({ length: 14 }, () => 0) },
+            track.airplay[0] ?? {
+              spins: 0,
+              trend: Array.from({ length: 14 }, () => 0),
+            },
           );
 
       if (!airplay) continue;
@@ -118,14 +243,21 @@ export function buildHubMetrics(catalogue: Track[]): HubMetric[] {
 
     const searchIndex = Math.min(
       100,
-      Math.round((spins7d / Math.max(1, GEO_HUBS[0].stations)) * 0.9 + rand() * 12),
+      Math.round(
+        (spins7d / Math.max(1, GEO_HUBS[0].stations)) * 0.9 + rand() * 12,
+      ),
     );
 
     return {
       hub,
       spins7d,
       spinsPrev7d,
-      growthRate: spinsPrev7d === 0 ? (spins7d > 0 ? null : 0) : (spins7d - spinsPrev7d) / spinsPrev7d,
+      growthRate:
+        spinsPrev7d === 0
+          ? spins7d > 0
+            ? null
+            : 0
+          : (spins7d - spinsPrev7d) / spinsPrev7d,
       searchIndex,
       searchGrowth: spinsPrev7d === 0 ? null : (searchIndex / 60 - 1) * 0.8,
       tracks,
@@ -178,12 +310,32 @@ export function buildVelocity(track: Track): TrackVelocity {
   const prior7 = trend.slice(-14, -7);
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
+  if (track.origin !== "test-fixture") {
+    const recent = sum(last7),
+      prior = sum(prior7);
+    return {
+      trackId: track.id,
+      title: track.title,
+      primaryArtist: track.primaryArtist,
+      spinGrowth: prior ? (recent - prior) / prior : null,
+      searchGrowth: null,
+      radioLead: null,
+      series: last7.map((spins, index) => ({
+        label: DAY_LABELS[index],
+        spins,
+        search: 0,
+      })),
+    };
+  }
   const series: VelocityPoint[] = last7.map((spins, i) => {
     // Search lags radio by a day or two and is noisier.
     const lagged = last7[Math.max(i - 1, 0)] ?? spins;
     const search = Math.max(
       2,
-      Math.min(100, Math.round(lagged * 1.6 + rand() * 18 + (spins > lagged ? -6 : 4))),
+      Math.min(
+        100,
+        Math.round(lagged * 1.6 + rand() * 18 + (spins > lagged ? -6 : 4)),
+      ),
     );
     return { label: DAY_LABELS[i], spins, search };
   });
@@ -197,9 +349,16 @@ export function buildVelocity(track: Track): TrackVelocity {
     trackId: track.id,
     title: track.title,
     primaryArtist: track.primaryArtist,
-    spinGrowth: priorSum === 0 ? (recentSum > 0 ? null : 0) : (recentSum - priorSum) / priorSum,
-    searchGrowth: searchThen === 0 ? null : (searchNow - searchThen) / searchThen,
-    radioLead: searchThen === 0 ? null : (recentSum / priorSum) - (searchNow / searchThen),
+    spinGrowth:
+      priorSum === 0
+        ? recentSum > 0
+          ? null
+          : 0
+        : (recentSum - priorSum) / priorSum,
+    searchGrowth:
+      searchThen === 0 ? null : (searchNow - searchThen) / searchThen,
+    radioLead:
+      searchThen === 0 ? null : recentSum / priorSum - searchNow / searchThen,
     series,
   };
 }
@@ -235,15 +394,22 @@ export interface HitCandidate {
  * Mbarara for two or three weeks before Kampala stations add it.
  */
 export function buildHitPredictor(catalogue: Track[]): HitCandidate[] {
+  catalogue = catalogue.filter((track) => track.origin === "test-fixture");
+  if (!catalogue.length) return [];
   const kampala = GEO_HUBS[0];
 
   const candidates = catalogue
     .map((track) => {
       const secondary = UGANDA_HUBS.filter((h) => h.tier === "secondary")
         .map((hub) => {
-          const region = hub.region ? track.airplay.find((a) => a.region === hub.region) : null;
+          const region = hub.region
+            ? track.airplay.find((a) => a.region === hub.region)
+            : null;
           const spins = region
-            ? Math.round(region.trend.slice(-7).reduce((a, b) => a + b, 0) * hubWeight(hub))
+            ? Math.round(
+                region.trend.slice(-7).reduce((a, b) => a + b, 0) *
+                  hubWeight(hub),
+              )
             : 0;
           return { hub, spins };
         })
@@ -251,14 +417,19 @@ export function buildHitPredictor(catalogue: Track[]): HitCandidate[] {
 
       const central = track.airplay.find((a) => a.region === "Central");
       const kampalaSpins = central
-        ? Math.round(central.trend.slice(-7).reduce((a, b) => a + b, 0) * hubWeight(kampala))
+        ? Math.round(
+            central.trend.slice(-7).reduce((a, b) => a + b, 0) *
+              hubWeight(kampala),
+          )
         : 0;
 
       if (!secondary || secondary.spins < EMERGING_SPIN_FLOOR) return null;
 
       const ratio = secondary.spins / Math.max(kampalaSpins, 1);
       // A record strong in the regions but absent from Kampala scores highest.
-      const score = Math.round(Math.min(100, (secondary.spins / 220) * 55 + Math.min(ratio, 4) * 11));
+      const score = Math.round(
+        Math.min(100, (secondary.spins / 220) * 55 + Math.min(ratio, 4) * 11),
+      );
       const verdict: HitCandidate["verdict"] =
         ratio < 0.6 ? "breaking-now" : ratio < 1.8 ? "watch" : "early";
 

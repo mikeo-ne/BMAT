@@ -1,20 +1,28 @@
+import { capturePollingAvailable } from "@/lib/runtime-storage";
 import type { Metadata } from "next";
 
 import { CmoAudit } from "@/components/cmo-audit";
 import { buildDisputes, buildSplitSheets } from "@/lib/splits";
-import { readTracks } from "@/lib/store";
+import { readWorkspaceData } from "@/lib/workspace-data";
 
 export const metadata: Metadata = {
   title: "CMO & Regulatory Audit",
   description:
-    "UPRS aggregated radio play ledger with station, region, period and membership filters, flat-rate royalty estimation and CSV export.",
+    "Captured-play allocations with station, region, period and local rights-holder filters, illustrative daypart estimates and logging-sheet exports for UPRS review.",
 };
 
 export const dynamic = "force-dynamic";
 
 export default async function CmoAuditPage() {
-  const catalogue = await readTracks();
-  const disputes = buildDisputes(buildSplitSheets(catalogue));
-
-  return <CmoAudit catalogue={catalogue} now={new Date().toISOString()} disputes={disputes} />;
+  const data = await readWorkspaceData();
+  const disputes = buildDisputes(buildSplitSheets(data.catalogue));
+  return (
+    <CmoAudit
+      catalogue={data.catalogue}
+      disputes={disputes}
+      initialEvents={data.history}
+      now={data.now}
+      canPoll={capturePollingAvailable()}
+    />
+  );
 }

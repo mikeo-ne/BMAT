@@ -61,13 +61,23 @@ const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
  * /api/royalties and persist through prisma/schema.prisma.
  */
 export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
-  const [statements, setStatements] = useState<RoyaltyStatement[]>(model.statements);
+  const [statements, setStatements] = useState<RoyaltyStatement[]>(
+    model.statements,
+  );
   const [batches, setBatches] = useState<PayoutBatch[]>(model.batches);
-  const [statusFilter, setStatusFilter] = useState<StatementStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<StatementStatus | "all">(
+    "all",
+  );
   const [periodFilter, setPeriodFilter] = useState<string>("all");
 
-  const summary = useMemo(() => totals({ ...model, statements, batches }), [model, statements, batches]);
-  const periods = useMemo(() => [...new Set(statements.map((s) => s.period))].sort().reverse(), [statements]);
+  const summary = useMemo(
+    () => totals({ ...model, statements, batches }),
+    [model, statements, batches],
+  );
+  const periods = useMemo(
+    () => [...new Set(statements.map((s) => s.period))].sort().reverse(),
+    [statements],
+  );
 
   const filtered = useMemo(
     () =>
@@ -86,7 +96,11 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
   function approve(id: string) {
     const next = statements.map((s) =>
       s.id === id && s.status === "pending"
-        ? { ...s, status: "approved" as const, approvedAt: new Date().toISOString() }
+        ? {
+            ...s,
+            status: "approved" as const,
+            approvedAt: new Date().toISOString(),
+          }
         : s,
     );
     setStatements(next);
@@ -128,7 +142,7 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
     {
       label: "Paid",
       value: formatCurrency(summary.paidUgx),
-      hint: `${summary.paidCount} statements batched out`,
+      hint: `${summary.paidCount} locally marked; no transfer`,
       tone: "text-accent",
     },
     {
@@ -150,11 +164,14 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
       <section className="panel p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold tracking-tight">Distribution & payouts</h2>
+            <h2 className="text-sm font-semibold tracking-tight">
+              Distribution & payouts
+            </h2>
             <p className="mt-1 max-w-2xl text-xs text-muted">
               {model.report.periodLabel} · {model.report.memberCount} members ·{" "}
-              {model.report.workCount} recordings · {model.report.stationCount} reporting stations ·
-              flat-rate basis, placeholder tariff until the published UPRS schedule is loaded.
+              {model.report.workCount} recordings · {model.report.stationCount}{" "}
+              reporting stations · flat-rate basis, placeholder tariff until the
+              published UPRS schedule is loaded.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -162,7 +179,10 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
               type="button"
               className="btn btn-ghost"
               onClick={() =>
-                downloadCsv(`east-sound-royalty-statements-${stamp()}.csv`, statementsToCsv(statements))
+                downloadCsv(
+                  `east-sound-royalty-statements-${stamp()}.csv`,
+                  statementsToCsv(statements),
+                )
               }
             >
               Download statements
@@ -170,7 +190,12 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={() => downloadCsv(`east-sound-payout-batches-${stamp()}.csv`, batchesToCsv(batches))}
+              onClick={() =>
+                downloadCsv(
+                  `east-sound-payout-batches-${stamp()}.csv`,
+                  batchesToCsv(batches),
+                )
+              }
             >
               Download batches
             </button>
@@ -178,48 +203,83 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Royalty totals">
+      <section
+        className="grid grid-cols-2 gap-3 xl:grid-cols-4"
+        aria-label="Royalty totals"
+      >
         {cards.map((card) => (
           <div key={card.label} className="panel p-4">
-            <p className="text-[11px] uppercase tracking-wider text-muted">{card.label}</p>
-            <p className={`mt-1 font-mono text-xl font-semibold ${card.tone}`}>{card.value}</p>
+            <p className="text-[11px] uppercase tracking-wider text-muted">
+              {card.label}
+            </p>
+            <p className={`mt-1 font-mono text-xl font-semibold ${card.tone}`}>
+              {card.value}
+            </p>
             <p className="mt-1 text-[11px] text-muted">{card.hint}</p>
           </div>
         ))}
       </section>
 
+      <p className="rounded-xl border border-accent/20 bg-accent/5 p-4 text-xs leading-relaxed text-muted">
+        Local settlement workspace: approvals and “paid” marks exist only in
+        this page’s memory and reset on reload. No bank transfer, UPRS filing,
+        provider settlement or persisted approval is performed. Exported figures
+        are illustrative captured-airplay estimates, not money owed.
+      </p>
       <section className="panel p-4" aria-labelledby="batches-heading">
-        <h2 id="batches-heading" className="text-sm font-semibold tracking-tight">
+        <h2
+          id="batches-heading"
+          className="text-sm font-semibold tracking-tight"
+        >
           Payout batches
         </h2>
         <p className="mt-1 text-xs text-muted">
-          One batch per reporting period. A batch stays draft until every statement is approved,
-          then moves to paid when the statements in it have been settled.
+          One batch per reporting period. A batch stays draft until every
+          statement is approved, then moves to paid when the statements in it
+          have been settled.
         </p>
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[720px] border-collapse text-xs">
             <thead>
               <tr className="text-left text-muted">
-                <th scope="col" className="px-2 py-2 font-medium">Period</th>
-                <th scope="col" className="px-2 py-2 font-medium">Status</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Members</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Plays</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Covered (UGX)</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Covered (USD)</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Paid</th>
+                <th scope="col" className="px-2 py-2 font-medium">
+                  Period
+                </th>
+                <th scope="col" className="px-2 py-2 font-medium">
+                  Status
+                </th>
+                <th scope="col" className="px-2 py-2 text-right font-medium">
+                  Members
+                </th>
+                <th scope="col" className="px-2 py-2 text-right font-medium">
+                  Plays
+                </th>
+                <th scope="col" className="px-2 py-2 text-right font-medium">
+                  Covered (UGX)
+                </th>
+                <th scope="col" className="px-2 py-2 text-right font-medium">
+                  Covered (USD)
+                </th>
+                <th scope="col" className="px-2 py-2 text-right font-medium">
+                  Paid
+                </th>
               </tr>
             </thead>
             <tbody>
               {batches.map((batch) => (
                 <tr key={batch.id} className="border-t border-line">
-                  <td className="px-2 py-2 font-medium text-foreground">{batch.periodLabel}</td>
+                  <td className="px-2 py-2 font-medium text-foreground">
+                    {batch.periodLabel}
+                  </td>
                   <td className="px-2 py-2">
                     <span className={`chip ${PAYOUT_CLASS[batch.status]}`}>
                       {PAYOUT_STATUS_LABEL[batch.status]}
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-right font-mono">{batch.members}</td>
+                  <td className="px-2 py-2 text-right font-mono">
+                    {batch.members}
+                  </td>
                   <td className="px-2 py-2 text-right font-mono">
                     {batch.plays.toLocaleString("en-US")}
                   </td>
@@ -227,7 +287,9 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
                     {batch.allocationUgx.toLocaleString("en-US")}
                   </td>
                   <td className="px-2 py-2 text-right font-mono">
-                    {batch.allocationUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                    {batch.allocationUsd.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </td>
                   <td className="px-2 py-2 text-right font-mono text-muted">
                     {batch.paidAt ? batch.paidAt.slice(0, 10) : "—"}
@@ -242,7 +304,10 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
       <section className="panel p-4" aria-labelledby="statements-heading">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 id="statements-heading" className="text-sm font-semibold tracking-tight">
+            <h2
+              id="statements-heading"
+              className="text-sm font-semibold tracking-tight"
+            >
               Member statements
             </h2>
             <p className="mt-1 text-xs text-muted">
@@ -269,15 +334,19 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
               <span className="hidden sm:inline">Status</span>
               <select
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as StatementStatus | "all")}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as StatementStatus | "all")
+                }
                 className="field w-auto"
               >
                 <option value="all">All statuses</option>
-                {(["pending", "approved", "paid", "blocked"] as const).map((status) => (
-                  <option key={status} value={status}>
-                    {STATUS_LABEL[status]}
-                  </option>
-                ))}
+                {(["pending", "approved", "paid", "blocked"] as const).map(
+                  (status) => (
+                    <option key={status} value={status}>
+                      {STATUS_LABEL[status]}
+                    </option>
+                  ),
+                )}
               </select>
             </label>
           </div>
@@ -292,44 +361,76 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
             <table className="w-full min-w-[980px] border-collapse text-xs">
               <thead>
                 <tr className="text-left text-muted">
-                  <th scope="col" className="px-2 py-2 font-medium">Member</th>
-                  <th scope="col" className="px-2 py-2 font-medium">Period</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">Plays</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">Stations</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">Recordings</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">UGX</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">USD</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">Share</th>
-                  <th scope="col" className="px-2 py-2 font-medium">Status</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">Actions</th>
+                  <th scope="col" className="px-2 py-2 font-medium">
+                    Member
+                  </th>
+                  <th scope="col" className="px-2 py-2 font-medium">
+                    Period
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    Plays
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    Stations
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    Recordings
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    UGX
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    USD
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    Share
+                  </th>
+                  <th scope="col" className="px-2 py-2 font-medium">
+                    Status
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((statement) => (
                   <tr key={statement.id} className="border-t border-line">
                     <td className="px-2 py-2">
-                      <span className="font-medium text-foreground">{statement.artist}</span>
+                      <span className="font-medium text-foreground">
+                        {statement.artist}
+                      </span>
                       <span className="ml-2 font-mono text-[10px] text-muted">
                         {statement.memberId}
                       </span>
                     </td>
-                    <td className="px-2 py-2 text-muted">{statement.periodLabel}</td>
+                    <td className="px-2 py-2 text-muted">
+                      {statement.periodLabel}
+                    </td>
                     <td className="px-2 py-2 text-right font-mono">
                       {statement.plays.toLocaleString("en-US")}
                     </td>
-                    <td className="px-2 py-2 text-right font-mono">{statement.stations}</td>
-                    <td className="px-2 py-2 text-right font-mono">{statement.works}</td>
+                    <td className="px-2 py-2 text-right font-mono">
+                      {statement.stations}
+                    </td>
+                    <td className="px-2 py-2 text-right font-mono">
+                      {statement.works}
+                    </td>
                     <td className="px-2 py-2 text-right font-mono">
                       {statement.allocationUgx.toLocaleString("en-US")}
                     </td>
                     <td className="px-2 py-2 text-right font-mono">
-                      {statement.allocationUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                      {statement.allocationUsd.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
                     </td>
                     <td className="px-2 py-2 text-right font-mono text-muted">
                       {formatShare(statement.shareOfPool, 2)}
                     </td>
                     <td className="px-2 py-2">
-                      <span className={`chip ${STATUS_CLASS[statement.status]}`}>
+                      <span
+                        className={`chip ${STATUS_CLASS[statement.status]}`}
+                      >
                         {STATUS_LABEL[statement.status]}
                       </span>
                       {statement.paymentReference ? (
@@ -355,10 +456,11 @@ export function RoyaltiesDashboard({ model }: RoyaltiesDashboardProps) {
                             className="btn btn-primary px-2 py-1 text-[10px]"
                             onClick={() => pay(statement.id)}
                           >
-                            Mark paid
+                            Mark paid locally
                           </button>
                         ) : null}
-                        {statement.status !== "blocked" && statement.status !== "paid" ? (
+                        {statement.status !== "blocked" &&
+                        statement.status !== "paid" ? (
                           <button
                             type="button"
                             className="btn btn-ghost px-2 py-1 text-[10px]"

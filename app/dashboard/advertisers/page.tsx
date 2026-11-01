@@ -5,7 +5,7 @@ import { AdAuditor } from "@/components/ad-auditor";
 export const metadata: Metadata = {
   title: "Ad Campaign Auditor",
   description:
-    "Book ad jingles with contracted airtime, then audit contracted plays against verified detected plays, with a time-of-day heatmap and a missed-airtime breach queue.",
+    "Explore an explicitly simulated ad-contract and spot-audit planning workspace, with contracted windows, a heatmap and example breach queues. Not detected brand activity.",
 };
 
 export default function AdCampaignAuditorPage() {

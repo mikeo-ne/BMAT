@@ -57,7 +57,12 @@ export function segmentLabel(segment: MixSegment): string {
  * Roughly one segment in six comes back below `CONFIDENCE_FLOOR` — those are the
  * queue an A&R admin works through.
  */
-export function buildMixTimeline(seedKey: string, catalogue: Track[]): MixSegment[] {
+export function buildMixTimeline(
+  seedKey: string,
+  catalogue: Track[],
+): MixSegment[] {
+  catalogue = catalogue.filter((track) => track.origin === "test-fixture");
+  if (!catalogue.length) return [];
   const rand = createRandom(hashSeed(`mix:${seedKey}`));
   const segments: MixSegment[] = [];
 
@@ -89,7 +94,11 @@ export function buildMixTimeline(seedKey: string, catalogue: Track[]): MixSegmen
 
     const named = kind === "track";
     // Matched tracks land high; unidentified ones deliberately land under the floor.
-    const confidence = named ? 0.64 + rand() * 0.35 : kind === "unidentified" ? 0.18 + rand() * 0.4 : null;
+    const confidence = named
+      ? 0.64 + rand() * 0.35
+      : kind === "unidentified"
+        ? 0.18 + rand() * 0.4
+        : null;
 
     segments.push({
       id: `${seedKey}-seg-${index}`,
@@ -121,7 +130,9 @@ export function buildMixTimeline(seedKey: string, catalogue: Track[]): MixSegmen
  * worth flagging to the station.
  */
 export function buildTransitions(segments: MixSegment[]): TrackTransition[] {
-  const music = segments.filter((s) => s.kind === "track" || s.kind === "unidentified");
+  const music = segments.filter(
+    (s) => s.kind === "track" || s.kind === "unidentified",
+  );
   const transitions: TrackTransition[] = [];
 
   for (let i = 1; i < music.length; i++) {
@@ -141,7 +152,9 @@ export function buildTransitions(segments: MixSegment[]): TrackTransition[] {
 /** Segments the parser could not name confidently, earliest first. */
 export function buildUnidentifiedQueue(segments: MixSegment[]): MixSegment[] {
   return segments.filter(
-    (s) => s.kind === "unidentified" || (s.confidence !== null && s.confidence < CONFIDENCE_FLOOR),
+    (s) =>
+      s.kind === "unidentified" ||
+      (s.confidence !== null && s.confidence < CONFIDENCE_FLOOR),
   );
 }
 
@@ -169,15 +182,21 @@ export interface ManualLink {
  * range, and ad breaks are compressed and flat — which is what makes the
  * transitions readable at a glance.
  */
-export function buildMixWaveform(segments: MixSegment[], stepSec = 2): number[] {
-  const rand = createRandom(hashSeed(`wave:${segments.length}:${segments[0]?.id ?? "empty"}`));
+export function buildMixWaveform(
+  segments: MixSegment[],
+  stepSec = 2,
+): number[] {
+  const rand = createRandom(
+    hashSeed(`wave:${segments.length}:${segments[0]?.id ?? "empty"}`),
+  );
   const samples = Math.ceil(MIX_DURATION_SEC / stepSec);
   const values: number[] = [];
 
   for (let i = 0; i < samples; i++) {
     const at = i * stepSec;
     const segment =
-      segments.find((s) => at >= s.startSec && at < s.endSec) ?? segments[segments.length - 1];
+      segments.find((s) => at >= s.startSec && at < s.endSec) ??
+      segments[segments.length - 1];
 
     if (!segment) {
       values.push(0);
@@ -185,7 +204,8 @@ export function buildMixWaveform(segments: MixSegment[], stepSec = 2): number[] 
     }
 
     // Attack and release at each segment edge so blocks read as separate items.
-    const inPoint = (at - segment.startSec) / Math.max(segment.endSec - segment.startSec, 1);
+    const inPoint =
+      (at - segment.startSec) / Math.max(segment.endSec - segment.startSec, 1);
     const edge = Math.min(inPoint * 8, (1 - inPoint) * 8, 1);
 
     const base =
@@ -219,7 +239,12 @@ export function searchCatalogue(catalogue: Track[], query: string): Track[] {
 
   return catalogue
     .filter((track) => {
-      const hay = [track.title, track.primaryArtist, ...track.featuredArtists, track.isrc]
+      const hay = [
+        track.title,
+        track.primaryArtist,
+        ...track.featuredArtists,
+        track.isrc,
+      ]
         .join(" ")
         .toLowerCase();
       return hay.includes(q);

@@ -16,9 +16,21 @@ export interface AlertChannel {
 }
 
 export const CHANNELS: AlertChannel[] = [
-  { id: "whatsapp", label: "WhatsApp", hint: "Instant push to the artist's number" },
-  { id: "email", label: "Email", hint: "Daily digest or per-play, with the audit trail attached" },
-  { id: "webhook", label: "Webhook", hint: "POST a signed JSON payload to your endpoint" },
+  {
+    id: "whatsapp",
+    label: "WhatsApp",
+    hint: "Instant push to the artist's number",
+  },
+  {
+    id: "email",
+    label: "Email",
+    hint: "Daily digest or per-play, with the audit trail attached",
+  },
+  {
+    id: "webhook",
+    label: "Webhook",
+    hint: "POST a signed JSON payload to your endpoint",
+  },
 ];
 
 /* -------------------------------------------------------------------------- */
@@ -41,6 +53,7 @@ export interface AlertRule {
 
 /** Default rules so the panel is populated on first load. */
 export function buildDefaultRules(catalogue: Track[]): AlertRule[] {
+  if (catalogue.some((track) => track.origin !== "test-fixture")) return [];
   const rules: AlertRule[] = [];
 
   for (const [i, track] of catalogue.slice(0, 4).entries()) {
@@ -49,13 +62,18 @@ export function buildDefaultRules(catalogue: Track[]): AlertRule[] {
       targetType: "track",
       targetId: track.id,
       label: track.title,
-      channels: i === 0 ? ["whatsapp"] : i === 1 ? ["whatsapp", "email"] : ["email"],
+      channels:
+        i === 0 ? ["whatsapp"] : i === 1 ? ["whatsapp", "email"] : ["email"],
       enabled: i < 3,
       verifiedOnly: i % 2 === 0,
     });
   }
 
-  for (const [i, station] of ["capital-kla", "cbs-kla", "gaaki-jin"].entries()) {
+  for (const [i, station] of [
+    "capital-kla",
+    "cbs-kla",
+    "gaaki-jin",
+  ].entries()) {
     const found = FM_STATIONS.find((s) => s.id === station);
     rules.push({
       id: `rule_station_${i + 1}`,
@@ -75,7 +93,9 @@ export function toggleChannel(rule: AlertRule, channel: ChannelId): AlertRule {
   const has = rule.channels.includes(channel);
   return {
     ...rule,
-    channels: has ? rule.channels.filter((c) => c !== channel) : [...rule.channels, channel],
+    channels: has
+      ? rule.channels.filter((c) => c !== channel)
+      : [...rule.channels, channel],
   };
 }
 
@@ -113,8 +133,6 @@ export interface AlertEvent {
   message: string;
 }
 
-const SIGNATURES = ["the East Sound panel", "East Sound Fingerprint", "the UPRS registry"];
-
 /**
  * Deterministic play events for the rules that are switched on.
  *
@@ -126,6 +144,7 @@ export function simulateAlertEvents(
   catalogue: Track[],
   now: Date = new Date(),
 ): AlertEvent[] {
+  catalogue = catalogue.filter((track) => track.origin === "test-fixture");
   const stations = alertStations();
   const events: AlertEvent[] = [];
 
@@ -145,7 +164,7 @@ export function simulateAlertEvents(
 
       const station =
         rule.targetType === "station"
-          ? stations.find((s) => s.id === rule.targetId) ?? stations[0]
+          ? (stations.find((s) => s.id === rule.targetId) ?? stations[0])
           : stations[Math.floor(rand() * stations.length)];
 
       if (!station) continue;
@@ -154,7 +173,13 @@ export function simulateAlertEvents(
       const hour = 6 + Math.floor(rand() * 14);
       const minute = Math.floor(rand() * 60);
       const atIso = new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), (hour - 3 + 24) % 24, minute),
+        Date.UTC(
+          now.getUTCFullYear(),
+          now.getUTCMonth(),
+          now.getUTCDate(),
+          (hour - 3 + 24) % 24,
+          minute,
+        ),
       ).toISOString();
 
       const verified = rand() > 0.14;
@@ -181,28 +206,36 @@ export function simulateAlertEvents(
   return events.sort((a, b) => b.atIso.localeCompare(a.atIso));
 }
 
-/**
- * The push copy, in the shape the product ships.
- *
- * `🔥 AIRPLAY ALERT: Your track 'Katono' was just played on Capital FM
- * (91.3 Kampala) at 15:42 EAT! Verified by the East Sound panel.`
- */
-export function whatsappMessage(title: string, station: StationRef, atIso: string): string {
-  const signature = SIGNATURES[hashSeed(`${title}:${station.id}`) % SIGNATURES.length];
-  const freq = station.frequency === "—" ? "" : `${station.frequency.replace(" MHz", "")} `;
-  return `🔥 AIRPLAY ALERT: Your track '${title}' was just played on ${station.name} (${freq}${station.hub}) at ${formatEatClock(atIso)}! Verified by ${signature}.`;
+/** Demo push copy must not claim broadcast or registry verification. */
+export function whatsappMessage(
+  title: string,
+  station: StationRef,
+  atIso: string,
+): string {
+  const freq =
+    station.frequency === "—"
+      ? ""
+      : `${station.frequency.replace(" MHz", "")} `;
+  return `🔥 AIRPLAY ALERT (DEMO): A simulated play of '${title}' on ${station.name} (${freq}${station.hub}) at ${formatEatClock(atIso)}. Not independently verified or UPRS-endorsed.`;
 }
 
 /** Same event, when East Sound could not fingerprint the playout. */
-export function unverifiedMessage(title: string, station: StationRef, atIso: string): string {
-  const freq = station.frequency === "—" ? "" : `${station.frequency.replace(" MHz", "")} `;
-  return `⚠️ UNVERIFIED AIRPLAY: A play resembling '${title}' was logged on ${station.name} (${freq}${station.hub}) at ${formatEatClock(atIso)}, but no fingerprint match was returned. Not billable until resolved.`;
+export function unverifiedMessage(
+  title: string,
+  station: StationRef,
+  atIso: string,
+): string {
+  const freq =
+    station.frequency === "—"
+      ? ""
+      : `${station.frequency.replace(" MHz", "")} `;
+  return `⚠️ UNVERIFIED AIRPLAY (DEMO): A simulated play resembling '${title}' was logged on ${station.name} (${freq}${station.hub}) at ${formatEatClock(atIso)}, but no fingerprint match was returned. Not billable until resolved.`;
 }
 
 /** The JSON body a webhook subscriber would receive. */
 export function webhookPayload(event: AlertEvent): Record<string, unknown> {
   return {
-    event: "airplay.verified",
+    event: event.verified ? "airplay.verified" : "airplay.unverified",
     occurred_at: event.atIso,
     track_id: event.trackId,
     title: event.title,
@@ -214,5 +247,7 @@ export function webhookPayload(event: AlertEvent): Record<string, unknown> {
     },
     verified: event.verified,
     source: "east-sound",
+    demo: true,
+    independently_verified: false,
   };
 }

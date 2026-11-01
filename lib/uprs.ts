@@ -1,7 +1,14 @@
+import { csvCell } from "@/lib/csv";
+import { TIME_BANDS, TIME_BAND_META, type TimeBand } from "@/lib/dayparts";
 import { campaignFactor } from "@/lib/airplay";
 import { formatPeriod, lastNMonths, periodStartIso } from "@/lib/format";
 import { hashSeed, createRandom } from "@/lib/airplay";
-import { FM_STATIONS, REGIONS, stationsForRegion, type Region } from "@/lib/regions";
+import {
+  FM_STATIONS,
+  REGIONS,
+  stationsForRegion,
+  type Region,
+} from "@/lib/regions";
 import type { Track } from "@/lib/types";
 
 /**
@@ -38,14 +45,14 @@ export interface UprsMember {
 /** Stable member id derived from the name, so re-runs never renumber members. */
 export function memberIdFor(name: string): string {
   const n = hashSeed(`uprs:${name.trim().toLowerCase()}`) % 100_000;
-  return `UPRS-${String(n).padStart(5, "0")}`;
+  return `ES-${String(n).padStart(5, "0")}`;
 }
 
 export function buildMembers(catalogue: Track[]): UprsMember[] {
   const works = new Map<string, number>();
 
   for (const track of catalogue) {
-    for (const name of [track.primaryArtist, ...track.featuredArtists]) {
+    for (const { name } of sharesFor(track)) {
       const key = name.trim();
       if (!key) continue;
       works.set(key, (works.get(key) ?? 0) + 1);
@@ -53,7 +60,11 @@ export function buildMembers(catalogue: Track[]): UprsMember[] {
   }
 
   return [...works.entries()]
-    .map(([name, count]) => ({ memberId: memberIdFor(name), name, works: count }))
+    .map(([name, count]) => ({
+      memberId: memberIdFor(name),
+      name,
+      works: count,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -75,6 +86,14 @@ export const DISTRIBUTION_POLICY: DistributionPolicy = {
 
 /** Per-artist share of one recording's plays under the policy. */
 export function sharesFor(track: Track): { name: string; share: number }[] {
+  if (track.ownership)
+    return track.ownership.parties
+      .filter((party) => party.shares.performance > 0)
+      .map((party) => ({
+        name: party.name,
+        share: party.shares.performance / 100,
+      }));
+  if (track.origin !== "test-fixture") return [];
   const features = track.featuredArtists.map((f) => f.trim()).filter(Boolean);
 
   if (features.length === 0) {
@@ -108,7 +127,10 @@ export const TARIFF: Record<StationTier, TariffRate> = {
   television: { tier: "television", label: "Television", ugxPerPlay: 620 },
 };
 
-export function tierFor(reach: number, medium: "FM" | "TV" = "FM"): StationTier {
+export function tierFor(
+  reach: number,
+  medium: "FM" | "TV" = "FM",
+): StationTier {
   if (medium === "TV") return "television";
   if (reach >= 1_000_000) return "national";
   if (reach >= 400_000) return "regional";
@@ -140,6 +162,9 @@ export interface PlayRow {
   share: number;
   ugxPerPlay: number;
   allocationUgx: number;
+  /** Present only for explicitly modelled time-weighted monthly rows. */
+  timeBand?: TimeBand;
+  multiplier?: number;
 }
 
 /** The 14-day reporting window the airplay model produces, in months. */
@@ -171,9 +196,13 @@ export function buildPlayLedger(input: {
   const rows: PlayRow[] = [];
 
   for (const track of input.catalogue) {
+    if (track.origin !== "test-fixture") continue;
     const rand = createRandom(hashSeed(`uprs-ledger:${track.isrc}`));
     const shares = sharesFor(track);
-    const nowFactor = Math.max(0.05, campaignFactor(ageDaysOn(track.releaseDate, now.toISOString())));
+    const nowFactor = Math.max(
+      0.05,
+      campaignFactor(ageDaysOn(track.releaseDate, now.toISOString())),
+    );
 
     for (const period of periods) {
       const periodIso = periodStartIso(period);
@@ -196,7 +225,9 @@ export function buildPlayLedger(input: {
         if (reachTotal === 0) continue;
 
         for (const station of stations) {
-          const stationPlays = Math.round((regionMonthly * station.reach) / reachTotal);
+          const stationPlays = Math.round(
+            (regionMonthly * station.reach) / reachTotal,
+          );
           if (stationPlays <= 0) continue;
 
           const rate = rateFor(station.reach);
@@ -251,10 +282,17 @@ export const EMPTY_FILTERS: CmoFilters = {
 /** Empty array means "no constraint" — the enterprise-table convention. */
 export function applyFilters(rows: PlayRow[], filters: CmoFilters): PlayRow[] {
   return rows.filter((row) => {
-    if (filters.stations.length > 0 && !filters.stations.includes(row.stationId)) return false;
-    if (filters.regions.length > 0 && !filters.regions.includes(row.region)) return false;
-    if (filters.periods.length > 0 && !filters.periods.includes(row.period)) return false;
-    if (filters.members.length > 0 && !filters.members.includes(row.memberId)) return false;
+    if (
+      filters.stations.length > 0 &&
+      !filters.stations.includes(row.stationId)
+    )
+      return false;
+    if (filters.regions.length > 0 && !filters.regions.includes(row.region))
+      return false;
+    if (filters.periods.length > 0 && !filters.periods.includes(row.period))
+      return false;
+    if (filters.members.length > 0 && !filters.members.includes(row.memberId))
+      return false;
     return true;
   });
 }
@@ -296,9 +334,24 @@ export interface DistributionReport {
   periodLabel: string;
   royaltyPoolUgx: number;
   royaltyPoolUsd: number;
-  byRate: { label: string; tier: StationTier; plays: number; ugxPerPlay: number; amountUgx: number }[];
+  byRate: {
+    label: string;
+    tier: StationTier;
+    plays: number;
+    ugxPerPlay: number;
+    amountUgx: number;
+  }[];
   byRegion: { region: Region; plays: number; amountUgx: number }[];
   allocations: MemberAllocation[];
+  timeWeighting?: {
+    basePoolUgx: number;
+    bands: {
+      band: TimeBand;
+      multiplier: number;
+      plays: number;
+      amountUgx: number;
+    }[];
+  };
 }
 
 export function buildReport(
@@ -313,9 +366,16 @@ export function buildReport(
   const works = new Set(rows.map((r) => r.isrc));
   const periods = [...new Set(rows.map((r) => r.period))].sort();
 
-  const rateBuckets = new Map<StationTier, { plays: number; amountUgx: number; ugxPerPlay: number }>();
+  const rateBuckets = new Map<
+    StationTier,
+    { plays: number; amountUgx: number; ugxPerPlay: number }
+  >();
   for (const row of rows) {
-    const bucket = rateBuckets.get(row.tier) ?? { plays: 0, amountUgx: 0, ugxPerPlay: row.ugxPerPlay };
+    const bucket = rateBuckets.get(row.tier) ?? {
+      plays: 0,
+      amountUgx: 0,
+      ugxPerPlay: row.ugxPerPlay,
+    };
     bucket.plays += row.plays;
     bucket.amountUgx += row.allocationUgx;
     rateBuckets.set(row.tier, bucket);
@@ -329,11 +389,24 @@ export function buildReport(
     regionBuckets.set(row.region, bucket);
   }
 
-  const perMember = new Map<string, { artist: string; plays: number; stations: Set<string>; works: Set<string>; amountUgx: number }>();
+  const perMember = new Map<
+    string,
+    {
+      artist: string;
+      plays: number;
+      stations: Set<string>;
+      works: Set<string>;
+      amountUgx: number;
+    }
+  >();
   for (const row of rows) {
-    const bucket =
-      perMember.get(row.memberId) ??
-      { artist: row.artist, plays: 0, stations: new Set<string>(), works: new Set<string>(), amountUgx: 0 };
+    const bucket = perMember.get(row.memberId) ?? {
+      artist: row.artist,
+      plays: 0,
+      stations: new Set<string>(),
+      works: new Set<string>(),
+      amountUgx: 0,
+    };
     bucket.plays += row.plays;
     bucket.stations.add(row.stationId);
     bucket.works.add(row.isrc);
@@ -407,6 +480,28 @@ export function buildReport(
       amountUgx: regionBuckets.get(region)?.amountUgx ?? 0,
     })),
     allocations,
+    ...(rows.some((row) => row.timeBand)
+      ? {
+          timeWeighting: {
+            basePoolUgx: rows.reduce(
+              (sum, row) => sum + row.plays * row.ugxPerPlay,
+              0,
+            ),
+            bands: TIME_BANDS.map((band) => {
+              const entries = rows.filter((row) => row.timeBand === band);
+              return {
+                band,
+                multiplier: entries[0]?.multiplier ?? 1,
+                plays: entries.reduce((sum, row) => sum + row.plays, 0),
+                amountUgx: entries.reduce(
+                  (sum, row) => sum + row.allocationUgx,
+                  0,
+                ),
+              };
+            }),
+          },
+        }
+      : {}),
   };
 }
 
@@ -430,13 +525,14 @@ const CSV_COLUMNS = [
   "Allocation (USD)",
 ] as const;
 
-function escapeCsv(value: string | number): string {
-  const text = String(value);
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
+const escapeCsv = csvCell;
 
 export function ledgerToCsv(rows: PlayRow[]): string {
-  const header = CSV_COLUMNS.join(",");
+  const weighted = rows.some((row) => row.timeBand);
+  const header = [
+    ...CSV_COLUMNS,
+    ...(weighted ? ["Time band (modelled)", "Time multiplier"] : []),
+  ].join(",");
 
   const body = rows.map((row) =>
     [
@@ -453,6 +549,12 @@ export function ledgerToCsv(rows: PlayRow[]): string {
       row.ugxPerPlay,
       row.allocationUgx,
       (row.allocationUgx / UGX_PER_USD).toFixed(2),
+      ...(weighted
+        ? [
+            row.timeBand ? TIME_BAND_META[row.timeBand].label : "Unweighted",
+            row.multiplier ?? 1,
+          ]
+        : []),
     ]
       .map(escapeCsv)
       .join(","),
@@ -467,7 +569,17 @@ export function reportToCsv(report: DistributionReport): string {
     `Generated,${escapeCsv(new Date(report.generatedAt).toISOString())}`,
     `Reporting period,${escapeCsv(report.periodLabel)}`,
     `Scope,${escapeCsv(report.filterSummary.join(" | "))}`,
-    `Flat-rate basis,${escapeCsv("placeholder tariff — not the published UPRS schedule")}`,
+    `${report.timeWeighting ? "Weighted basis" : "Flat-rate basis"},${escapeCsv("placeholder tariff — not the published UPRS schedule")}`,
+    ...(report.timeWeighting
+      ? [
+          "Daypart basis,Modelled monthly allocation: 45% prime; 40% standard; remainder night. Not timestamped broadcast evidence.",
+          `Unweighted pool (UGX),${report.timeWeighting.basePoolUgx}`,
+          ...report.timeWeighting.bands.map(
+            (band) =>
+              `${TIME_BAND_META[band.band].label} multiplier,${band.multiplier}`,
+          ),
+        ]
+      : []),
     "",
     "Summary",
     `Total plays,${report.totalPlays}`,
