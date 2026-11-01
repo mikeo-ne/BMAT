@@ -36,7 +36,14 @@ export function isWorkspace(value: string | null): value is WorkspaceId {
 }
 
 export function workspaceForPath(pathname: string): WorkspaceId {
-  if (pathname === "/dashboard/cmo") return "cmo";
+  if (
+    [
+      "/dashboard/cmo",
+      "/dashboard/cmo/master",
+      "/dashboard/east-sound",
+    ].includes(pathname.replace(/\/+$/, ""))
+  )
+    return "cmo";
   if (pathname === "/dashboard/advertisers") return "advertiser";
   if (
     [

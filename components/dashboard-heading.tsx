@@ -9,6 +9,8 @@ const TITLES: Record<string, string> = {
   "/dashboard/monitoring": "Live Station Monitor",
   "/dashboard/playout": "Broadcaster Playout Log",
   "/dashboard/cmo": "CMO & UPRS Regulatory Auditor",
+  "/dashboard/cmo/master": "CMO & UPRS Regulatory Auditor",
+  "/dashboard/east-sound": "CMO & UPRS Regulatory Auditor",
   "/dashboard/splits": "Rights & Split-Sheet Management",
   "/dashboard/advertisers": "Advertiser Spot Tracker",
   "/dashboard/mix-parser": "Unidentified Audio & DJ Mix Parser",
