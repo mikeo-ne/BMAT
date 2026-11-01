@@ -194,9 +194,12 @@ export function notificationProviderReadiness(): ProviderReadiness {
       validEmail(process.env.EAST_SOUND_EMAIL_FROM ?? ""),
     webhook:
       webhookAllowlist().length > 0 &&
-      (process.env.EAST_SOUND_WEBHOOK_SECRET?.length ?? 0) >= 32,
+      ((process.env.EAST_SOUND_WEBHOOK_SECRET?.length ?? 0) >= 32 ||
+        !!process.env.EAST_SOUND_SECRET_KEY),
     liveEnabled: process.env.EAST_SOUND_LIVE_NOTIFICATIONS === "true",
-    worker: (process.env.EAST_SOUND_NOTIFICATION_TOKEN?.length ?? 0) >= 32,
+    worker:
+      process.env.EAST_SOUND_WORKER_ENABLED === "1" ||
+      (process.env.EAST_SOUND_NOTIFICATION_TOKEN?.length ?? 0) >= 32,
   };
 }
 function statusResult(response: {
@@ -291,6 +294,8 @@ export async function sendAlert(
   if (
     !webhook ||
     !webhook.enabled ||
+    ((webhook.secret ?? process.env.EAST_SOUND_WEBHOOK_SECRET)?.length ?? 0) <
+      32 ||
     !config.webhooks.some(
       (hook) =>
         hook.id === webhook.id && hook.url === webhook.url && hook.enabled,
@@ -316,7 +321,7 @@ export async function sendAlert(
       "X-East-Sound-Signature": signWebhook(
         body,
         timestamp,
-        process.env.EAST_SOUND_WEBHOOK_SECRET!,
+        webhook.secret ?? process.env.EAST_SOUND_WEBHOOK_SECRET!,
       ),
       "Idempotency-Key": `${event.id}:${encodeURIComponent(webhook.id)}`,
     }),

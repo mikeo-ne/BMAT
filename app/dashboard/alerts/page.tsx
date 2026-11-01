@@ -2,7 +2,7 @@ import { capturePollingAvailable } from "@/lib/runtime-storage";
 import type { Metadata } from "next";
 
 import { AlertsView } from "@/components/alerts-view";
-import { readWorkspaceData } from "@/lib/workspace-data";
+import { readPageWorkspace } from "@/lib/workspace-data";
 import { notificationProviderReadiness } from "@/lib/notification-transport";
 
 export const metadata: Metadata = {
@@ -14,10 +14,10 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AlertsPage() {
-  const data = await readWorkspaceData();
+  const data = await readPageWorkspace(["artist"], "/dashboard/alerts");
   return (
     <AlertsView
-      catalogue={data.catalogue}
+      catalogue={data.catalogue.filter((t) => t.ownerId === data.actor.id)}
       initialEvents={data.history}
       now={data.now}
       providers={notificationProviderReadiness()}

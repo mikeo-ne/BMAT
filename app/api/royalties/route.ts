@@ -1,3 +1,4 @@
+import { guardedApi } from "@/lib/auth-core";
 import { NextResponse } from "next/server";
 
 import { buildCapturedRoyaltiesModel } from "@/lib/royalties";
@@ -14,27 +15,29 @@ export const dynamic = "force-dynamic";
  * the reporting window (default 6, bounded 1-12).
  */
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const rawMonths = Number(searchParams.get("months") ?? "6");
-  const months = Number.isFinite(rawMonths)
-    ? Math.min(12, Math.max(1, Math.round(rawMonths)))
-    : 6;
+  return guardedApi(request, ["cmo"], false, async (actor) => {
+    const { searchParams } = new URL(request.url);
+    const rawMonths = Number(searchParams.get("months") ?? "6");
+    const months = Number.isFinite(rawMonths)
+      ? Math.min(12, Math.max(1, Math.round(rawMonths)))
+      : 6;
 
-  const data = await readWorkspaceData();
-  const model = buildCapturedRoyaltiesModel(
-    data.catalogue,
-    data.history,
-    new Date(),
-    months,
-  );
+    const data = await readWorkspaceData(new Date(), actor);
+    const model = buildCapturedRoyaltiesModel(
+      data.catalogue,
+      data.history,
+      new Date(),
+      months,
+    );
 
-  return NextResponse.json({
-    generatedAt: new Date().toISOString(),
-    window: months,
-    report: model.report,
-    members: model.members,
-    statements: model.statements,
-    batches: model.batches,
-    months: model.months,
+    return NextResponse.json({
+      generatedAt: new Date().toISOString(),
+      window: months,
+      report: model.report,
+      members: model.members,
+      statements: model.statements,
+      batches: model.batches,
+      months: model.months,
+    });
   });
 }

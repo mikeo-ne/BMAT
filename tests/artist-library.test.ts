@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+vi.mock("server-only", () => ({}));
+import { describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/artists/route";
 import {
   appleMusicEmbedUrl,
@@ -227,19 +228,9 @@ describe("reference filtering, links and export", () => {
     expect(csv).not.toContain("UG-ESD");
     expect(csv).not.toContain("OLA MUMMY");
   });
-  it("exposes a read-only public API with explicit rights and analytics boundaries", async () => {
-    const response = GET();
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.kind).toBe("public-music-reference");
-    expect(body.artists).toHaveLength(4);
-    expect(body.recordings).toHaveLength(12);
-    expect(body.usage).toEqual({
-      playback: "original-platform-embed",
-      masterAudioProvided: false,
-      masterLicenceGranted: false,
-      rightsSplitsVerified: false,
-      airplay: "not-connected",
-    });
+  it("requires an authenticated artist for the research API; public charts expose only their minimal projection", async () => {
+    const response = await GET();
+    expect(response.status).toBe(401);
+    expect(response.headers.get("cache-control")).toBe("no-store");
   });
 });

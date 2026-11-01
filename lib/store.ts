@@ -29,7 +29,7 @@ import {
   parseIsrc,
 } from "@/lib/isrc";
 import type { DeliveryOwnership } from "@/lib/delivery-splits";
-import type { Track } from "@/lib/types";
+import type { AudioSignature, Track } from "@/lib/types";
 
 /** Explicit SQL repository or single-process JSON store. Master bytes remain filesystem-backed. */
 export const DATA_DIR =
@@ -44,12 +44,16 @@ function serialise<T>(operation: () => Promise<T>): Promise<T> {
   return next;
 }
 async function ensureDirs() {
-  await mkdir(UPLOAD_DIR, { recursive: true });
+  await mkdir(UPLOAD_DIR, { recursive: true, mode: 0o700 });
 }
 async function atomicJson(file: string, value: unknown): Promise<void> {
   const temporary = `${file}.${randomUUID()}.tmp`;
   try {
-    await writeFile(temporary, JSON.stringify(value, null, 2), "utf8");
+    await writeFile(temporary, JSON.stringify(value, null, 2), {
+      encoding: "utf8",
+      mode: 0o600,
+      flag: "wx",
+    });
     await rename(temporary, file);
   } finally {
     await rm(temporary, { force: true });
@@ -162,6 +166,10 @@ export class DuplicateIsrcError extends Error {
   }
 }
 export interface NewTrackInput {
+  ownerId?: string;
+  fingerprint?: AudioSignature;
+  agreementId?: string;
+  publicCharts?: boolean;
   title: string;
   primaryArtist: string;
   featuredArtists: string[];
@@ -181,6 +189,10 @@ export async function addTrack(input: NewTrackInput): Promise<Track> {
     const track = {
       ...buildTrack({ ...input, id: `trk_${randomUUID()}` }),
       ...(input.ownership ? { ownership: input.ownership } : {}),
+      ...(input.ownerId ? { ownerId: input.ownerId } : {}),
+      ...(input.fingerprint ? { fingerprint: input.fingerprint } : {}),
+      ...(input.agreementId ? { agreementId: input.agreementId } : {}),
+      publicCharts: input.publicCharts === true,
     };
     try {
       return await addPostgresTrack(track);
@@ -197,6 +209,11 @@ export async function addTrack(input: NewTrackInput): Promise<Track> {
   return serialise(async () => {
     const existing = parseCatalogue(await readFile(TRACKS_FILE, "utf8"));
     if (
+      input.agreementId &&
+      existing.some((t) => t.agreementId === input.agreementId)
+    )
+      throw new Error("That release agreement was already delivered.");
+    if (
       existing.some(
         (track) => normaliseIsrc(track.isrc) === normaliseIsrc(input.isrc),
       )
@@ -205,6 +222,10 @@ export async function addTrack(input: NewTrackInput): Promise<Track> {
     const track = {
       ...buildTrack({ ...input, id: `trk_${randomUUID().slice(0, 8)}` }),
       ...(input.ownership ? { ownership: input.ownership } : {}),
+      ...(input.ownerId ? { ownerId: input.ownerId } : {}),
+      ...(input.fingerprint ? { fingerprint: input.fingerprint } : {}),
+      ...(input.agreementId ? { agreementId: input.agreementId } : {}),
+      publicCharts: input.publicCharts === true,
     };
     await atomicJson(TRACKS_FILE, [track, ...existing]);
     return track;
@@ -238,7 +259,10 @@ export async function saveUpload(
   if (!masterUploadsAvailable()) throw new Error(MASTER_STORAGE_NOTICE);
   await ensureDirs();
   const storedName = `${randomUUID()}${path.extname(fileName).toLowerCase()}`;
-  await writeFile(path.join(UPLOAD_DIR, storedName), buffer);
+  await writeFile(path.join(UPLOAD_DIR, storedName), buffer, {
+    mode: 0o600,
+    flag: "wx",
+  });
   return storedName;
 }
 export async function removeUpload(storedName: string): Promise<void> {

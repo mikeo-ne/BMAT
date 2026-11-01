@@ -1,3 +1,4 @@
+import { requirePageRole } from "@/lib/auth";
 import type { Metadata } from "next";
 
 import { MixParserView } from "@/components/mix-parser-view";
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function MixParserPage() {
+  await requirePageRole(["cmo"], "/dashboard/mix-parser");
   const catalogue = await readTracks();
 
   return <MixParserView catalogue={catalogue} />;

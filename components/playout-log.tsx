@@ -346,7 +346,7 @@ export function PlayoutLog({
                         </td>
                         <td className="px-4 py-3.5">
                           <span
-                            className={`whitespace-nowrap rounded-full px-2 py-1 text-[9px] ${event.trackId ? "bg-brand/7 text-brand" : "bg-[#f6edf1] text-[#a06981]"}`}
+                            className={`whitespace-nowrap rounded-full px-2 py-1 text-[9px] ${event.trackId ? "bg-brand/7 text-brand" : "bg-rose-400/10 text-rose-300"}`}
                           >
                             {event.trackId
                               ? event.source === "captured"

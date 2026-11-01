@@ -4,9 +4,8 @@ import { postgresStorageEnabled } from "@/lib/postgres/pool";
 /** Vercel's local disk is not a shared datastore. Never accept a write into /tmp as durable success. */
 export function referenceStorageOnly(): boolean {
   return (
-    (process.env.EAST_SOUND_STATIC_EXPORT === "1" ||
-      process.env.VERCEL === "1") &&
-    !postgresStorageEnabled()
+    process.env.EAST_SOUND_STATIC_EXPORT === "1" ||
+    (process.env.VERCEL === "1" && !postgresStorageEnabled())
   );
 }
 export function capturePollingAvailable(): boolean {
@@ -23,7 +22,7 @@ export function masterUploadsAvailable(): boolean {
 }
 export function deploymentStorageNotice(): string | null {
   if (referenceStorageOnly())
-    return "Read-only reference deployment: public releases only, with no connected capture storage. Channel settings, previews and PDF exports stay in your browser. Live capture requires configured PostgreSQL; master delivery requires authenticated durable storage.";
+    return "Read-only reference deployment: public releases only, with no connected capture storage. Only public charts and statistics are accessible; private workspaces require persistent authenticated storage. Live capture requires configured PostgreSQL; master delivery requires authenticated durable storage.";
   if (!masterUploadsAvailable())
     return "Cloud deployment: capture storage uses the configured PostgreSQL backend. Master delivery and catalogue mutations remain disabled until authenticated durable master storage is available.";
   return null;
@@ -39,4 +38,4 @@ export function assertMutableStorage(): void {
   if (referenceStorageOnly()) throw new StorageUnavailableError();
 }
 export const MASTER_STORAGE_NOTICE =
-  "Master uploads, tag reservations and catalogue deletions are disabled on this deployment. Use an authenticated Node host with durable storage, or implement authenticated direct-to-object-storage delivery. No file or catalogue change was saved.";
+  "Master uploads, tag reservations and catalogue deletions are disabled for this deployment or development-only mock identity. Use a non-mock artist account on a Node host with durable storage, or implement authenticated direct-to-object-storage delivery. No file or catalogue change was saved.";

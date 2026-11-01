@@ -71,7 +71,10 @@ export function selectLibraryArtist(artist: ArtistSelection) {
   const url = new URL(window.location.href);
   // Keep a reloadable library URL even when entered from an in-place overview tab.
   // Native history preserves staged delivery state and integrates with Next's router.
-  url.pathname = url.pathname.replace(/\/artist(\/?)$/, "/artists$1");
+  url.pathname = url.pathname.replace(
+    /\/artist(?:\/(?:catalogue|delivery))?(\/?)$/,
+    "/artists$1",
+  );
   url.hash = artist === "all" ? "" : artist;
   window.history.replaceState(null, "", url.pathname + url.search + url.hash);
   window.dispatchEvent(new Event("hashchange"));
@@ -85,7 +88,7 @@ export function ArtistSpotlight({
   return (
     <section
       aria-labelledby="artist-spotlight-heading"
-      className="rounded-2xl border border-brand/15 bg-[#edf3e7] p-4 sm:p-5"
+      className="rounded-2xl border border-brand/15 bg-brand/5 p-4 sm:p-5"
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -101,7 +104,7 @@ export function ArtistSpotlight({
             statistics come only from connected captures.
           </p>
         </div>
-        <span className="chip !border-brand/15 !bg-white/60 !text-[10px]">
+        <span className="chip !border-brand/15 !bg-surface-2/60 !text-[10px]">
           <BookOpen size={11} />
           {REFERENCE_RECORDINGS.length} track references
         </span>
@@ -117,7 +120,7 @@ export function ArtistSpotlight({
               type="button"
               aria-label={`Explore ${artist.displayName} music`}
               onClick={() => onSelect(artist.id)}
-              className="group flex min-w-0 items-center gap-3 rounded-xl border border-white/80 bg-white/75 p-3 text-left transition-colors hover:border-brand/30 hover:bg-white"
+              className="group flex min-w-0 items-center gap-3 rounded-xl border border-line bg-surface-2/60 p-3 text-left transition-colors hover:border-brand/30 hover:bg-surface-2"
             >
               <span
                 aria-hidden

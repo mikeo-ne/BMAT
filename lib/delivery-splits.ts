@@ -15,17 +15,25 @@ export const DELIVERY_ROLES = [
 export type DeliveryRole = (typeof DELIVERY_ROLES)[number];
 
 export interface DeliveryParty {
+  email?: string;
   id: string;
   name: string;
   role: DeliveryRole;
   shares: Record<DeliveryRight, number>;
-  /** A local, typed acknowledgement; identity has NOT been authenticated. */
-  signature: { typedName: string; signedAt: string } | null;
+  /** The approvalMethod distinguishes legacy local acknowledgements from immutable account-bound attestations. */
+  signature: {
+    typedName: string;
+    signedAt: string;
+    userId?: string;
+    accountEmail?: string;
+  } | null;
 }
 
 export interface DeliveryOwnership {
   version: 1;
-  approvalMethod: "local-acknowledgement";
+  approvalMethod: "local-acknowledgement" | "authenticated-account";
+  agreementId?: string;
+  bindingDigest?: string;
   parties: DeliveryParty[];
 }
 

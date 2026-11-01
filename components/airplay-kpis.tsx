@@ -57,7 +57,7 @@ export function AirplayKpis({
       hint: "Enabled rules with a configured, opted-in channel",
       icon: Bell,
       color: "#567baa",
-      tag: "Local notification network",
+      tag: "Configured account watches",
     },
     {
       label: "Flagged unmatched audio",

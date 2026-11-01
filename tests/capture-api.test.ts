@@ -1,7 +1,8 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { testActor } from "@/tests/fixtures/auth";
 import { CAPTURE_NOW, capturedSpin } from "@/tests/fixtures/captured";
 import { buildFixtureTracks } from "@/tests/fixtures/catalogue";
 vi.mock("server-only", () => ({}));
@@ -36,7 +37,9 @@ const request = (
 
 describe("protected captured-event API and immutable local storage", () => {
   it("returns an empty captured-only feed rather than fabricating a broadcast", async () => {
-    const response = await route.GET();
+    expect((await route.GET()).status).toBe(401);
+    const auditor = await testActor("cmo");
+    const response = await route.GET(auditor.request("/api/playout"));
     expect(response.status).toBe(200);
     const json = await response.json();
     expect(json).toMatchObject({ source: "captured-only", records: [] });
@@ -75,6 +78,10 @@ describe("protected captured-event API and immutable local storage", () => {
     const before = await catalogue.readTracks();
     const first = await route.POST(request({ records: [capturedSpin()] }));
     expect(first.status).toBe(201);
+    if (process.platform !== "win32")
+      expect(
+        (await stat(path.join(directory, "broadcasts.json"))).mode & 0o777,
+      ).toBe(0o600);
     expect(await first.json()).toEqual({ inserted: 1, duplicates: 0 });
     const second = await route.POST(request({ records: [capturedSpin()] }));
     expect(await second.json()).toEqual({ inserted: 0, duplicates: 1 });
@@ -113,7 +120,8 @@ describe("protected captured-event API and immutable local storage", () => {
       { source: "captured", id: "looks-captured", detectedAt: "not-a-date" },
     ]);
     await writeFile(file, corrupt);
-    expect((await route.GET()).status).toBe(503);
+    const auditor = await testActor("cmo");
+    expect((await route.GET(auditor.request("/api/playout"))).status).toBe(503);
     expect(
       (await route.POST(request({ records: [capturedSpin()] }))).status,
     ).toBe(503);

@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { setTimeout as delay } from "node:timers/promises";
+import { processFileOutbox } from "@/lib/file-notification-queue";
 import { processPostgresOutbox } from "@/lib/postgres/outbox";
 import { notificationProviderReadiness } from "@/lib/notification-transport";
 import { closePostgresPool, postgresStorageEnabled } from "@/lib/postgres/pool";
@@ -8,7 +9,6 @@ const shutdown = new AbortController();
 process.once("SIGTERM", () => shutdown.abort());
 process.once("SIGINT", () => shutdown.abort());
 async function main() {
-  if (!postgresStorageEnabled()) throw new Error("PostgreSQL is not enabled.");
   const ready = notificationProviderReadiness();
   if (
     !ready.liveEnabled ||
@@ -17,11 +17,13 @@ async function main() {
     throw new Error("Live provider delivery is not configured.");
   const once = process.argv.includes("--once");
   console.log(
-    "East Sound PostgreSQL notification worker started (provider acceptance is not a delivery receipt).",
+    "East Sound durable notification worker started (provider acceptance is not a delivery receipt).",
   );
   while (!shutdown.signal.aborted) {
     try {
-      const result = await processPostgresOutbox();
+      const result = postgresStorageEnabled()
+        ? await processPostgresOutbox()
+        : await processFileOutbox();
       if (result.attempted) console.log(JSON.stringify(result));
       if (once) return;
       // Always yield; an unavailable database must not cause a tight polling loop.
@@ -44,7 +46,7 @@ async function main() {
 main()
   .catch(() => {
     console.error(
-      "Worker disabled: configure PostgreSQL, explicit live enable and at least one real provider. No jobs were claimed.",
+      "Worker disabled: configure persistent storage, explicit live enable and at least one real provider. No jobs were claimed.",
     );
     process.exitCode = 1;
   })

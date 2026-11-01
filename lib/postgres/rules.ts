@@ -1,4 +1,5 @@
 import "server-only";
+import type { PoolClient } from "pg";
 import { createHash } from "node:crypto";
 import {
   channelReady,
@@ -25,6 +26,7 @@ export async function syncPostgresRules(
   config: NotificationPreferences,
   user: string,
   catalogue: Track[],
+  after?: (db: PoolClient) => Promise<void>,
 ) {
   const plan: {
     external_key: string;
@@ -91,7 +93,9 @@ export async function syncPostgresRules(
             destination: target.destination,
             webhook_kind: target.kind,
             template: config.whatsapp.template,
-            milestones: sub.milestones,
+            // Non-milestone SQL rules still require a nonempty storage array.
+            // These values are never evaluated for first/prime triggers.
+            milestones: trigger === "milestone" ? sub.milestones : [100, 1000],
             active: sub.enabled,
             activation_key: sub.activatedAt ?? sub.createdAt,
           });
@@ -115,12 +119,14 @@ export async function syncPostgresRules(
       "SELECT sha256 FROM east_sound.notification_configs WHERE tenant_id=$1 AND user_id=$2",
       [tenant, user],
     );
-    if (previous.rows[0]?.sha256 === checksum)
+    if (previous.rows[0]?.sha256 === checksum) {
+      await after?.(db);
       return {
         unchanged: true,
         rules: plan.length,
         active: plan.filter((rule) => rule.active).length,
       };
+    }
     await db.query(
       "UPDATE east_sound.notification_rules SET is_active=false WHERE tenant_id=$1 AND user_id=$2 AND is_active",
       [tenant, user],
@@ -161,6 +167,7 @@ export async function syncPostgresRules(
       ON CONFLICT(tenant_id,user_id) DO UPDATE SET sha256=excluded.sha256,updated_at=clock_timestamp()`,
       [tenant, user, checksum],
     );
+    await after?.(db);
     return {
       unchanged: false,
       rules: plan.length,

@@ -11,7 +11,7 @@ export function UgandaAirplayMap({
   focusRegion,
   onFocusRegion,
 }: {
-  events: BroadcastSpin[];
+  events: Pick<BroadcastSpin, "trackId" | "stationId" | "region" | "source">[];
   focusRegion: Region | "All";
   onFocusRegion: (region: Region | "All") => void;
 }) {
@@ -51,8 +51,8 @@ export function UgandaAirplayMap({
         </span>
       </header>
       <div className="grid flex-1 grid-cols-1 min-[580px]:grid-cols-[1fr_0.9fr]">
-        <div className="map-grid relative flex min-h-[270px] items-center justify-center border-y border-line/50 bg-[#f4f8f5] min-[580px]:border-b-0 min-[580px]:border-r">
-          <span className="absolute left-4 top-3 flex items-center gap-1 text-[8px] uppercase tracking-[0.16em] text-[#8ca59a]">
+        <div className="map-grid relative flex min-h-[270px] items-center justify-center border-y border-line/50 bg-surface-2/60 min-[580px]:border-b-0 min-[580px]:border-r">
+          <span className="absolute left-4 top-3 flex items-center gap-1 text-[8px] uppercase tracking-[0.16em] text-muted">
             <MoveUpRight size={12} />N
           </span>
           <svg
@@ -167,7 +167,7 @@ export function UgandaAirplayMap({
               Kampala
             </text>
           </svg>
-          <span className="absolute bottom-3 left-4 rounded bg-white/75 px-1.5 py-0.5 text-[8px] text-muted">
+          <span className="absolute bottom-3 left-4 rounded bg-surface/90 px-1.5 py-0.5 text-[8px] text-muted">
             Schematic · not administrative boundaries
           </span>
         </div>

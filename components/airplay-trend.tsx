@@ -4,7 +4,13 @@ import { TrendingUp } from "lucide-react";
 import { formatCompact, formatNumber } from "@/lib/format";
 import { eatDate, eatHour, type BroadcastSpin } from "@/lib/playout";
 
-export function AirplayTrend({ events }: { events: BroadcastSpin[] }) {
+export function AirplayTrend({
+  events,
+  title = "Your airplay, over time",
+}: {
+  title?: string;
+  events: Pick<BroadcastSpin, "trackId" | "detectedAt">[];
+}) {
   const [mode, setMode] = useState<"daily" | "hourly">("daily");
   const [hover, setHover] = useState<number | null>(null);
   const id = useId().replace(/:/g, "");
@@ -56,7 +62,7 @@ export function AirplayTrend({ events }: { events: BroadcastSpin[] }) {
         <div>
           <p className="eyebrow">MOMENTUM</p>
           <h3 id="trend-heading" className="mt-1.5 text-sm font-semibold">
-            Your airplay, over time
+            {title}
           </h3>
         </div>
         <div className="flex rounded-lg border border-line bg-surface-2/60 p-0.5">

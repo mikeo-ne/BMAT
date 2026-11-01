@@ -8,6 +8,10 @@ vi.mock("next/navigation", () => ({ usePathname: () => route.pathname }));
 afterEach(cleanup);
 
 const headings = [
+  ["/dashboard/charts", "National Top 100 Charts"],
+  ["/dashboard/stats", "Public Airplay Statistics"],
+  ["/dashboard/artist/catalogue", "My Catalogue & ISRC"],
+  ["/dashboard/artist/delivery", "Master Delivery"],
   ["/dashboard/artist", "Artist & Label Portal"],
   ["/dashboard/playout", "Broadcaster Playout Log"],
   ["/dashboard/cmo", "CMO & UPRS Regulatory Auditor"],
@@ -27,5 +31,6 @@ describe("workspace headings in Node and trailing-slash static exports", () => {
     route.pathname = pathname;
     render(<DashboardHeading />);
     expect(screen.getByRole("heading", { name: title, level: 1 })).toBeTruthy();
+    expect(document.title).toBe(`${title} · East Sound`);
   });
 });

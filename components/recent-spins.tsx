@@ -1,4 +1,5 @@
 "use client";
+import { useAuth } from "@/components/auth-provider";
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Headphones, Music2 } from "lucide-react";
@@ -13,6 +14,18 @@ export function RecentSpins({
   events: BroadcastSpin[];
   limit?: number;
 }) {
+  const role = useAuth().session.user?.role ?? "public";
+  const destination =
+    role === "artist"
+      ? {
+          href: "/dashboard/analytics/regional",
+          label: "View regional analytics",
+        }
+      : role === "cmo"
+        ? { href: "/dashboard/cmo", label: "View audit ledger" }
+        : role === "broadcaster"
+          ? { href: "/dashboard/playout", label: "View playout log" }
+          : { href: "/dashboard/charts", label: "View public charts" };
   const [evidence, setEvidence] = useState<BroadcastSpin | null>(null);
   return (
     <section
@@ -27,10 +40,10 @@ export function RecentSpins({
           </h3>
         </div>
         <Link
-          href="/dashboard/playout"
+          href={destination.href}
           className="flex items-center gap-1 text-[10px] font-medium text-brand"
         >
-          View playout log
+          {destination.label}
           <ArrowUpRight size={13} />
         </Link>
       </header>
@@ -41,7 +54,7 @@ export function RecentSpins({
             className="flex flex-wrap items-center gap-3 px-5 py-3.5 transition-colors hover:bg-surface-2/40"
           >
             <span
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold ${event.trackId ? "bg-brand/10 text-brand" : "bg-[#f5eaf0] text-[#a06981]"}`}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold ${event.trackId ? "bg-brand/10 text-brand" : "bg-rose-400/10 text-rose-300"}`}
             >
               {event.primaryArtist ? (
                 initials(event.primaryArtist)
@@ -65,7 +78,7 @@ export function RecentSpins({
               </p>
             </div>
             <span
-              className={`hidden rounded-full px-2 py-0.5 text-[9px] sm:block ${event.trackId ? "bg-brand/5 text-brand" : "bg-[#f6edf1] text-[#a06981]"}`}
+              className={`hidden rounded-full px-2 py-0.5 text-[9px] sm:block ${event.trackId ? "bg-brand/5 text-brand" : "bg-rose-400/10 text-rose-300"}`}
             >
               {event.trackId
                 ? event.source === "captured"

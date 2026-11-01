@@ -1,3 +1,4 @@
+import { guardedApi } from "@/lib/auth-core";
 import {
   MUSIC_RESEARCHED_ON,
   MUSIC_REFERENCE_NOTICE,
@@ -7,7 +8,7 @@ import {
 } from "@/lib/artist-library";
 
 /** Read-only research catalogue. Never writes to the delivered-master or royalty stores. */
-export function GET() {
+function artistsResponse() {
   return Response.json({
     kind: "public-music-reference",
     researchedOn: MUSIC_RESEARCHED_ON,
@@ -23,4 +24,8 @@ export function GET() {
     },
     notice: MUSIC_REFERENCE_NOTICE,
   });
+}
+
+export async function GET(request?: Request) {
+  return guardedApi(request, ["artist"], false, async () => artistsResponse());
 }

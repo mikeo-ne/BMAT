@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
-
-export default function Home() {
-  redirect("/dashboard/artist");
+import { serverSession } from "@/lib/auth";
+import { ROLE_HOME } from "@/lib/auth-types";
+export default async function Home() {
+  const auth = await serverSession();
+  redirect(ROLE_HOME[auth?.user.role ?? "public"]);
 }

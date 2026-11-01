@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { RoyaltiesDashboard } from "@/components/royalties-dashboard";
 import { buildCapturedRoyaltiesModel } from "@/lib/royalties";
-import { readWorkspaceData } from "@/lib/workspace-data";
+import { readPageWorkspace } from "@/lib/workspace-data";
 
 export const metadata: Metadata = {
   title: "Royalties — Distribution & Payouts",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RoyaltiesPage() {
-  const data = await readWorkspaceData();
+  const data = await readPageWorkspace(["cmo"], "/dashboard/royalties");
   const now = new Date();
   const model = buildCapturedRoyaltiesModel(
     data.catalogue,

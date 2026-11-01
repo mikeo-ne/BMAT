@@ -6,6 +6,7 @@ import { FM_STATIONS } from "@/lib/regions";
 import type { AdCampaign, ContractTerms } from "@/lib/advertising";
 
 interface CampaignFormProps {
+  allowedStationIds?: string[];
   onCreate: (campaign: AdCampaign) => void;
   /** Ids already in use, so a new campaign gets a unique one. */
   nextId: string;
@@ -36,15 +37,34 @@ const MAX_JINGLE_BYTES = 12 * 1024 * 1024;
 /** Assumed spot length until the jingle is actually probed. */
 const DEFAULT_JINGLE_SEC = 30;
 
-export function CampaignForm({ onCreate, nextId }: CampaignFormProps) {
+export function CampaignForm({
+  onCreate,
+  nextId,
+  allowedStationIds,
+}: CampaignFormProps) {
   const [draft, setDraft] = useState<DraftTerms>(BLANK);
   const [file, setFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const stations = useMemo(
-    () => [...FM_STATIONS].sort((a, b) => a.name.localeCompare(b.name)),
-    [],
+    () =>
+      FM_STATIONS.filter(
+        (s) => !allowedStationIds || allowedStationIds.includes(s.id),
+      ).sort((a, b) => a.name.localeCompare(b.name)),
+    [allowedStationIds],
   );
+
+  if (!stations.length)
+    return (
+      <section className="panel p-4">
+        <h2 className="text-sm font-semibold">Create campaign</h2>
+        <p className="mt-3 text-xs text-muted">
+          This planning model supports FM only. No FM station is assigned to
+          your account; no campaign can be booked for another station. TV ad
+          recognition requires a separate authorized integration.
+        </p>
+      </section>
+    );
 
   const set = (key: keyof DraftTerms) => (value: string) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -59,7 +79,10 @@ export function CampaignForm({ onCreate, nextId }: CampaignFormProps) {
 
     const isMp3 = next.type === "audio/mpeg" || /\.mp3$/i.test(next.name);
     if (!isMp3) {
-      setErrors((prev) => ({ ...prev, file: "Ad jingles are accepted as MP3 only." }));
+      setErrors((prev) => ({
+        ...prev,
+        file: "Ad jingles are accepted as MP3 only.",
+      }));
       setFile(null);
       return;
     }
@@ -72,7 +95,11 @@ export function CampaignForm({ onCreate, nextId }: CampaignFormProps) {
     setFile(next);
   }
 
-  function validate(): { ok: boolean; terms?: ContractTerms; jingle?: AdCampaign["jingle"] } {
+  function validate(): {
+    ok: boolean;
+    terms?: ContractTerms;
+    jingle?: AdCampaign["jingle"];
+  } {
     const next: Record<string, string> = {};
 
     const plays = Number(draft.playsPerDay);
@@ -92,7 +119,11 @@ export function CampaignForm({ onCreate, nextId }: CampaignFormProps) {
     if (!Number.isInteger(endHour) || endHour < 1 || endHour > 24) {
       next.windowEndHour = "Use an hour from 1 to 24.";
     }
-    if (Number.isInteger(startHour) && Number.isInteger(endHour) && endHour <= startHour) {
+    if (
+      Number.isInteger(startHour) &&
+      Number.isInteger(endHour) &&
+      endHour <= startHour
+    ) {
       next.windowEndHour = "The window has to close after it opens.";
     }
     if (!Number.isInteger(days) || days < 1 || days > 90) {
@@ -105,7 +136,9 @@ export function CampaignForm({ onCreate, nextId }: CampaignFormProps) {
     return {
       ok: true,
       terms: {
-        stationId: draft.stationId,
+        stationId: stations.some((s) => s.id === draft.stationId)
+          ? draft.stationId
+          : (stations[0]?.id ?? ""),
         playsPerDay: plays,
         windowStartHour: startHour,
         windowEndHour: endHour,
@@ -143,32 +176,58 @@ export function CampaignForm({ onCreate, nextId }: CampaignFormProps) {
   }
 
   const field = (key: keyof DraftTerms) => ({
-    value: draft[key],
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => set(key)(e.target.value),
+    value:
+      key === "stationId"
+        ? stations.some((s) => s.id === draft.stationId)
+          ? draft.stationId
+          : (stations[0]?.id ?? "")
+        : draft[key],
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      set(key)(e.target.value),
     "aria-invalid": errors[key] ? true : undefined,
   });
 
   return (
     <section className="panel p-4" aria-labelledby="campaign-form-heading">
-      <h2 id="campaign-form-heading" className="text-sm font-semibold tracking-tight">
+      <h2
+        id="campaign-form-heading"
+        className="text-sm font-semibold tracking-tight"
+      >
         Create campaign
       </h2>
       <p className="mt-1 text-xs leading-relaxed text-muted">
-        Upload the jingle and set the contracted airtime. East Sound audits every booked spot against
-        fingerprinted playout and reports the gap.
+        Upload a sample jingle and plan the contracted airtime. This
+        demonstration models outcomes; it does not verify fingerprinted playout
+        or purchase airtime.
       </p>
 
-      <form className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleSubmit} noValidate>
+      <form
+        className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"
+        onSubmit={handleSubmit}
+        noValidate
+      >
         <label className="field sm:col-span-2">
           <span className="label">Advertiser</span>
-          <input className="field" placeholder="Nile Breweries" {...field("brand")} />
-          {errors.brand ? <span className="text-[11px] text-brand">{errors.brand}</span> : null}
+          <input
+            className="field"
+            placeholder="Nile Breweries"
+            {...field("brand")}
+          />
+          {errors.brand ? (
+            <span className="text-[11px] text-brand">{errors.brand}</span>
+          ) : null}
         </label>
 
         <label className="field sm:col-span-2">
           <span className="label">Product or campaign</span>
-          <input className="field" placeholder="Nile Special — drive time" {...field("product")} />
-          {errors.product ? <span className="text-[11px] text-brand">{errors.product}</span> : null}
+          <input
+            className="field"
+            placeholder="Nile Special — drive time"
+            {...field("product")}
+          />
+          {errors.product ? (
+            <span className="text-[11px] text-brand">{errors.product}</span>
+          ) : null}
         </label>
 
         <label className="field">
@@ -184,7 +243,13 @@ export function CampaignForm({ onCreate, nextId }: CampaignFormProps) {
 
         <label className="field">
           <span className="label">Spots per day</span>
-          <input className="field" type="number" min={1} max={12} {...field("playsPerDay")} />
+          <input
+            className="field"
+            type="number"
+            min={1}
+            max={12}
+            {...field("playsPerDay")}
+          />
           {errors.playsPerDay ? (
             <span className="text-[11px] text-brand">{errors.playsPerDay}</span>
           ) : null}
@@ -192,24 +257,48 @@ export function CampaignForm({ onCreate, nextId }: CampaignFormProps) {
 
         <label className="field">
           <span className="label">Window opens (EAT)</span>
-          <input className="field" type="number" min={0} max={23} {...field("windowStartHour")} />
+          <input
+            className="field"
+            type="number"
+            min={0}
+            max={23}
+            {...field("windowStartHour")}
+          />
           {errors.windowStartHour ? (
-            <span className="text-[11px] text-brand">{errors.windowStartHour}</span>
+            <span className="text-[11px] text-brand">
+              {errors.windowStartHour}
+            </span>
           ) : null}
         </label>
 
         <label className="field">
           <span className="label">Window closes (EAT)</span>
-          <input className="field" type="number" min={1} max={24} {...field("windowEndHour")} />
+          <input
+            className="field"
+            type="number"
+            min={1}
+            max={24}
+            {...field("windowEndHour")}
+          />
           {errors.windowEndHour ? (
-            <span className="text-[11px] text-brand">{errors.windowEndHour}</span>
+            <span className="text-[11px] text-brand">
+              {errors.windowEndHour}
+            </span>
           ) : null}
         </label>
 
         <label className="field">
           <span className="label">Flight length (days)</span>
-          <input className="field" type="number" min={1} max={90} {...field("days")} />
-          {errors.days ? <span className="text-[11px] text-brand">{errors.days}</span> : null}
+          <input
+            className="field"
+            type="number"
+            min={1}
+            max={90}
+            {...field("days")}
+          />
+          {errors.days ? (
+            <span className="text-[11px] text-brand">{errors.days}</span>
+          ) : null}
         </label>
 
         <label className="field">
@@ -226,7 +315,9 @@ export function CampaignForm({ onCreate, nextId }: CampaignFormProps) {
               {file.name} · {(file.size / 1024).toFixed(0)} KB
             </span>
           ) : null}
-          {errors.file ? <span className="text-[11px] text-brand">{errors.file}</span> : null}
+          {errors.file ? (
+            <span className="text-[11px] text-brand">{errors.file}</span>
+          ) : null}
         </label>
 
         <div className="flex items-center gap-3 sm:col-span-2">

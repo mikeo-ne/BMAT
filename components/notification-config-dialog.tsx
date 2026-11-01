@@ -38,7 +38,7 @@ const DAYS = [
   "Saturday",
 ];
 
-export function NotificationConfigDialog({
+function NotificationConfigForm({
   onClose,
   initialTab = "whatsapp",
   onSaved,
@@ -53,7 +53,7 @@ export function NotificationConfigDialog({
   );
   const [tab, setTab] = useState<ConfigTab>(initialTab);
   const [errors, setErrors] = useState<string[]>([]);
-  function submit() {
+  async function submit() {
     const issues = preferencesIssues({
       ...draft,
       email: { ...draft.email, address: draft.email.address.trim() },
@@ -63,7 +63,7 @@ export function NotificationConfigDialog({
       return;
     }
     try {
-      const result = save({
+      const result = await save({
         ...readNotificationPreferences(),
         whatsapp: {
           ...draft.whatsapp,
@@ -76,8 +76,8 @@ export function NotificationConfigDialog({
       });
       onSaved?.(
         result.persisted
-          ? "Channel settings saved in this browser. Live provider delivery still requires a configured, authenticated worker."
-          : "Settings are available for this session only; browser storage is unavailable.",
+          ? "Channel settings saved to your private account. Provider delivery requires an enabled worker and configured providers."
+          : "The server save was not confirmed. Refresh and retry.",
       );
       onClose();
     } catch (error) {
@@ -89,9 +89,10 @@ export function NotificationConfigDialog({
   return (
     <Dialog title="Airplay Alerts & Webhooks" onClose={onClose} wide>
       <p className="text-xs leading-relaxed text-muted">
-        Configure recipients and routing. Settings stay in this browser; no
-        access token, bot token or API key belongs here. Saving a number does
-        not verify ownership or connect Meta automatically.
+        Configure recipients and routing for your signed-in account. Webhook
+        signing secrets are encrypted on the server and are never returned. No
+        provider access token, bot token or API key belongs here. Saving a
+        number does not verify ownership or connect Meta automatically.
       </p>
       <div
         role="tablist"
@@ -380,8 +381,10 @@ export function NotificationConfigDialog({
               <p className="text-xs leading-relaxed text-muted">
                 Route events to a label backend, a Discord webhook, or a
                 Telegram relay. Use your own label name; East Sound does not
-                imply any label affiliation. Sensitive webhook URLs are stored
-                locally—never paste a bot or API token into this interface.
+                imply any label affiliation. Webhook destinations are
+                account-scoped; signing secrets are write-only. Only
+                operator-allowlisted public HTTPS destinations can receive live
+                deliveries. Never paste a provider API token here.
               </p>
               {draft.webhooks.length === 0 && (
                 <div className="rounded-xl border border-dashed border-line p-6 text-center text-xs text-muted">
@@ -450,6 +453,36 @@ export function NotificationConfigDialog({
                         })
                       }
                     />
+                  </label>
+                  <label className="block text-xs">
+                    Webhook signing secret (write-only)
+                    <input
+                      type="password"
+                      className="field mt-1.5"
+                      autoComplete="new-password"
+                      minLength={32}
+                      maxLength={256}
+                      placeholder={
+                        hook.secretConfigured
+                          ? "Configured · leave blank to keep"
+                          : "At least 32 characters"
+                      }
+                      value={hook.secret ?? ""}
+                      onChange={(event) =>
+                        setDraft({
+                          ...draft,
+                          webhooks: draft.webhooks.map((entry) =>
+                            entry.id === hook.id
+                              ? { ...entry, secret: event.target.value }
+                              : entry,
+                          ),
+                        })
+                      }
+                    />
+                    <span className="mt-1 block text-[10px] text-muted">
+                      HMAC-SHA256 over timestamp.body · X-East-Sound-Signature.
+                      A changed endpoint requires a fresh secret.
+                    </span>
                   </label>
                   <label className="block text-xs">
                     Payload format
@@ -548,7 +581,7 @@ export function NotificationConfigDialog({
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
           <span className="flex items-center gap-1.5 text-[10px] text-muted">
             <ShieldCheck size={12} />
-            Local configuration · not provider verification
+            Private account settings · not provider verification
           </span>
           <div className="flex gap-2">
             <button
@@ -569,7 +602,7 @@ export function NotificationConfigDialog({
   );
 }
 
-/** Header shortcut is available in every workspace, without navigating away or losing a staged master. */
+/** Header shortcut in non-public workspace views; it does not navigate away or discard staged masters. */
 export function NotificationSettingsLauncher() {
   const [open, setOpen] = useState(false);
   return (
@@ -584,5 +617,20 @@ export function NotificationSettingsLauncher() {
       </button>
       {open && <NotificationConfigDialog onClose={() => setOpen(false)} />}
     </>
+  );
+}
+
+export function NotificationConfigDialog(
+  props: Parameters<typeof NotificationConfigForm>[0],
+) {
+  const { loading } = useNotificationPreferences();
+  return loading ? (
+    <Dialog title="Airplay Alerts & Webhooks" onClose={props.onClose}>
+      <p role="status" className="text-xs text-muted">
+        Loading your private account preferences…
+      </p>
+    </Dialog>
+  ) : (
+    <NotificationConfigForm {...props} />
   );
 }

@@ -1,3 +1,4 @@
+import type { AudioSignature } from "@/lib/types";
 export const MAX_UPLOAD_BYTES = 80 * 1024 * 1024;
 
 export const ACCEPTED_AUDIO: Record<
@@ -14,6 +15,7 @@ export interface StagedFileIssue {
 }
 
 export interface StagedFile {
+  fingerprint?: AudioSignature;
   /** Client-side id, stable for the lifetime of the staged upload. */
   id: string;
   file: File;

@@ -1,3 +1,4 @@
+import { guardedApi } from "@/lib/auth-core";
 import { NextResponse } from "next/server";
 
 import { MONITORED_STATIONS } from "@/lib/monitoring";
@@ -20,45 +21,49 @@ interface PanelStation extends Omit<Station, "reach"> {
  * monitoring, audit and alert surfaces share one station registry.
  */
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const region = searchParams.get("region");
+  return guardedApi(request, ["broadcaster"], false, async (actor) => {
+    const { searchParams } = new URL(request.url);
+    const region = searchParams.get("region");
 
-  const stations: PanelStation[] = FM_STATIONS.map((station) => ({
-    ...station,
-    reach: null,
-    monitored: false,
-    frequencyVerified: false,
-    medium: "FM",
-  }));
+    const stations: PanelStation[] = FM_STATIONS.map((station) => ({
+      ...station,
+      reach: null,
+      monitored: false,
+      frequencyVerified: false,
+      medium: "FM",
+    }));
 
-  for (const tv of MONITORED_STATIONS.filter((s) => s.medium === "TV")) {
-    if (!stations.some((s) => s.id === tv.id)) {
-      stations.push({
-        id: tv.id,
-        name: tv.name,
-        region: tv.region,
-        location: tv.location,
-        frequency: tv.frequency,
-        reach: null,
-        monitored: false,
-        frequencyVerified: false,
-        medium: "TV",
-      });
+    for (const tv of MONITORED_STATIONS.filter((s) => s.medium === "TV")) {
+      if (!stations.some((s) => s.id === tv.id)) {
+        stations.push({
+          id: tv.id,
+          name: tv.name,
+          region: tv.region,
+          location: tv.location,
+          frequency: tv.frequency,
+          reach: null,
+          monitored: false,
+          frequencyVerified: false,
+          medium: "TV",
+        });
+      }
     }
-  }
 
-  const filtered =
-    region && (REGIONS as readonly string[]).includes(region)
-      ? stations.filter((s) => s.region === (region as Region))
-      : stations;
+    const filtered =
+      region && (REGIONS as readonly string[]).includes(region)
+        ? stations.filter((s) => s.region === (region as Region))
+        : stations;
 
-  return NextResponse.json({
-    regions: REGIONS,
-    stations: filtered,
-    monitoredCount: 0,
-    source: "station-directory-only",
-    notice:
-      "Directory metadata is not live connectivity, an audience source or verified frequency licensing. Browser-configured playback is separate from capture.",
-    panelSize: FM_STATIONS.length,
+    return NextResponse.json({
+      regions: REGIONS,
+      stations: filtered.filter((station) =>
+        actor.stationIds.includes(station.id),
+      ),
+      monitoredCount: 0,
+      source: "station-directory-only",
+      notice:
+        "Directory metadata is not live connectivity, an audience source or verified frequency licensing. Browser-configured playback is separate from capture.",
+      panelSize: actor.stationIds.length,
+    });
   });
 }

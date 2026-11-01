@@ -209,3 +209,22 @@ describe("public artist music library", () => {
     expect(onSelect).toHaveBeenCalledWith("soundlykbb");
   });
 });
+
+describe("nested artist-library URLs", () => {
+  it.each(["", "/catalogue", "/delivery"])(
+    "preserves a static base path, query and trailing slash from artist%s",
+    (suffix) => {
+      window.history.replaceState(
+        null,
+        "",
+        `/BMAT/dashboard/artist${suffix}/?from=workspace`,
+      );
+      selectLibraryArtist("baranga");
+      expect(
+        window.location.pathname +
+          window.location.search +
+          window.location.hash,
+      ).toBe("/BMAT/dashboard/artists/?from=workspace#baranga");
+    },
+  );
+});

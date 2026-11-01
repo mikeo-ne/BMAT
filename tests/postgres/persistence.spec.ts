@@ -36,6 +36,9 @@ import { appendCapturedSpins, readCapturedSpins } from "@/lib/broadcast-store";
 import { claimDelivery, finishDelivery } from "@/lib/notification-outbox";
 import { capturedSpin, optedInPreferences } from "@/tests/fixtures/captured";
 import { eatDate } from "@/lib/playout";
+import { testActor } from "@/tests/fixtures/auth";
+import { deliveryFixture } from "@/tests/fixtures/master";
+import { defaultNotificationPreferences } from "@/lib/notifications";
 
 let database: EmbeddedPostgres,
   pool: Pool,
@@ -95,7 +98,10 @@ beforeAll(async () => {
   await database.start();
   connection = `postgresql://postgres:qa-local-only@127.0.0.1:${port}/postgres`;
   pool = createPostgresPool(connection);
-  expect(await migratePostgres(pool)).toEqual(["001_capture_outbox.sql"]);
+  expect(await migratePostgres(pool)).toEqual([
+    "001_capture_outbox.sql",
+    "002_accounts_sessions.sql",
+  ]);
 }, 120000);
 afterAll(async () => {
   await closePostgresPool();
@@ -160,6 +166,13 @@ describe("real PostgreSQL migrations, capture transactions and multi-worker outb
     await writeFile(
       path.join(folder, "001_capture_outbox.sql"),
       "DROP SCHEMA east_sound CASCADE;",
+    );
+    await writeFile(
+      path.join(folder, "002_accounts_sessions.sql"),
+      await readFile(
+        path.join(process.cwd(), "db/migrations/002_accounts_sessions.sql"),
+        "utf8",
+      ),
     );
     await expect(migratePostgres(pool, folder)).rejects.toThrow(
       /applied migration changed/,
@@ -874,6 +887,272 @@ describe("real PostgreSQL migrations, capture transactions and multi-worker outb
         )
       ).rows[0].provider_id,
     ).toBeNull();
+  });
+
+  it("persists real accounts and hashed sessions with tenant separation and immediate disabled/revoked-session rejection", async () => {
+    const auth = await import("@/lib/auth-core"),
+      security = await import("@/lib/security-store");
+    const actor = await testActor("artist", "same-address@example.com");
+    expect((await auth.sessionForToken(actor.token))?.user.id).toBe(
+      actor.user.id,
+    );
+    const raw = await pool.query(
+      "SELECT token_hash FROM east_sound.auth_sessions WHERE user_id=$1",
+      [actor.user.id],
+    );
+    expect(raw.rows[0].token_hash).toBe(auth.tokenHash(actor.token));
+    expect(raw.rows[0].token_hash).not.toBe(actor.token);
+    const otherTenant = randomUUID();
+    await seedPostgres(pool, otherTenant);
+    vi.stubEnv("EAST_SOUND_TENANT_ID", otherTenant);
+    expect(await auth.sessionForToken(actor.token)).toBeNull();
+    expect(await security.findAccount(actor.user.id, true)).toBeNull();
+    const other = await testActor("artist", actor.user.email);
+    expect(other.user.id).not.toBe(actor.user.id);
+    vi.stubEnv("EAST_SOUND_TENANT_ID", tenant);
+    await pool.query(
+      "UPDATE east_sound.auth_users SET disabled=true WHERE id=$1",
+      [actor.user.id],
+    );
+    expect(await auth.sessionForToken(actor.token)).toBeNull();
+    await pool.query(
+      "UPDATE east_sound.auth_users SET disabled=false WHERE id=$1",
+      [actor.user.id],
+    );
+    await security.revokeSession(auth.tokenHash(actor.token));
+    expect(await auth.sessionForToken(actor.token)).toBeNull();
+  });
+
+  it("serializes account documents under concurrent co-signers and enforces composite tenant-owner foreign keys", async () => {
+    const actor = await testActor(),
+      security = await import("@/lib/security-store");
+    await Promise.all(
+      Array.from({ length: 24 }, () =>
+        security.mutateAccountDocument<number>(
+          actor.user.id,
+          "qa-counter",
+          "same-document",
+          (n) => (n ?? 0) + 1,
+        ),
+      ),
+    );
+    expect(
+      await security.readAccountDocument(
+        actor.user.id,
+        "qa-counter",
+        "same-document",
+      ),
+    ).toBe(24);
+    const secondTenant = randomUUID();
+    await seedPostgres(pool, secondTenant);
+    vi.stubEnv("EAST_SOUND_TENANT_ID", secondTenant);
+    expect(
+      await security.readAccountDocument(
+        actor.user.id,
+        "qa-counter",
+        "same-document",
+      ),
+    ).toBeNull();
+    await expect(
+      security.writeAccountDocument(actor.user.id, "qa-counter", 999),
+    ).rejects.toMatchObject({ code: "23503" });
+    vi.stubEnv("EAST_SOUND_TENANT_ID", tenant);
+    expect(
+      await security.readAccountDocument(
+        actor.user.id,
+        "qa-counter",
+        "same-document",
+      ),
+    ).toBe(24);
+  });
+
+  it("persists owner-bound masters/preferences, encrypts hook secrets and automatically queues only that account's new captures", async () => {
+    vi.stubEnv("EAST_SOUND_SECRET_KEY", "ab".repeat(32));
+    const owner = await testActor(),
+      other = await testActor(),
+      tracksApi = await import("@/app/api/tracks/route"),
+      prefs = await import("@/lib/account-notifications");
+    const first = await deliveryFixture(owner, "UG-ESD-26-08101"),
+      second = await deliveryFixture(other, "UG-ESD-26-08102");
+    const deliveredA = await tracksApi.POST(
+        owner.request("/api/tracks", { method: "POST", body: first.form() }),
+      ),
+      deliveredB = await tracksApi.POST(
+        other.request("/api/tracks", { method: "POST", body: second.form() }),
+      );
+    expect(deliveredA.status).toBe(201);
+    expect(deliveredB.status).toBe(201);
+    const a = (await deliveredA.json()).track,
+      b = (await deliveredB.json()).track;
+    const config = defaultNotificationPreferences(),
+      secret = "qa-postgres-encrypted-only-endpoint-secret";
+    config.whatsapp = {
+      ...config.whatsapp,
+      phone: "+256772000000",
+      consent: true,
+    };
+    config.webhooks = [
+      {
+        id: "label",
+        label: "QA",
+        kind: "json",
+        url: "https://hooks.example.com/airplay",
+        enabled: true,
+        secret,
+      },
+    ];
+    config.subscriptions = [
+      {
+        id: "all-owned",
+        name: "Owned catalogue",
+        trackId: "all",
+        stationId: "all",
+        region: "All",
+        channels: ["whatsapp", "webhook"],
+        triggers: ["first"],
+        milestones: [],
+        enabled: true,
+        createdAt: "2000-01-01T00:00:00.000Z",
+      },
+    ];
+    const saved = await prefs.saveAccountPreferences(owner.user, config);
+    expect(JSON.stringify(saved)).not.toContain(secret);
+    expect(saved.webhooks[0].secretConfigured).toBe(true);
+    const stored = await pool.query(
+      "SELECT value::text FROM east_sound.account_documents WHERE owner_id=$1 AND kind='notification-preferences'",
+      [owner.user.id],
+    );
+    expect(stored.rows[0].value).not.toContain(secret);
+    expect(stored.rows[0].value).toContain("v1.");
+    await appendCapturedSpins([
+      spin("other-private-capture", {
+        trackId: b.id,
+        isrc: b.isrc,
+        detectedAt: new Date().toISOString(),
+      }),
+    ]);
+    expect((await counts()).jobs).toBe(0);
+    await appendCapturedSpins([
+      spin("owned-private-capture", {
+        trackId: a.id,
+        isrc: a.isrc,
+        detectedAt: new Date().toISOString(),
+      }),
+    ]);
+    expect((await counts()).jobs).toBe(2);
+    const outbox = await import("@/app/api/notifications/outbox/route");
+    expect(
+      (
+        await (
+          await outbox.GET(owner.request("/api/notifications/outbox"))
+        ).json()
+      ).jobs,
+    ).toHaveLength(2);
+    expect(
+      (
+        await (
+          await outbox.GET(other.request("/api/notifications/outbox"))
+        ).json()
+      ).jobs,
+    ).toEqual([]);
+    const captured = await import("@/app/api/playout/route");
+    expect(
+      (
+        await (
+          await captured.GET(
+            owner.request("/api/playout?userId=" + other.user.id + "&role=cmo"),
+          )
+        ).json()
+      ).records.map((r: { id: string }) => r.id),
+    ).toEqual(["owned-private-capture"]);
+    expect(transport.alert).not.toHaveBeenCalled();
+  });
+
+  it("commits a CMO review and audit atomically, handles retries idempotently and refuses audit rollback gaps", async () => {
+    const cmo = await testActor("cmo"),
+      service = await import("@/lib/rights-reviews"),
+      security = await import("@/lib/security-store"),
+      reference = (await readTracks())[0];
+    const input = {
+      requestId: randomUUID(),
+      trackId: reference.id,
+      decision: "needs-correction",
+      note: "Obtain independent approvals before treating public credits as owned rights.",
+    };
+    const results = await Promise.all([
+      service.recordRightsReview(cmo.user, input),
+      service.recordRightsReview(cmo.user, input),
+    ]);
+    expect(results[0]).toEqual(results[1]);
+    expect(await service.listRightsReviews()).toHaveLength(1);
+    expect(
+      (await security.readSecurityAudit()).filter(
+        (r) => r.action === "rights.review_recorded",
+      ),
+    ).toHaveLength(1);
+    await expect(
+      security.mutateAccountDocument(
+        cmo.user.id,
+        "qa-audit-rollback",
+        "bad",
+        () => ({ shouldNot: "commit" }),
+        {
+          actorId: cmo.user.id,
+          action: "x".repeat(81),
+          objectKey: "bad",
+          detail: {},
+        },
+      ),
+    ).rejects.toMatchObject({ code: "22001" });
+    expect(
+      await security.readAccountDocument(
+        cmo.user.id,
+        "qa-audit-rollback",
+        "bad",
+      ),
+    ).toBeNull();
+  });
+
+  it("provisions an assigned broadcaster through the actual trusted account CLI without logging passwords", async () => {
+    const run = promisify(execFile),
+      email = "qa-cli-manager@example.com",
+      password = "Only a temporary CLI provisioning password!";
+    const result = await run(
+      process.execPath,
+      [
+        "--conditions=react-server",
+        "--import",
+        "tsx",
+        "scripts/account.ts",
+        "--role",
+        "broadcaster",
+        "--email",
+        email,
+        "--name",
+        "QA Manager",
+        "--stations",
+        "cbs-kla",
+      ],
+      {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          EAST_SOUND_ACCOUNT_PASSWORD: password,
+          DOTENV_CONFIG_QUIET: "true",
+        },
+        timeout: 30000,
+      },
+    );
+    expect(result.stdout).not.toContain(password);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      created: true,
+      role: "broadcaster",
+      stationIds: ["cbs-kla"],
+    });
+    const auth = await import("@/lib/auth-core"),
+      account = await auth.loginAccount(email, password);
+    expect(account.role).toBe("broadcaster");
+    expect(account.stationIds).toEqual(["cbs-kla"]);
   });
 
   it("runs the actual migration, seed and one-batch worker CLIs with server-only module conditions", async () => {

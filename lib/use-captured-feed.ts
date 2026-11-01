@@ -1,5 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useAuth } from "@/components/auth-provider";
+import { cacheSnapshot } from "@/lib/browser-cache";
+import { sessionScope } from "@/lib/auth-types";
+import { useEffect, useRef, useState } from "react";
 import { isStoredCapturedSpin } from "@/lib/captured-airplay";
 import type { BroadcastSpin } from "@/lib/playout";
 
@@ -14,6 +17,12 @@ export function useCapturedFeed(
     now: initialNow,
   });
   const [unavailable, setUnavailable] = useState(false);
+  const { session } = useAuth();
+  const scope = useRef(sessionScope(session.user));
+  useEffect(() => {
+    if (session.user && scope.current === sessionScope(session.user))
+      void cacheSnapshot(session.user.id, "spins", snapshot.events);
+  }, [session.user, snapshot.events]);
   useEffect(() => {
     if (!canPoll) return;
     let closed = false;
