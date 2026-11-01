@@ -1,22 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f7f6;
-  --surface: #ffffff;
-  --surface-2: #f2f5f4;
-  --line: #e3e9e6;
-  --foreground: #182c29;
-  --muted: #62736e;
-  --brand: #137b61;
-  --brand-ink: #ffffff;
-  --accent: #137b61;
+  --background: #020617;
+  --surface: #0f172a;
+  --surface-2: #172338;
+  --line: #233147;
+  --foreground: #e2e8f0;
+  --muted: #94a3b8;
+  --brand: #34d399;
+  --brand-ink: #042f2e;
+  --accent: #34d399;
   --region-central: #29977e;
   --region-eastern: #d3a044;
   --region-western: #6897c5;
   --region-northern: #9b85c9;
-  --color-red-200: #9f3041;
-  --color-red-300: #b6404b;
-  --color-red-400: #c44552;
+  --color-red-200: #fecaca;
+  --color-red-300: #fca5a5;
+  --color-red-400: #f87171;
 }
 
 @theme inline {
@@ -34,7 +34,7 @@
 }
 
 html {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 body {
@@ -70,7 +70,7 @@ body {
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 1rem;
-    box-shadow: 0 2px 6px rgb(24 44 41 / 0.015);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
   }
 
   .field {
@@ -193,8 +193,8 @@ body {
 }
 
 .app-sidebar {
-  background: #12242b;
-  box-shadow: 4px 0 24px rgb(18 36 43 / 0.025);
+  background: #0f172a;
+  box-shadow: 4px 0 24px rgb(0 0 0 / 0.12);
 }
 .app-sidebar select {
   color-scheme: dark;
@@ -257,14 +257,14 @@ body {
   transform: translateY(-150%);
   padding: 10px 16px;
   background: var(--brand);
-  color: white;
+  color: var(--brand-ink);
   border-radius: 8px;
 }
 .skip-link:focus {
   transform: translateY(0);
 }
 .map-grid {
-  background-image: radial-gradient(#cedbd6 1px, transparent 1px);
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
   background-size: 16px 16px;
 }
 .map-region {
@@ -299,8 +299,8 @@ select {
   touch-action: manipulation;
 }
 ::selection {
-  background: #d5ef83;
-  color: #193d2d;
+  background: #34d399;
+  color: #042f2e;
 }
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -322,5 +322,39 @@ select {
   body,
   main {
     background: white !important;
+  }
+}
+
+/* The view color signals the selected UI mode, never identity or API authorization. */
+.workspace-nav-link[aria-current="page"] {
+  color: var(--workspace-accent);
+  border-color: color-mix(in srgb, var(--workspace-accent) 24%, transparent);
+  background: color-mix(in srgb, var(--workspace-accent) 9%, transparent);
+}
+.workspace-badge {
+  color: var(--workspace-accent);
+  border-color: color-mix(in srgb, var(--workspace-accent) 24%, transparent);
+  background: color-mix(in srgb, var(--workspace-accent) 10%, transparent);
+}
+.workspace-avatar {
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 12%, transparent);
+}
+@media print {
+  :root {
+    --background: #fff;
+    --surface: #fff;
+    --surface-2: #f2f5f4;
+    --line: #e3e9e6;
+    --foreground: #182c29;
+    --muted: #62736e;
+    --brand: #137b61;
+    --brand-ink: #fff;
+  }
+  .dashboard-root {
+    padding-left: 0 !important;
+  }
+  .panel {
+    box-shadow: none;
   }
 }

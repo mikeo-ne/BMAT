@@ -1,5 +1,14 @@
 "use client";
 
+import { DemoStudio } from "@/components/demo-studio";
+import { useAuth } from "@/components/auth-provider";
+import { sessionScope } from "@/lib/auth-types";
+import { ReleaseAgreementPanel } from "@/components/authenticated-splits";
+import { cacheSnapshot } from "@/lib/browser-cache";
+import { authFetch } from "@/lib/auth-client";
+import { MasterSignaturePreview } from "@/components/master-signature-preview";
+import { useArtistNavigation } from "@/components/artist-navigation";
+import type { ArtistView } from "@/lib/workspaces";
 import { CapturedFeedNotice } from "@/components/captured-feed-notice";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -75,7 +84,7 @@ interface Notice {
   tone: "success" | "error";
   message: string;
 }
-type View = "overview" | "delivery" | "catalogue" | "music";
+type View = ArtistView;
 const DRAFT_KEY = "__draft__";
 function blankMeta(releaseDate: string): MetadataValues {
   return {
@@ -109,14 +118,34 @@ export function ArtistPortal({
   deliveryAvailable = true,
   initialView = "overview",
 }: ArtistPortalProps) {
+  const { session } = useAuth();
+  const [dataScope] = useState(() => sessionScope(session.user));
+  const [approvedRelease, setApprovedRelease] = useState<{
+    id: string;
+    key: string;
+  } | null>(null);
+  const [sharePublic, setSharePublic] = useState(false);
+  const onAgreementReady = useCallback(
+    (id: string | null, key: string) =>
+      setApprovedRelease((old) =>
+        id
+          ? old?.id === id && old.key === key
+            ? old
+            : { id, key }
+          : old?.key === key
+            ? null
+            : old,
+      ),
+    [],
+  );
   const [today] = useState(() => eatDate(now ?? new Date().toISOString()));
   const [reference] = useState(() => now ?? new Date().toISOString());
-  const [view, setView] = useState<View>(initialView);
+  const [view, setView] = useArtistNavigation(initialView);
   function showMusic(artistId?: PublicArtistId) {
-    selectLibraryArtist(
-      artistId ?? artistSelectionFromHash(window.location.hash),
-    );
+    const selection = artistId ?? artistSelectionFromHash(window.location.hash);
+    // Push the library entry before adding its filter hash, so Back returns to the previous tab.
     setView("music");
+    selectLibraryArtist(selection);
   }
   const [storedTracks, setTracks] = useState<Track[]>(initialTracks);
   const [staged, setStaged] = useState<StagedFile[]>([]);
@@ -146,7 +175,18 @@ export function ArtistPortal({
   const activeMeta = meta[formKey] ?? blankMeta(today);
   const activeParties =
     splits[formKey] ?? createDeliveryParties(activeMeta.primaryArtist);
-  const splitIssues = validateDeliveryParties(activeParties);
+  const splitIssues = validateDeliveryParties(activeParties, false);
+  const agreementDraftKey = JSON.stringify([
+    formKey,
+    activeMeta,
+    activeParties.map(({ signature: _signature, ...party }) => {
+      void _signature;
+      return party;
+    }),
+    active?.fingerprint?.sourceSha256,
+  ]);
+  const agreementId =
+    approvedRelease?.key === agreementDraftKey ? approvedRelease.id : null;
   const feed = useCapturedFeed(
     initialEvents,
     reference,
@@ -157,6 +197,12 @@ export function ArtistPortal({
       catalogueWithCapturedStats(storedTracks, feed.events, new Date(feed.now)),
     [storedTracks, feed.events, feed.now],
   );
+  useEffect(() => {
+    if (session.user && dataScope === sessionScope(session.user)) {
+      void cacheSnapshot(session.user.id, "catalogue", storedTracks);
+      void cacheSnapshot(session.user.id, "spins", feed.events);
+    }
+  }, [session.user, storedTracks, feed.events, dataScope]);
   const allEvents = useMemo(
     () => currentCapturedWindow(feed.events, new Date(feed.now)),
     [feed.events, feed.now],
@@ -175,9 +221,15 @@ export function ArtistPortal({
   const artists = [
     ...new Set(tracks.map((track) => track.primaryArtist)),
   ].sort();
-  const visibleTracks = tracks.filter(
-    (track) => !artist || track.primaryArtist === artist,
-  );
+  const visibleTracks = catalogueWithCapturedStats(
+    storedTracks,
+    filteredEvents,
+    new Date(feed.now),
+  )
+    .filter((track) => !artist || track.primaryArtist === artist)
+    .sort(
+      (a, b) => b.totalSpins - a.totalSpins || a.title.localeCompare(b.title),
+    );
   const topTracks = useMemo(() => {
     const counts = new Map<string, number>();
     for (const event of filteredEvents)
@@ -195,7 +247,7 @@ export function ArtistPortal({
       if (!deliveryAvailable) return;
       setAllocating((previous) => [...previous, key]);
       try {
-        const response = await fetch(
+        const response = await authFetch(
           `/api/tracks?${new URLSearchParams({ releaseDate })}`,
           { method: "PUT" },
         );
@@ -374,7 +426,11 @@ export function ArtistPortal({
   const handleDeliver = useCallback(async () => {
     if (!active || submitting || !deliveryAvailable) return;
     const validation = validateMeta(activeMeta);
-    const ownershipIssues = validateDeliveryParties(activeParties);
+    const ownershipIssues = validateDeliveryParties(activeParties, false);
+    if (!agreementId)
+      ownershipIssues.push(
+        "Every collaborator must approve the current account-bound agreement.",
+      );
     if (ownershipIssues.length)
       validation.ownership = ownershipIssues.join(" ");
     setErrors(validation);
@@ -383,6 +439,9 @@ export function ArtistPortal({
     setNotice(null);
     const form = new FormData();
     form.set("audio", active.file, active.fileName);
+    form.set("fingerprint", JSON.stringify(active.fingerprint ?? null));
+    form.set("agreementId", agreementId ?? "");
+    form.set("publicCharts", String(sharePublic));
     for (const [key, value] of Object.entries(activeMeta))
       form.set(key, value.trim());
     form.set(
@@ -398,7 +457,7 @@ export function ArtistPortal({
       }),
     );
     try {
-      const response = await fetch("/api/tracks", {
+      const response = await authFetch("/api/tracks", {
         method: "POST",
         body: form,
       });
@@ -433,9 +492,12 @@ export function ArtistPortal({
     active,
     activeMeta,
     activeParties,
+    agreementId,
+    sharePublic,
     removeStaged,
     submitting,
     deliveryAvailable,
+    setView,
   ]);
 
   const handleDelete = useCallback(async (id: string) => {
@@ -447,7 +509,9 @@ export function ArtistPortal({
       return;
     setPendingDeleteId(id);
     try {
-      const response = await fetch(`/api/tracks/${id}`, { method: "DELETE" });
+      const response = await authFetch(`/api/tracks/${id}`, {
+        method: "DELETE",
+      });
       if (!response.ok) throw new Error("Could not withdraw that track.");
       setTracks((previous) => previous.filter((track) => track.id !== id));
       setNotice({
@@ -756,7 +820,8 @@ export function ArtistPortal({
               ))}
             </div>
             <RecentSpins events={filteredEvents} />
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-brand/15 bg-[#edf3e7] px-5 py-4">
+            <DemoStudio />
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-brand/15 bg-brand/5 px-5 py-4">
               <div className="flex items-center gap-3">
                 <ShieldCheck size={22} className="text-brand" />
                 <div>
@@ -813,7 +878,7 @@ export function ArtistPortal({
                   },
                   {
                     label: "Approvals",
-                    done: !!active && splitIssues.length === 0,
+                    done: !!active && !!agreementId,
                   },
                 ].map((step, index) => (
                   <li key={step.label} className="flex items-center gap-1.5">
@@ -937,11 +1002,18 @@ export function ArtistPortal({
                         : undefined
                     }
                     submissionReady={
-                      deliveryAvailable && splitIssues.length === 0
+                      deliveryAvailable &&
+                      splitIssues.length === 0 &&
+                      !!agreementId
                     }
                   >
+                    {active?.fingerprint && (
+                      <MasterSignaturePreview signature={active.fingerprint} />
+                    )}
                     <DeliverySplitEditor
                       key={formKey}
+                      authenticated
+                      accountEmail={session.user?.email ?? ""}
                       parties={activeParties}
                       recordingReady={
                         Object.keys(validateMeta(activeMeta)).length === 0 &&
@@ -958,6 +1030,24 @@ export function ArtistPortal({
                         }));
                       }}
                     />
+                    <ReleaseAgreementPanel
+                      metadata={activeMeta}
+                      parties={activeParties}
+                      signature={active?.fingerprint}
+                      draftKey={agreementDraftKey}
+                      onReady={onAgreementReady}
+                    />
+                    <label className="mt-4 flex items-start gap-2 text-[11px] leading-relaxed text-muted">
+                      <input
+                        type="checkbox"
+                        checked={sharePublic}
+                        onChange={(e) => setSharePublic(e.target.checked)}
+                        className="accent-brand"
+                      />
+                      Opt this recording’s title and credited artists into
+                      public national charts. Audio, private splits and account
+                      details remain private.
+                    </label>
                   </TrackMetadataForm>
                 </fieldset>
               </div>
@@ -966,6 +1056,29 @@ export function ArtistPortal({
         )}
         {view === "catalogue" && (
           <>
+            {tracks.some((t) => t.ownerId === session.user?.id) && (
+              <section className="panel p-5" aria-label="Your playable masters">
+                <h3 className="text-sm font-semibold">Your playable masters</h3>
+                <div className="mt-4 space-y-4">
+                  {tracks
+                    .filter((t) => t.ownerId === session.user?.id)
+                    .map((t) => (
+                      <div key={t.id}>
+                        <p className="mb-2 text-xs">
+                          {t.title} · {t.primaryArtist}
+                        </p>
+                        <audio
+                          controls
+                          preload="metadata"
+                          aria-label={`Play your master ${t.title}`}
+                          src={`/api/tracks/${t.id}`}
+                          className="h-10 w-full"
+                        />
+                      </div>
+                    ))}
+                </div>
+              </section>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs text-muted">
                 <strong className="text-foreground">
@@ -992,7 +1105,7 @@ export function ArtistPortal({
       <p className="text-center text-[9px] leading-relaxed text-muted">
         {view === "music"
           ? "Public release research does not establish captured airplay. External players follow their provider’s terms and availability; no artist affiliation or permission to ingest a master is implied."
-          : "Real source-linked releases; airplay statistics include captured records only. No capture data means unknown airplay, not zero national activity. Local ISRC reservations and typed approvals are not official registrations or authenticated signatures."}
+          : "Real source-linked releases; airplay statistics include captured records only. No capture data means unknown airplay, not zero national activity. Audio signatures and account-bound approvals do not establish rights ownership or official ISRC registration."}
       </p>
     </div>
   );

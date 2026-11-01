@@ -1,517 +1,644 @@
-import { createHash, randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { open, readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
-
+import {
+  approveOwnAllocation,
+  createActor,
+  deliverApi,
+  fits,
+  ingest,
+  mutationHeaders,
+  privateCacheKeys,
+  QA_PASSWORD,
+  sample,
+  sha,
+  stageMaster,
+} from "./helpers";
 const browserErrors = new WeakMap<Page, string[]>();
 test.beforeEach(({ page }) => {
-  const errors: string[] = [];
-  browserErrors.set(page, errors);
-  page.on("pageerror", (error) => errors.push(error.message));
+  browserErrors.set(page, []);
+  page.on("pageerror", (e) => browserErrors.get(page)!.push(e.message));
 });
 test.afterEach(({ page }) => {
   expect(browserErrors.get(page)).toEqual([]);
 });
 
-const notificationKey = "east-sound:notifications:v1";
-function kpi(page: Page, label: string) {
-  return page
-    .getByText(label, { exact: true })
-    .locator("..")
-    .locator("..")
-    .locator("dd");
-}
-function wav(seconds = 10) {
-  const rate = 16000;
-  const bytes = Buffer.alloc(44 + rate * seconds * 2);
-  bytes.write("RIFF");
-  bytes.writeUInt32LE(bytes.length - 8, 4);
-  bytes.write("WAVE", 8);
-  bytes.write("fmt ", 12);
-  bytes.writeUInt32LE(16, 16);
-  bytes.writeUInt16LE(1, 20);
-  bytes.writeUInt16LE(1, 22);
-  bytes.writeUInt32LE(rate, 24);
-  bytes.writeUInt32LE(rate * 2, 28);
-  bytes.writeUInt16LE(2, 32);
-  bytes.writeUInt16LE(16, 34);
-  bytes.write("data", 36);
-  bytes.writeUInt32LE(bytes.length - 44, 40);
-  for (let index = 0; index < rate * seconds; index++)
-    bytes.writeInt16LE(
-      Math.round(Math.sin((index / rate) * 440 * Math.PI * 2) * 4000),
-      44 + index * 2,
-    );
-  return bytes;
-}
-async function fits(page: Page) {
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth + 1,
-    ),
-  ).toBe(true);
-  if (await page.getByRole("dialog").count())
-    expect(
-      await page
-        .getByRole("dialog")
-        .evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth + 1),
-    ).toBe(true);
-}
-
-test("real reference catalogue, empty captures and source-linked artists", async ({
+test("Web Audio fingerprint, independent co-writer sign-off, private delivery/playback and authenticated withdrawal", async ({
   page,
-  request,
+  context,
+  browser,
+  baseURL,
 }) => {
-  const { tracks } = await (await request.get("/api/tracks")).json();
-  const references = tracks.filter(
-    (track: { origin: string }) => track.origin === "public-reference",
+  const owner = await createActor(context, baseURL, { name: "QA Browser" }),
+    peerContext = await browser.newContext({ baseURL }),
+    writer = await createActor(peerContext, baseURL, { name: "Co Writer" });
+  await stageMaster(page, "Independent approval master", "QA Browser");
+  await page
+    .getByRole("button", { name: "Add co-writer", exact: true })
+    .click();
+  await page
+    .getByLabel("Collaborator 2 name", { exact: true })
+    .fill("Co Writer");
+  await page
+    .getByLabel("Collaborator 2 email", { exact: true })
+    .fill(writer.user.email);
+  for (const pool of [
+    "Master ownership",
+    "Performance rights",
+    "Mechanical splits",
+  ]) {
+    await page.getByRole("button", { name: new RegExp(`^${pool}`) }).click();
+    await page
+      .getByLabel(`QA Browser ${pool} percentage`, { exact: true })
+      .fill("60");
+    await page
+      .getByLabel(`Co Writer ${pool} percentage`, { exact: true })
+      .fill("40");
+  }
+  const createdResponse = page.waitForResponse(
+    (r) =>
+      r.url().includes("/api/agreements") && r.request().method() === "POST",
   );
-  expect(references).toHaveLength(12);
-  expect(
-    references.every(
-      (track: {
-        isrc: string;
-        audio: { storedName: string | null; format: string | null };
-        ownership?: unknown;
-      }) =>
-        track.isrc === "" &&
-        track.audio.storedName === null &&
-        track.audio.format === null &&
-        !track.ownership,
+  await page
+    .getByRole("button", {
+      name: "Create agreement & invite collaborators",
+      exact: true,
+    })
+    .click();
+  const created = await createdResponse;
+  expect(created.status()).toBe(201);
+  const contract = await created.json();
+  await approveOwnAllocation(page, "QA Browser");
+  await expect(
+    page.getByRole("button", { name: "Deliver to catalogue", exact: true }),
+  ).toBeDisabled();
+  const token = contract.invitations[0].token,
+    forged = await context.request.post("/api/agreements", {
+      headers: mutationHeaders(owner, baseURL),
+      data: {
+        action: "approve",
+        invite: token,
+        typedName: "Co Writer",
+        acknowledgement: true,
+      },
+    });
+  expect(forged.status()).toBe(404);
+  await peerContext.clearCookies();
+  const peer = await peerContext.newPage(),
+    invitePath = `/dashboard/splits?invite=${token}`;
+  await peer.goto(invitePath);
+  await expect(peer).toHaveURL(/\/login\?next=/);
+  expect(new URL(peer.url()).searchParams.get("next")).toBe(invitePath);
+  await peer
+    .getByLabel("Email address", { exact: true })
+    .fill(writer.user.email);
+  await peer.getByLabel("Password", { exact: true }).fill(QA_PASSWORD);
+  await peer.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(peer).toHaveURL(
+    new RegExp(`/dashboard/splits\\?invite=${token}$`),
+  );
+  await approveOwnAllocation(peer, "Co Writer");
+  await expect(
+    peer.getByText(
+      "Your approval has been recorded against this exact version.",
+      { exact: true },
     ),
-  ).toBe(true);
-  await page.goto("/dashboard/artist");
-  await expect(page.getByRole("tab", { name: /Your catalogue/ })).toBeVisible();
-  await page.getByRole("tab", { name: /Your catalogue/ }).click();
-  await expect(page.getByText("SALO", { exact: true })).toBeVisible();
-  expect(await page.locator("body").innerText()).not.toMatch(
-    /Mukisa Collective|Ray Bwete|Nyege Nyege Tapes|Original seeded artists and ISRCs retained/,
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Refresh sign-offs", exact: true })
+    .click();
+  await expect(
+    page.getByText("All accounts approved. Delivery unlocked.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  const posted = page.waitForResponse(
+    (r) => r.url().endsWith("/api/tracks") && r.request().method() === "POST",
   );
-  await page.goto("/dashboard/artists");
-  for (const artist of ["BARANGA", "MR FALLBACK", "SOUNDLYKBB", "TAI DAI"])
-    await expect(
-      page.getByRole("button", { name: new RegExp(artist) }).first(),
-    ).toBeVisible();
-  await expect(page.locator("iframe")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Deliver to catalogue", exact: true })
+    .click();
+  const delivered = await posted;
+  expect(delivered.status()).toBe(201);
+  const { track } = await delivered.json();
+  expect(track.fingerprint).toMatchObject({
+    algorithm: "pcm-rms-fft-v1",
+    sourceSha256: sha(sample()),
+    sampleRate: 11025,
+  });
+  expect(track.fingerprint.waveform).toHaveLength(128);
+  expect(track.fingerprint.bands).toHaveLength(1024);
+  expect(new Set(track.fingerprint.bands).size).toBeGreaterThan(3);
+  expect(
+    track.ownership.parties
+      .map((p: { signature: { userId: string } }) => p.signature.userId)
+      .sort(),
+  ).toEqual([owner.user.id, writer.user.id].sort());
+  const player = page.getByLabel(
+    "Play your master Independent approval master",
+    { exact: true },
+  );
+  await player.evaluate(async (el: HTMLAudioElement) => {
+    await el.play();
+  });
+  await expect
+    .poll(() => player.evaluate((el: HTMLAudioElement) => el.currentTime))
+    .toBeGreaterThan(0.1);
+  expect(
+    (await peerContext.request.get(`/api/tracks/${track.id}`)).status(),
+  ).toBe(404);
+  const range = await context.request.get(`/api/tracks/${track.id}`, {
+    headers: { range: "bytes=0-43" },
+  });
+  expect(range.status()).toBe(206);
+  expect(await range.body()).toEqual(sample().subarray(0, 44));
+  const deleteResponse = await context.request.delete(
+    `/api/tracks/${track.id}`,
+    { headers: mutationHeaders(owner, baseURL) },
+  );
+  expect(deleteResponse.status()).toBe(200);
+  expect((await context.request.get(`/api/tracks/${track.id}`)).status()).toBe(
+    404,
+  );
+  await peerContext.close();
+});
+
+test("actual MP3 decoding computes nonzero spectral features, while oversize and non-audio files fail before delivery", async ({
+  page,
+  context,
+  baseURL,
+}, testInfo) => {
+  await createActor(context, baseURL);
+  await page.goto("/dashboard/artist/delivery");
+  const tooLarge = testInfo.outputPath("too-large.wav"),
+    handle = await open(tooLarge, "w");
+  await handle.truncate(80 * 1024 * 1024 + 1);
+  await handle.close();
+  await page.locator('input[type="file"]').setInputFiles(tooLarge);
+  await expect(page.locator("body")).toContainText(/80 MB|80 MiB/);
+  await expect(
+    page.getByLabel("Computed audio signature", { exact: true }),
+  ).toHaveCount(0);
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "cover.jpg",
+    mimeType: "image/jpeg",
+    buffer: Buffer.from([0, 1]),
+  });
+  await expect(page.locator("body")).toContainText("not an audio file");
+  const mp3 = await readFile("public/demo/east-sound-sample.mp3");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "QA MP3 - Decoded source.mp3",
+    mimeType: "audio/mpeg",
+    buffer: mp3,
+  });
+  await expect(
+    page.getByLabel("Computed audio signature", { exact: true }),
+  ).toBeVisible({ timeout: 30000 });
+  await expect(
+    page.getByRole("img", {
+      name: "Waveform energy of the uploaded master",
+      exact: true,
+    }),
+  ).toBeVisible();
+  const heights = await page
+    .getByRole("img", {
+      name: "Waveform energy of the uploaded master",
+      exact: true,
+    })
+    .locator("rect")
+    .evaluateAll((rects) => rects.map((r) => Number(r.getAttribute("height"))));
+  expect(Math.max(...heights)).toBeGreaterThan(3);
+  await expect(
+    page.getByRole("button", { name: "Deliver to catalogue", exact: true }),
+  ).toBeDisabled();
   await fits(page);
 });
 
-test("notification binding, subscription CRUD, cross-tab KPI and safe phone simulation", async ({
+test("account-persisted phone/webhook settings automatically enqueue owned captures and keep the WhatsApp simulator/PDF local", async ({
   page,
   context,
+  browser,
+  baseURL,
 }) => {
-  const writes: string[] = [];
-  page.on("request", (request) => {
-    if (request.method() === "POST") writes.push(request.url());
-  });
+  const actor = await createActor(context, baseURL),
+    track = await deliverApi(
+      context,
+      baseURL,
+      actor,
+      "Notification binding master",
+    ),
+    otherContext = await browser.newContext({ baseURL });
+  await createActor(otherContext, baseURL);
   await page.goto("/dashboard/alerts");
-  await expect(kpi(page, "Active notification subscriptions")).toHaveText("0");
   await page
     .getByRole("button", { name: "Configure channels", exact: true })
     .click();
   let dialog = page.getByRole("dialog");
-  await dialog.getByLabel(/WhatsApp phone number/).fill("+2560772123456");
-  await dialog.getByRole("button", { name: "Save channel settings" }).click();
-  await expect(dialog.getByRole("alert")).toContainText(
-    "international WhatsApp number",
-  );
   await dialog.getByLabel(/WhatsApp phone number/).fill("+256 772 123456");
   await dialog.getByLabel(/recipient’s permission/).check();
   await dialog
-    .getByRole("textbox", { name: "Message template", exact: true })
-    .fill(
-      "🔥 Airplay Alert! '{{title}}' on {{station}} ({{location}}) at {{time}}. Total spins today: {{spinsToday}}. {{trigger}}",
-    );
-  await dialog.getByRole("button", { name: "Save channel settings" }).click();
+    .getByRole("button", { name: "Save channel settings", exact: true })
+    .click();
   await expect(dialog).toHaveCount(0);
-  expect(
-    await page.evaluate(
-      (key) => JSON.parse(localStorage.getItem(key)!).whatsapp.phone,
-      notificationKey,
-    ),
-  ).toBe("+256772123456");
+  await page
+    .getByRole("button", { name: "Configure channels", exact: true })
+    .click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByRole("tab", { name: "Webhooks", exact: true }).click();
+  await dialog
+    .getByRole("button", { name: "Add webhook destination", exact: true })
+    .click();
+  const secret = "qa-write-only-webhook-signing-secret-not-a-provider-token";
+  await dialog
+    .getByLabel("Label or destination name", { exact: true })
+    .fill("QA Label");
+  await dialog.getByLabel(/Webhook signing secret/).fill(secret);
+  await dialog
+    .getByLabel("Webhook HTTPS URL", { exact: true })
+    .fill("https://hooks.east-sound-qa.example.com/airplay");
+  await dialog
+    .getByRole("button", { name: "Save channel settings", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
   await page
     .getByRole("button", { name: "New subscription", exact: true })
     .click();
   dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Subscription name").fill("Tai Dai release campaign");
+  await dialog
+    .getByLabel("Subscription name", { exact: true })
+    .fill("QA owned first spin");
   await dialog
     .getByRole("combobox", { name: "Recording", exact: true })
-    .selectOption("ref_tai-dai-outside-shoes");
-  await dialog.getByLabel(/Milestone thresholds/).fill("100, 1000, 10000");
-  await dialog.getByRole("button", { name: "Save subscription" }).click();
-  await expect(kpi(page, "Active notification subscriptions")).toHaveText("1");
-  const second = await context.newPage();
-  await second.goto("/dashboard/alerts");
-  await expect(kpi(second, "Active notification subscriptions")).toHaveText(
-    "1",
-  );
-  await page
-    .getByRole("button", {
-      name: "Pause Tai Dai release campaign",
-      exact: true,
-    })
+    .selectOption(track.id);
+  await dialog
+    .getByRole("group", { name: "Instant triggers", exact: true })
+    .getByRole("checkbox")
+    .nth(0)
+    .check();
+  await dialog
+    .getByRole("group", { name: "Instant triggers", exact: true })
+    .getByRole("checkbox")
+    .nth(1)
+    .uncheck();
+  await dialog
+    .getByRole("group", { name: "Instant triggers", exact: true })
+    .getByRole("checkbox")
+    .nth(2)
+    .uncheck();
+  await dialog.getByLabel("WhatsApp", { exact: true }).check();
+  await dialog.getByLabel("Webhook", { exact: true }).check();
+  await dialog
+    .getByRole("button", { name: "Save subscription", exact: true })
     .click();
-  await expect(kpi(page, "Active notification subscriptions")).toHaveText("0");
-  await expect(kpi(second, "Active notification subscriptions")).toHaveText(
-    "0",
-  );
-  await page
-    .getByRole("button", {
-      name: "Resume Tai Dai release campaign",
-      exact: true,
-    })
-    .click();
-  await expect(kpi(second, "Active notification subscriptions")).toHaveText(
-    "1",
-  );
-  await second.close();
-  await page
-    .getByRole("button", { name: "Edit Tai Dai release campaign", exact: true })
-    .click();
-  dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Subscription name").fill("Updated Tai Dai campaign");
-  await dialog.getByRole("button", { name: "Save subscription" }).click();
-  await page
-    .getByLabel("Search notification subscriptions")
-    .fill("not-in-the-catalogue");
-  await expect(
-    page.getByText("No subscriptions in this view.", { exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Reset subscription filters" })
-    .click();
-  const audited = await kpi(page, "Total audited spins").innerText();
-  await page
-    .getByRole("button", { name: "Test WhatsApp Notification", exact: true })
-    .click();
-  dialog = page.getByRole("dialog");
-  for (const trigger of [/^First/, /^Milestone/, /^Prime/]) {
-    await dialog
-      .getByRole("group", { name: "Test notification trigger" })
-      .getByRole("button", { name: trigger })
-      .click();
-    await expect(
-      dialog.getByLabel("Simulated WhatsApp notification"),
-    ).toContainText("TEST — SIMULATED AIRPLAY");
-  }
-  await expect(
-    dialog.getByLabel("Simulated WhatsApp notification"),
-  ).toContainText("Outside Shoes");
-  await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  await expect(kpi(page, "Total audited spins")).toHaveText(audited);
+  const prefs = await (await context.request.get("/api/preferences")).text();
+  expect(prefs).not.toContain(secret);
+  expect(prefs).toContain('"secretConfigured":true');
+  expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
+    secret,
+  );
+  await ingest(context, track);
+  const jobs = (
+    await (await context.request.get("/api/notifications/outbox")).json()
+  ).jobs;
+  expect(jobs.map((j: { channel: string }) => j.channel).sort()).toEqual([
+    "webhook",
+    "whatsapp",
+  ]);
+  expect(
+    jobs.every(
+      (j: { status: string; attempts: number }) =>
+        j.status === "queued" && j.attempts === 0,
+    ),
+  ).toBe(true);
+  expect(
+    (await (await otherContext.request.get("/api/notifications/outbox")).json())
+      .jobs,
+  ).toEqual([]);
+  const outbox = page.getByLabel("Private automatic notification outbox", {
+    exact: true,
+  });
+  await outbox.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(outbox).toContainText(track.title);
+  const writes: string[] = [];
+  page.on("request", (r) => {
+    if (["POST", "PUT", "DELETE"].includes(r.method())) writes.push(r.url());
+  });
   await page
     .getByRole("button", {
-      name: "Delete Updated Tai Dai campaign",
+      name: "Log demo spin & preview WhatsApp",
       exact: true,
     })
     .click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Delete subscription", exact: true })
-    .click();
-  await expect(kpi(page, "Active notification subscriptions")).toHaveText("0");
+  await expect(
+    page.getByLabel("WhatsApp phone simulator", { exact: true }),
+  ).toContainText(
+    "🔥 Airplay Alert! 'Mulongo' just played on Capital FM (Kampala)",
+  );
   expect(writes).toEqual([]);
-  await fits(page);
+  expect(
+    (await (await context.request.get("/api/notifications/outbox")).json())
+      .jobs,
+  ).toHaveLength(2);
+  await page.getByRole("tab", { name: "Email digests", exact: true }).click();
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: /PDF/ }).first().click();
+  const file = await downloaded;
+  expect((await readFile((await file.path())!)).subarray(0, 5).toString()).toBe(
+    "%PDF-",
+  );
+  await otherContext.close();
 });
 
-test("daily/weekly PDF downloads and safe webhook configuration previews", async ({
+test("station-manager assignments govern logs, source settings and ad options; source/evidence audio genuinely plays", async ({
   page,
+  context,
+  browser,
+  baseURL,
 }) => {
-  await page.goto("/dashboard/alerts");
-  await page.getByRole("tab", { name: "Email digests", exact: true }).click();
-  for (const kind of ["daily", "weekly"]) {
-    if (kind === "weekly")
-      await page
-        .getByRole("button", { name: /^Weekly regional trends/ })
-        .click();
-    const downloadPromise = page.waitForEvent("download");
-    await page
-      .getByRole("button", { name: "Export digest PDF", exact: true })
-      .click();
-    const download = await downloadPromise;
-    expect(download.suggestedFilename()).toContain(kind);
-    const bytes = await readFile((await download.path())!);
-    expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
-  }
-  await page
-    .getByRole("button", { name: "Digest settings", exact: true })
-    .click();
-  let dialog = page.getByRole("dialog");
-  await expect(
-    dialog.getByRole("tab", { name: "Email digests", exact: true }),
-  ).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Escape");
-  await page
-    .getByRole("tab", { name: "Delivery & webhooks", exact: true })
-    .click();
-  await expect(page.getByLabel("Sample webhook JSON")).toContainText(
-    '"mode": "simulator"',
+  const ownerContext = await browser.newContext({ baseURL }),
+    owner = await createActor(ownerContext, baseURL),
+    track = await deliverApi(
+      ownerContext,
+      baseURL,
+      owner,
+      "Scoped station evidence " + crypto.randomUUID().slice(0, 8),
+    );
+  const manager = await createActor(context, baseURL, {
+    role: "broadcaster",
+    stations: ["cbs-kla"],
+  });
+  await ingest(ownerContext, track, "cbs-kla", true);
+  await ingest(ownerContext, track, "capital-kla");
+  const clips: string[] = [];
+  await page.route(
+    "https://clips.east-sound-qa.example.com/**",
+    async (route) => {
+      clips.push(route.request().url());
+      await route.fulfill({
+        status: 200,
+        contentType: "audio/wav",
+        headers: { "access-control-allow-origin": "*" },
+        body: sample(),
+      });
+    },
   );
+  await page.goto("/dashboard/playout");
+  await expect(
+    page.getByLabel("Authenticated role: Broadcaster / Station Manager", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "Configure Airplay Alerts & Webhooks",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  const records = (await (await context.request.get("/api/playout")).json())
+    .records;
+  expect(
+    records.every((r: { stationId: string }) => r.stationId === "cbs-kla"),
+  ).toBe(true);
+  expect(
+    (await context.request.get("/api/playout?stationId=capital-kla")).status(),
+  ).toBe(403);
   await page
-    .getByRole("button", { name: "Export worker configuration", exact: true })
+    .getByRole("button", {
+      name: new RegExp(
+        `^Audible evidence snippet for ${track.title} on CBS FM`,
+      ),
+    })
+    .click();
+  let dialog = page.getByRole("dialog", {
+    name: "Audible Evidence Snippet",
+    exact: true,
+  });
+  const evidence = dialog.getByLabel(
+    "10-second broadcast evidence from CBS FM",
+    { exact: true },
+  );
+  await expect
+    .poll(() =>
+      evidence.evaluate((el: HTMLAudioElement) =>
+        Number.isFinite(el.duration) ? el.duration : 0,
+      ),
+    )
+    .toBe(10);
+  await evidence.evaluate(async (el: HTMLAudioElement) => {
+    await el.play();
+  });
+  await expect
+    .poll(() => evidence.evaluate((el: HTMLAudioElement) => el.currentTime))
+    .toBeGreaterThan(0.1);
+  await dialog.getByRole("button", { name: /Verify/ }).click();
+  await expect(dialog).toContainText(
+    /bytes match|SHA-256 verified|Digest verified/i,
+  );
+  await page.keyboard.press("Escape");
+  await page.goto("/dashboard/monitoring");
+  await expect(
+    page.getByRole("button", {
+      name: "Configure Capital FM source",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  const beforeSources = clips.length;
+  await page
+    .getByRole("button", { name: "Connect a station source", exact: true })
     .click();
   dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("recipient");
-  await page.keyboard.press("Escape");
+  expect(
+    await dialog
+      .getByRole("combobox", { name: "Station", exact: true })
+      .locator("option")
+      .allTextContents(),
+  ).toEqual(["CBS FM · FM"]);
+  await dialog
+    .getByLabel("Source HTTPS URL", { exact: true })
+    .fill("https://clips.east-sound-qa.example.com/station.wav");
+  await dialog.getByLabel(/I am authorised/).check();
+  await dialog
+    .getByRole("button", { name: "Save source", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  expect(clips).toHaveLength(beforeSources);
+  await page
+    .getByRole("button", { name: "Open CBS FM feed", exact: true })
+    .click();
+  const stream = page.getByLabel("FM source player", { exact: true });
+  await stream.evaluate(async (el: HTMLVideoElement) => {
+    await el.play();
+  });
+  await expect
+    .poll(() => stream.evaluate((el: HTMLVideoElement) => el.currentTime))
+    .toBeGreaterThan(0.1);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Open CBS FM feed", exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(async () =>
+      (await privateCacheKeys(page)).includes(manager.user.id + ":stations"),
+    )
+    .toBe(true);
+  await page.goto("/dashboard/advertisers");
+  await page.locator("#campaign-create").evaluate((el) => {
+    if (el instanceof HTMLDetailsElement) el.open = true;
+  });
+  const station = page.getByRole("combobox", { name: "Station", exact: true });
+  expect(
+    await station
+      .locator("option")
+      .evaluateAll((options) =>
+        options.map((option) => (option as HTMLOptionElement).value),
+      ),
+  ).toEqual(["cbs-kla"]);
+  await expect(station.locator("option")).toContainText("CBS FM");
   await fits(page);
+  await ownerContext.close();
 });
 
-test("authorized station source connects only on explicit open and never produces a capture", async ({
+test("CMO ledgers and immutable split-resolution decisions persist, while ordinary artists cannot invoke them", async ({
   page,
-  request,
+  context,
+  browser,
+  baseURL,
 }) => {
-  const original = (await (await request.get("/api/playout")).json()).records;
-  let sourceRequests = 0;
-  await page.route("https://source.example.com/live.wav", async (route) => {
-    sourceRequests++;
-    await route.fulfill({
-      status: 200,
-      headers: {
-        "content-type": "audio/wav",
-        "access-control-allow-origin": "*",
+  const ownerContext = await browser.newContext({ baseURL }),
+    owner = await createActor(ownerContext, baseURL),
+    track = await deliverApi(
+      ownerContext,
+      baseURL,
+      owner,
+      "CMO signed review master",
+    );
+  await ingest(ownerContext, track);
+  await createActor(context, baseURL, { role: "cmo", name: "QA CMO Auditor" });
+  await page.goto("/dashboard/cmo");
+  await expect(
+    page.getByLabel("Authenticated role: CMO Auditor", { exact: true }),
+  ).toBeVisible();
+  expect((await context.request.get("/api/audit")).status()).toBe(200);
+  expect(
+    (await context.request.get("/api/royalties/export")).headers()[
+      "content-type"
+    ],
+  ).toContain("csv");
+  expect((await ownerContext.request.get("/api/rights-reviews")).status()).toBe(
+    403,
+  );
+  await page.goto("/dashboard/splits");
+  const review = page.getByLabel("CMO split resolution ledger", {
+    exact: true,
+  });
+  await review
+    .getByRole("combobox", { name: "Review recording", exact: true })
+    .selectOption(track.id);
+  await review
+    .getByRole("combobox", { name: "Resolution decision", exact: true })
+    .selectOption("reviewed");
+  await review
+    .getByLabel("Review rationale", { exact: true })
+    .fill(
+      "All three contributor allocations were reviewed against the immutable audio-bound agreement.",
+    );
+  await review
+    .getByRole("button", { name: "Record signed review decision", exact: true })
+    .click();
+  await expect(review.getByRole("status")).toContainText(
+    "Review and audit entry saved",
+  );
+  await page.reload();
+  await expect(
+    page.getByLabel("CMO split resolution ledger", { exact: true }),
+  ).toContainText(
+    "All three contributor allocations were reviewed against the immutable audio-bound agreement.",
+  );
+  expect(
+    (
+      await (await context.request.get("/api/rights-reviews")).json()
+    ).reviews.some((r: { trackId: string }) => r.trackId === track.id),
+  ).toBe(true);
+  await ownerContext.close();
+});
+
+test("blocked localStorage does not break HttpOnly login or account-persisted licensed source settings", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await createActor(context, baseURL, {
+    role: "broadcaster",
+    stations: ["cbs-kla"],
+  });
+  await page.addInitScript(() => {
+    Object.defineProperty(Storage.prototype, "setItem", {
+      configurable: true,
+      value() {
+        throw new DOMException("Storage blocked", "SecurityError");
       },
-      body: wav(),
+    });
+    Object.defineProperty(Storage.prototype, "getItem", {
+      configurable: true,
+      value() {
+        throw new DOMException("Storage blocked", "SecurityError");
+      },
     });
   });
   await page.goto("/dashboard/monitoring");
   await page
-    .getByRole("button", { name: "Configure Capital FM source", exact: true })
+    .getByRole("button", { name: "Connect a station source", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Source HTTPS URL").fill("http://localhost/live");
-  await dialog.getByRole("button", { name: /Save source/ }).click();
-  await expect(dialog.getByRole("alert")).toContainText("public HTTPS");
   await dialog
-    .getByLabel("Source HTTPS URL")
-    .fill("https://source.example.com/live.wav");
-  await dialog.getByRole("checkbox").check();
-  await dialog.getByRole("button", { name: /Save source/ }).click();
-  expect(sourceRequests).toBe(0);
-  await page
-    .getByRole("button", { name: "Open Capital FM feed", exact: true })
+    .getByLabel("Source HTTPS URL", { exact: true })
+    .fill("https://clips.east-sound-qa.example.com/blocked-storage.wav");
+  await dialog.getByLabel(/I am authorised/).check();
+  await dialog
+    .getByRole("button", { name: "Save source", exact: true })
     .click();
-  await page
-    .getByLabel("FM source player")
-    .evaluate((media: HTMLVideoElement) => media.play());
-  await expect.poll(() => sourceRequests).toBeGreaterThan(0);
+  await expect(dialog).toHaveCount(0);
+  await page.reload();
   await expect(
-    page.getByText(
-      /Capture, matching and evidence storage are separate integrations/,
-    ),
+    page.getByRole("button", { name: "Open CBS FM feed", exact: true }),
   ).toBeVisible();
-  expect((await (await request.get("/api/playout")).json()).records).toEqual(
-    original,
-  );
-  await page
-    .getByRole("button", { name: "Remove Capital FM source", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "Open Capital FM feed", exact: true }),
-  ).toHaveCount(0);
-});
-
-test("intercepted QA evidence plays ten seconds, verifies downloaded bytes and never persists", async ({
-  page,
-  request,
-}) => {
-  const before = (await (await request.get("/api/playout")).json()).records;
-  const bytes = wav();
-  const url = "https://evidence.example.com/qa-ten-second.wav";
-  const now = new Date();
-  const record = {
-    id: "qa-browser-evidence-only",
-    source: "captured",
-    detectedAt: new Date(now.getTime() - 60000).toISOString(),
-    stationId: "capital-kla",
-    stationName: "Capital FM",
-    region: "Central",
-    medium: "FM",
-    trackId: "ref_baranga-salo",
-    title: "SALO",
-    primaryArtist: "Baranga",
-    isrc: null,
-    durationSec: 154,
-    confidence: 0.98,
-    evidence: { url, sha256: createHash("sha256").update(bytes).digest("hex") },
-  };
-  await page.route("**/api/playout", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        records: [record],
-        generatedAt: now.toISOString(),
-      }),
-    }),
-  );
-  await page.route(url, (route) =>
-    route.fulfill({
-      status: 200,
-      headers: {
-        "content-type": "audio/wav",
-        "access-control-allow-origin": "*",
-      },
-      body: bytes,
-    }),
-  );
-  await page.goto("/dashboard/playout");
-  await expect(kpi(page, "Total audited spins")).toHaveText("1");
-  const button = page.getByRole("button", {
-    name: /^Audible evidence snippet for SALO/,
-  });
-  await button.click();
-  const dialog = page.getByRole("dialog");
-  const audio = dialog.locator("audio");
-  await expect
-    .poll(() => audio.evaluate((element: HTMLAudioElement) => element.duration))
-    .toBe(10);
-  await audio.evaluate((element: HTMLAudioElement) => element.play());
-  await expect
-    .poll(() => audio.evaluate((element: HTMLAudioElement) => element.paused))
-    .toBe(false);
-  await expect
-    .poll(() =>
-      audio.evaluate((element: HTMLAudioElement) => element.currentTime),
-    )
-    .toBeGreaterThan(0.1);
-  await expect
-    .poll(() => audio.evaluate((element: HTMLAudioElement) => element.paused), {
-      timeout: 15000,
-    })
-    .toBe(true);
   expect(
-    await audio.evaluate((element: HTMLAudioElement) => element.currentTime),
-  ).toBeCloseTo(10, 1);
-  await dialog
-    .getByRole("button", { name: "Verify downloaded SHA-256", exact: true })
-    .click();
-  await expect(
-    dialog.getByRole("button", {
-      name: "Downloaded bytes match SHA-256",
-      exact: true,
-    }),
-  ).toBeDisabled();
-  await page.keyboard.press("Escape");
-  await expect(button).toBeFocused();
-  expect((await (await request.get("/api/playout")).json()).records).toEqual(
-    before,
-  );
+    (await (await context.request.get("/api/station-sources")).json()).sources,
+  ).toHaveLength(1);
 });
 
-test("80 MB delivery staging, local tags, rights approvals and genuine master cleanup", async ({
+test("mock OAuth is explicitly development-only and cannot deliver real masters or allocate live tags", async ({
   page,
-  request,
+  context,
+  baseURL,
 }) => {
-  const actor = `QA Delivery ${randomUUID().slice(0, 8)}`;
-  const before = (await (await request.get("/api/tracks")).json()).tracks;
-  try {
-    await page.goto("/dashboard/artist");
-    await page.getByRole("tab", { name: /Master delivery/ }).click();
-    await page.locator('input[type="file"]').setInputFiles({
-      name: `${actor} - Browser QA.wav`,
-      mimeType: "audio/wav",
-      buffer: wav(1),
-    });
-    await expect(page.getByLabel(/^ISRC/)).toHaveValue(/^UG-ESD-\d{2}-\d{5}$/);
+  await page.goto("/login");
+  const mock = page.getByRole("button", { name: "Mock google", exact: true });
+  if (await mock.count()) {
+    await mock.click();
+    await expect(page).toHaveURL(/\/dashboard\/artist$/);
+    const session = await (
+      await context.request.get("/api/auth/session")
+    ).json();
+    expect(session.user.mock).toBe(true);
+    expect(
+      (
+        await context.request.put("/api/tracks?releaseDate=2026-11-01", {
+          headers: mutationHeaders(session, baseURL),
+        })
+      ).status(),
+    ).toBe(403);
     await expect(
-      page.getByRole("button", { name: "Deliver to catalogue", exact: true }),
-    ).toBeDisabled();
-    await page
-      .getByRole("button", {
-        name: `Record approval for ${actor}`,
+      page.getByRole("button", {
+        name: "Log demo spin & preview WhatsApp",
         exact: true,
-      })
-      .click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Type the collaborator’s full name").fill(actor);
-    await dialog.getByRole("checkbox").check();
-    await dialog
-      .getByRole("button", { name: "Record local approval", exact: true })
-      .click();
-    await expect(
-      page.getByRole("button", { name: "Deliver to catalogue", exact: true }),
-    ).toBeEnabled();
-    const responsePromise = page.waitForResponse(
-      (response) =>
-        response.url().endsWith("/api/tracks") &&
-        response.request().method() === "POST",
-    );
-    await page
-      .getByRole("button", { name: "Deliver to catalogue", exact: true })
-      .click();
-    const response = await responsePromise;
-    expect(response.status()).toBe(201);
-    const result = await response.json();
-    expect(result.track).toMatchObject({
-      primaryArtist: actor,
-      status: "processing",
-      totalSpins: 0,
-      origin: "delivered",
+      }),
+    ).toBeVisible();
+  } else {
+    const response = await context.request.post("/api/auth/mock-oauth", {
+      headers: { origin: new URL(baseURL!).origin },
+      data: { provider: "google" },
     });
-  } finally {
-    const current = (await (await request.get("/api/tracks")).json()).tracks;
-    for (const track of current.filter(
-      (track: { primaryArtist: string }) => track.primaryArtist === actor,
-    ))
-      await request.delete(`/api/tracks/${encodeURIComponent(track.id)}`);
-    expect((await (await request.get("/api/tracks")).json()).tracks).toEqual(
-      before,
-    );
+    expect(response.status()).toBe(404);
   }
 });
-
-for (const width of [320, 390]) {
-  test(`responsive workspaces and notification dialogs at ${width}px`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width, height: 844 });
-    for (const route of [
-      "/dashboard/artist",
-      "/dashboard/alerts",
-      "/dashboard/playout",
-      "/dashboard/cmo",
-      "/dashboard/monitoring",
-      "/dashboard/artists",
-      "/dashboard/analytics/regional",
-      "/dashboard/advertisers",
-    ]) {
-      await page.goto(route);
-      await fits(page);
-    }
-    await page.goto("/dashboard/alerts");
-    await page
-      .getByRole("button", { name: "Configure channels", exact: true })
-      .click();
-    await fits(page);
-    await page
-      .getByRole("dialog")
-      .getByRole("tab", { name: "Webhooks", exact: true })
-      .click();
-    await fits(page);
-    await page.keyboard.press("Escape");
-    await page
-      .getByRole("button", { name: "New subscription", exact: true })
-      .click();
-    await fits(page);
-    await page.keyboard.press("Escape");
-    await page
-      .getByRole("button", { name: "Test WhatsApp Notification", exact: true })
-      .click();
-    await fits(page);
-    await page.keyboard.press("Escape");
-    await page
-      .getByRole("button", { name: "Open navigation", exact: true })
-      .click();
-    const role = page.getByLabel("Switch workspace");
-    expect(await role.locator("option").allTextContents()).toEqual([
-      "Artist & Label Portal",
-      "Broadcaster Playout Log",
-      "CMO & UPRS Regulatory Auditor",
-      "Advertiser Spot Tracker",
-    ]);
-    await role.selectOption("cmo");
-    await expect(page).toHaveURL(/\/dashboard\/cmo$/);
-    await fits(page);
-  });
-}

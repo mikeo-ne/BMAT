@@ -6,18 +6,24 @@ if (!baseURL)
     "Set EAST_SOUND_TEST_URL to the approved Vercel deployment URL.",
   );
 const address = new URL(baseURL);
+const localReference =
+  process.env.EAST_SOUND_LOCAL_REFERENCE_SMOKE === "1" &&
+  address.protocol === "http:" &&
+  ["127.0.0.1", "localhost", "[::1]"].includes(address.hostname);
+const approvedRemote =
+  address.protocol === "https:" &&
+  !address.port &&
+  address.hostname.endsWith(".vercel.app");
 if (
-  address.protocol !== "https:" ||
+  (!localReference && !approvedRemote) ||
   address.username ||
   address.password ||
-  address.port ||
   address.search ||
   address.hash ||
-  !["", "/"].includes(address.pathname) ||
-  !address.hostname.endsWith(".vercel.app")
+  !["", "/"].includes(address.pathname)
 )
   throw new Error(
-    "Deployment verification requires an HTTPS Vercel URL without credentials.",
+    "Use an approved HTTPS Vercel URL, or explicitly opt into an isolated loopback reference smoke server.",
   );
 
 export default defineConfig({
@@ -31,6 +37,8 @@ export default defineConfig({
   reporter: "list",
   use: {
     baseURL,
+    actionTimeout: 15000,
+    navigationTimeout: 30000,
     viewport: { width: 1440, height: 1000 },
     acceptDownloads: true,
     screenshot: "only-on-failure",

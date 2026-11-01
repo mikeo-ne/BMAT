@@ -93,8 +93,10 @@ describe("metadata onboarding", () => {
     fireEvent.click(screen.getByRole("button"));
     expect(screen.getByRole("tooltip")).toBeTruthy();
   });
-  it("defines four role workspaces with deterministic landing routes", () => {
-    expect(WORKSPACES).toHaveLength(4);
+  it("adds a public view while retaining four specialized workspaces", () => {
+    expect(WORKSPACES).toHaveLength(5);
+    expect(isWorkspace("public")).toBe(true);
+    expect(workspaceForPath("/dashboard/charts")).toBe("public");
     expect(
       WORKSPACES.some(
         (workspace) => workspace.label === "Broadcaster Playout Log",

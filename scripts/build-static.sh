@@ -7,7 +7,7 @@
 # with the repo's basePath. The primary server build keeps its API routes;
 # deployment capability guards still reject unsupported Vercel master writes.
 #
-# Result: ./out/ ready to upload to GitHub Pages. Read-only: delivery/upload and
+# Result: ./.static-build/out/ ready to upload to GitHub Pages. Read-only: delivery/upload and
 # unsupported mutations are disabled rather than reported as successful.
 set -euo pipefail
 
@@ -34,9 +34,11 @@ tar -C "${SRC}" \
 # 1. No API routes in a static export.
 rm -rf "${TMP}/app/api"
 
+# Private pages must never be exported as unauthenticated HTML, even when a production DB is configured.
+find "${TMP}/app/dashboard" -mindepth 1 -maxdepth 1 -type d ! -name charts ! -name stats -exec rm -rf {} +
+
 # 2. Prerender: strip force-dynamic so every page is built at compile time.
-grep -rl 'export const dynamic = "force-dynamic";' "${TMP}/app" \
-  | xargs -r sed -i '/export const dynamic = "force-dynamic";/d'
+find "${TMP}/app" -type f \( -name '*.tsx' -o -name '*.ts' \) -exec sed -i -E 's/export const dynamic[[:space:]]*=[[:space:]]*"force-dynamic";//g' {} +
 
 # 3. Static-export config with the Pages basePath.
 cat > "${TMP}/next.config.ts" <<CFG
@@ -56,7 +58,7 @@ CFG
 # Reuse the parent install.
 ln -s "${SRC}/node_modules" "${TMP}/node_modules"
 
-echo "→ building (this prerenders every dashboard)…"
+echo "→ building (public charts and statistics only)…"
 cd "${TMP}"
 EAST_SOUND_DATA_DIR="${TMP}/.data" EAST_SOUND_STATIC_EXPORT=1 BASE_PATH="${BASE_PATH}" npx next build
 

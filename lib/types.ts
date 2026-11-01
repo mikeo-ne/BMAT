@@ -26,7 +26,24 @@ export interface TrackAudio {
   previewUrl?: string;
 }
 
+export interface AudioSignature {
+  version: 1;
+  algorithm: "pcm-rms-fft-v1";
+  sourceSha256: string;
+  digest: string;
+  sampleRate: 11025;
+  durationSec: number;
+  analysedSec: number;
+  waveform: number[];
+  bands: number[];
+}
+
 export interface Track {
+  /** Immutable server-assigned owner; never accepted from an upload form. */
+  ownerId?: string;
+  agreementId?: string;
+  fingerprint?: AudioSignature;
+  publicCharts?: boolean;
   id: string;
   origin?: "public-reference" | "delivered" | "test-fixture";
   referenceId?: string;

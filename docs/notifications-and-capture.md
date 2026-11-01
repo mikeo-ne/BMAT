@@ -1,8 +1,10 @@
 # Airplay Alerts & Webhooks: integration contracts
 
-This prototype separates public release metadata, authorized capture ingestion, browser-local notification configuration and private server-side dispatch. **No live providers or station streams are supplied by default.** Never place access tokens, bot tokens, signing secrets or worker tokens in client-side settings, `NEXT_PUBLIC_*` variables, screenshots or checked-in files.
+East Sound separates public release metadata, authenticated account preferences, authorized capture ingestion and server-only provider dispatch. **No live providers or station streams are supplied by default.** Never place provider/bot/worker tokens in client settings, `NEXT_PUBLIC_*`, screenshots or Git. Per-endpoint webhook HMAC secrets may be entered once into the write-only settings field; the server encrypts and redacts them, and the client never persists or exports them. See [authenticated fullstack operations](fullstack-operations.md) for sessions, role isolation and account setup.
 
-**Backend selection:** this document's instant-dispatch/config and JSON-ledger examples describe the default file backend. For the opt-in durable PostgreSQL backend, see [PostgreSQL rules, migrations and polling worker](postgres-and-worker.md). Its private rule-registration step and committed-job instant dispatch differ; daily/weekly scheduling and the secure provider transports are shared. PostgreSQL rules/outbox persist private destinations and message inputs, unlike the file attempt-only ledger.
+**Account workflow:** authenticated `/api/preferences` saves immediately activate/revoke account-owned watches. New captures automatically queue eligible jobs in the file or PostgreSQL outbox; run the supervised `worker:notifications` CLI to drain them. No configuration export or administrative token is needed in the browser.
+
+**Administrative compatibility:** the `instant` + `config` HTTP examples below describe the older, separately privileged file-backend scheduler, not the account outbox. Do not run overlapping legacy and account watches for the same recipient. PostgreSQL HTTP instant dispatch instead drains committed outbox jobs; see [PostgreSQL rules, migrations and worker](postgres-and-worker.md). Daily/weekly scheduling remains an explicit operator integration. The metadata-only legacy attempt ledger is distinct from account documents/queues and the PostgreSQL payload-bearing outbox.
 
 ## 1. Configure a capture pipeline
 
@@ -34,7 +36,7 @@ Set a unique, random server-side `EAST_SOUND_INGEST_TOKEN` of at least 32 charac
 }
 ```
 
-**This is a schema illustration, not a captured airplay claim.** Do not submit it as activity. Omit `evidence` if no lawful, ten-second excerpt exists; the placeholder digest intentionally fails validation. Obtain recording IDs from `GET /api/tracks`; station IDs come from `lib/regions.ts`, with `nbs-tv-kla` additionally supported for TV.
+**This is a schema illustration, not a captured airplay claim.** Do not submit it as activity. Omit `evidence` if no lawful, ten-second excerpt exists; the placeholder digest intentionally fails validation. Obtain genuine matched recording IDs through an authorized operator/catalogue workflow (`GET /api/tracks` is artist-session/owner-scoped, not an ingestion-token enumeration API); station IDs come from `lib/regions.ts`, with `nbs-tv-kla` additionally supported for TV.
 
 Validation rules:
 
@@ -48,7 +50,7 @@ Validation rules:
 
 Responses: `201 {inserted, duplicates}`, `401` invalid credentials, `503` disabled integration/unavailable store, `415` content type, `413` size limit, `400` malformed JSON, `422` invalid records; PostgreSQL additionally returns `409` for changed reuse of an immutable provider event ID. No partial batch is saved on a validation error.
 
-`GET /api/playout` returns `{source: "captured-only", records, generatedAt, notice}`. No file means an empty feed; malformed data returns an error without overwriting the file. The current prototype exposes this read API without authentication: protect it and evidence access appropriately before public deployment.
+`GET /api/playout` returns `{source: "captured-only", records, generatedAt, notice}`. No file means an empty feed; malformed data returns an error without overwriting the file. Reads require a real account session and are filtered to the artist's owned tracks or the broadcaster's assigned stations; only CMO auditors receive the workspace-wide feed. Query/body/localStorage role or owner claims cannot expand that scope. Public charts/statistics expose only minimized public data, never evidence URLs.
 
 ## 2. Configure recipients and subscriptions
 
@@ -60,9 +62,9 @@ Open **Airplay Alerts & Webhooks → Configure channels**, or the global header 
 - Templates: up to 1,000 characters with supported `{{title}}`, `{{artist}}`, `{{station}}`, `{{location}}`, `{{region}}`, `{{time}}`, `{{spinsToday}}`, `{{totalSpins}}`, `{{milestone}}` and `{{trigger}}` tokens. Rendered instant messages are bounded to 1,024 characters. Unknown/malformed tokens fail validation.
 - Subscriptions: up to 100; select recording/all, station/all, region, channel(s), trigger(s) and up to 20 positive whole-number milestones.
 
-Settings persist under `east-sound:notifications:v1` in that browser, synchronize across tabs, and fall back to memory if storage is blocked. Invalid stored data is reported, not silently overwritten. Phone/email/webhook values may be sensitive: secure the device/profile and avoid sharing exported configuration.
+Settings persist in authenticated server account documents. Non-authoritative IndexedDB snapshots are user-scoped and evicted on logout/account change; the old unscoped `east-sound:notifications:v1` value is not imported as authority. Blocked localStorage does not prevent a valid cookie session or successful server save. Contacts remain sensitive: secure the device and private server/backup access, and avoid sharing configuration exports. Enabled webhook destinations require a write-only 32–256 character secret; changing the endpoint requires a fresh secret.
 
-**Active** means an enabled, valid subscription with at least one locally ready, opted-in channel—not verified provider connectivity. Changes remain local until the private worker receives an updated exported config. Channel cards and the dispatch checklist do not claim an authenticated provider handshake.
+**Active** means an enabled, valid account subscription with at least one configured, opted-in channel—not verified provider connectivity. Saving settings updates the account's rules and server-controlled activation/generation; no export is needed for automatic account alerts. The outbox reports queue/provider acceptance separately from delivered/read. Channel cards do not claim a provider handshake.
 
 ### Trigger semantics
 
@@ -106,13 +108,13 @@ EAST_SOUND_WEBHOOK_ALLOWLIST=["https://your-relay.com/airplay"]
 
 Readiness checks only validate the presence/shape of configuration. No credentials, template approval, sender verification or external connection are independently tested by loading the UI. Provider failures are recorded rather than treated as success.
 
-## 4. Provision an authenticated scheduler (file backend)
+## 4. Legacy administrative scheduler and scheduled digests (file backend)
 
 PostgreSQL instant alerts instead use the registered-rule/transactional-outbox flow in [postgres-and-worker.md](postgres-and-worker.md); do not submit the following legacy instant payload there. Daily/weekly requests below also work in PostgreSQL mode with a shared database lease ledger.
 
 The UI's **Delivery & webhooks → Export worker configuration** flow asks for confirmation before downloading recipient/destination information. It contains no provider access tokens or server secrets, and downloading it does not activate a scheduler.
 
-Your private scheduler supplies the exported `config` to:
+For separately managed legacy watches or scheduled daily/weekly recaps, a trusted private scheduler supplies its reviewed `config` to:
 
 ```http
 POST /api/notifications/dispatch
@@ -129,7 +131,7 @@ Supported actions:
 - `weekly`: on the configured EAT weekday after its hour, the previous seven completed EAT days and an adjacent prior-period comparison.
 - Authorized `force: true` may generate a digest outside its schedule, but **cannot bypass consent** or provider/global-enable checks. Disabling a schedule and making an explicit forced request are separate decisions.
 
-The scheduler and its private configuration storage are **not provisioned by this application**. Updates made in a browser must be exported and applied to it. Use a production queue and tenant-specific authenticated configuration store rather than treating browser settings as a global server account.
+This **legacy scheduler service** is not provisioned. Its explicit configurations are separate from authenticated account preferences; never treat a browser export as a global server account or expose the integration token. Account instant alerts already use automatic queueing and the durable worker; do not also replay those alerts through this legacy path. Daily/weekly recaps still need an operator scheduler and a reviewed recipient/consent configuration.
 
 ### Attempts, retries and receipts
 
@@ -167,4 +169,4 @@ Outbound protection:
 
 A static build contains public catalogue metadata only and marks provider readiness disabled. It cannot run ingestion, master storage/tag reservation, dispatch or scheduling. Browser-local setup is not a substitute for those APIs.
 
-Before production, implement real user/tenant authorization; secure the catalogue/upload and capture read APIs; use durable transactional storage and provider callbacks; license stations/masters/evidence; authenticate rights-holder signatures; verify registry and current CMO tariffs; define retention and backup policies; monitor abuse and operational failures. The available UI roles are not access-control roles, and indicative financial exports are not official UPRS or BMAT certification.
+Before public production, complete mailbox verification/recovery/MFA or a real identity provider; provision and back up durable storage; configure provider callbacks, edge abuse controls and monitoring; license stations/masters/evidence; verify legal signer identity, official registries and applicable tariffs; and review retention/security/legal obligations. Server-side account/session/RBAC enforcement is implemented, but repository tests do not certify those external and operational requirements. Indicative allocations and account-bound reviews are not official UPRS or BMAT certification.

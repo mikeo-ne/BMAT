@@ -35,10 +35,14 @@ export function DeliverySplitEditor({
   parties,
   onChange,
   recordingReady,
+  authenticated = false,
+  accountEmail = "",
 }: {
   parties: DeliveryParty[];
   onChange: (parties: DeliveryParty[]) => void;
   recordingReady: boolean;
+  authenticated?: boolean;
+  accountEmail?: string;
 }) {
   const [right, setRight] = useState<DeliveryRight>("master");
   const [signingId, setSigningId] = useState<string | null>(null);
@@ -93,7 +97,9 @@ export function DeliverySplitEditor({
           className={`chip ${approved === parties.length && ready ? "text-brand" : ""}`}
         >
           <CheckCheck size={12} />
-          {approved}/{parties.length} approvals
+          {authenticated
+            ? "Draft allocations"
+            : `${approved}/${parties.length} approvals`}
         </span>
       </div>
       <div className="my-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -205,24 +211,26 @@ export function DeliverySplitEditor({
                 />
               </label>
               <div className="order-4 flex items-center justify-end gap-1">
-                <button
-                  type="button"
-                  className={`btn !px-2.5 !py-2.5 !text-[10px] ${party.signature ? "bg-brand/10 text-brand" : "btn-ghost !bg-surface"}`}
-                  disabled={!ready || !!party.signature}
-                  onClick={() => {
-                    setSigningId(party.id);
-                    setTypedName("");
-                    setConsent(false);
-                  }}
-                  aria-label={`${party.signature ? "Approval recorded for" : "Record approval for"} ${party.name || `collaborator ${i + 1}`}`}
-                >
-                  {party.signature ? (
-                    <Check size={12} />
-                  ) : (
-                    <PenLine size={12} />
-                  )}
-                  {party.signature ? "Approved" : "Approve"}
-                </button>
+                {!authenticated && (
+                  <button
+                    type="button"
+                    className={`btn !px-2.5 !py-2.5 !text-[10px] ${party.signature ? "bg-brand/10 text-brand" : "btn-ghost !bg-surface"}`}
+                    disabled={!ready || !!party.signature}
+                    onClick={() => {
+                      setSigningId(party.id);
+                      setTypedName("");
+                      setConsent(false);
+                    }}
+                    aria-label={`${party.signature ? "Approval recorded for" : "Record approval for"} ${party.name || `collaborator ${i + 1}`}`}
+                  >
+                    {party.signature ? (
+                      <Check size={12} />
+                    ) : (
+                      <PenLine size={12} />
+                    )}
+                    {party.signature ? "Approved" : "Approve"}
+                  </button>
+                )}
                 {party.id !== "primary" && (
                   <button
                     type="button"
@@ -237,6 +245,26 @@ export function DeliverySplitEditor({
                 )}
               </div>
             </div>
+            {authenticated && (
+              <label className="mt-3 block">
+                <span className="label !text-[9px]">
+                  Account email for private sign-off
+                </span>
+                <input
+                  type="email"
+                  className="field !bg-surface !text-xs"
+                  aria-label={`Collaborator ${i + 1} email`}
+                  value={
+                    party.id === "primary" ? accountEmail : (party.email ?? "")
+                  }
+                  disabled={party.id === "primary"}
+                  maxLength={254}
+                  onChange={(event) =>
+                    patch(party.id, { email: event.target.value })
+                  }
+                />
+              </label>
+            )}
           </div>
         ))}
       </div>
@@ -275,11 +303,11 @@ export function DeliverySplitEditor({
       )}
       <p className="mt-3 flex gap-2 text-[10px] leading-relaxed text-muted">
         <ShieldCheck size={13} className="mt-0.5 shrink-0" />
-        Local typed-name acknowledgements only; collaborator identity is not
-        verified. Any edit to the agreement clears all approvals. Use
-        authenticated e-signatures and legal review for a binding execution.
+        {authenticated
+          ? "These are draft allocations, not approvals. Create the immutable agreement below, then each collaborator signs in separately. Audio, credits or allocation edits require fresh sign-off."
+          : "Local typed-name acknowledgements only; collaborator identity is not verified. Any edit to the agreement clears all approvals. Use authenticated e-signatures and legal review for a binding execution."}
       </p>
-      {signing && (
+      {!authenticated && signing && (
         <Dialog
           title={`Approve splits · ${signing.name}`}
           onClose={() => setSigningId(null)}

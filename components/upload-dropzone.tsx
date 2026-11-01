@@ -1,7 +1,10 @@
 "use client";
+import { browserSession } from "@/lib/auth-client";
+import { sessionScope } from "@/lib/auth-types";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { fingerprintMaster } from "@/lib/master-signature-client";
 import { formatBytes, formatDuration } from "@/lib/format";
 import {
   hasAudioSignature,
@@ -41,6 +44,9 @@ export function UploadDropzone({
   const ingest = useCallback(
     async (fileList: FileList | File[]) => {
       if (busyRef.current) return;
+      const ownerScope = sessionScope(browserSession().user);
+      const isActive = () =>
+        mounted.current && sessionScope(browserSession().user) === ownerScope;
       const incoming = Array.from(fileList);
       if (incoming.length === 0) return;
       busyRef.current = true;
@@ -50,7 +56,7 @@ export function UploadDropzone({
       const staged: StagedFile[] = [];
       try {
         for (const file of incoming) {
-          if (!mounted.current) break;
+          if (!isActive()) break;
           setChecking(file.name);
           const reason = validateAudioFile(file);
           if (reason) {
@@ -69,7 +75,7 @@ export function UploadDropzone({
             continue;
           }
           const durationSec = await probeAudio(file);
-          if (!mounted.current) break;
+          if (!isActive()) break;
           if (durationSec === null || durationSec <= 0) {
             issues.push({
               fileName: file.name,
@@ -77,6 +83,21 @@ export function UploadDropzone({
             });
             continue;
           }
+          setChecking(file.name + " · computing waveform and FFT signature");
+          let signature;
+          try {
+            signature = await fingerprintMaster(file, durationSec, ownerScope);
+          } catch (error) {
+            issues.push({
+              fileName: file.name,
+              reason:
+                error instanceof Error
+                  ? error.message
+                  : "Audio analysis failed.",
+            });
+            continue;
+          }
+          if (!isActive()) break;
           const previewUrl = URL.createObjectURL(file);
           pendingUrls.current.push(previewUrl);
           staged.push({
@@ -86,11 +107,12 @@ export function UploadDropzone({
             sizeBytes: file.size,
             format,
             mimeType: format === "WAV" ? "audio/wav" : "audio/mpeg",
-            durationSec,
+            durationSec: signature.durationSec,
+            fingerprint: signature,
             previewUrl,
           });
         }
-        if (!mounted.current) {
+        if (!isActive()) {
           for (const file of staged) URL.revokeObjectURL(file.previewUrl);
           return;
         }
@@ -104,7 +126,7 @@ export function UploadDropzone({
         if (issues.length) onRejected(issues);
       } catch {
         for (const file of staged) URL.revokeObjectURL(file.previewUrl);
-        if (mounted.current)
+        if (isActive())
           onRejected([
             {
               fileName: "Audio master",
@@ -113,7 +135,7 @@ export function UploadDropzone({
           ]);
       } finally {
         busyRef.current = false;
-        if (mounted.current) {
+        if (isActive()) {
           setProbing(false);
           setChecking("");
         }

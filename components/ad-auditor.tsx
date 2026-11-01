@@ -27,12 +27,23 @@ import { formatShare } from "@/lib/format";
  * anything booked through the form is appended for the session. There is no
  * server round-trip yet, so a refresh returns to the seed set.
  */
-export function AdAuditor() {
+export function AdAuditor({
+  allowedStationIds,
+}: {
+  allowedStationIds?: string[];
+}) {
   const [campaigns, setCampaigns] = useState<AdCampaign[]>(() =>
-    buildCampaigns(),
+    buildCampaigns().filter(
+      (c) =>
+        !allowedStationIds || allowedStationIds.includes(c.terms.stationId),
+    ),
   );
   const [selectedId, setSelectedId] = useState<string>(
-    () => buildCampaigns()[0]?.id ?? "",
+    () =>
+      buildCampaigns().find(
+        (c) =>
+          !allowedStationIds || allowedStationIds.includes(c.terms.stationId),
+      )?.id ?? "",
   );
 
   const slotsByCampaign = useMemo(
@@ -73,6 +84,11 @@ export function AdAuditor() {
   );
 
   function handleCreate(campaign: AdCampaign) {
+    if (
+      allowedStationIds &&
+      !allowedStationIds.includes(campaign.terms.stationId)
+    )
+      return;
     setCampaigns((prev) => [...prev, campaign]);
     setSelectedId(campaign.id);
   }
@@ -196,7 +212,11 @@ export function AdAuditor() {
           </span>
         </summary>
         <div className="mt-4">
-          <CampaignForm onCreate={handleCreate} nextId={nextId} />
+          <CampaignForm
+            allowedStationIds={allowedStationIds}
+            onCreate={handleCreate}
+            nextId={nextId}
+          />
         </div>
       </details>
 

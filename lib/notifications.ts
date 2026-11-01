@@ -56,6 +56,9 @@ export interface AlertSubscription {
   activatedAt?: string;
 }
 export interface WebhookDestination {
+  /** Write-only input / worker-only decrypted value. Never returned or cached by the server. */
+  secret?: string;
+  secretConfigured?: boolean;
   id: string;
   label: string;
   kind: "json" | "discord" | "telegram";
@@ -260,7 +263,14 @@ export function parseNotificationPreferences(
     typeof email.weeklyDay !== "number"
   )
     return null;
-  const ids = new Set<string>();
+  const ids = new Set<string>([
+    "__proto__",
+    "constructor",
+    "prototype",
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+  ]);
   for (const hook of input.webhooks) {
     if (
       !object(hook) ||

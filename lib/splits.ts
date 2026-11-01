@@ -23,7 +23,13 @@ export interface SplitParty {
   /** Digital sign-off timestamp, null while outstanding. */
   signedAt: string | null;
   /** How the party signs, shown in the approval list. */
-  channel: "OTP" | "Email" | "Pending invite" | "Local approval" | null;
+  channel:
+    | "OTP"
+    | "Email"
+    | "Pending invite"
+    | "Local approval"
+    | "Account signature"
+    | null;
 }
 
 export type SheetStatus = "complete" | "awaiting-signatures" | "disputed";
@@ -94,7 +100,11 @@ export function buildSplitSheet(
       sharePct: party.shares.master,
       memberId: null,
       signedAt: party.signature?.signedAt ?? null,
-      channel: party.signature ? "Local approval" : null,
+      channel: party.signature
+        ? track.ownership!.approvalMethod === "authenticated-account"
+          ? "Account signature"
+          : "Local approval"
+        : null,
     }));
     const totalPct = parties.reduce((sum, party) => sum + party.sharePct, 0);
     return {

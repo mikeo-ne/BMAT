@@ -24,11 +24,13 @@ interface SplitManagerProps {
  * underlying registration is contested.
  */
 export function SplitManager({ sheets, disputes }: SplitManagerProps) {
-  const [selectedIsrc, setSelectedIsrc] = useState(sheets[0]?.isrc ?? "");
+  const [selectedTrackId, setSelectedTrackId] = useState(
+    sheets[0]?.trackId ?? "",
+  );
 
   const sheet = useMemo(
-    () => sheets.find((s) => s.isrc === selectedIsrc) ?? sheets[0],
-    [sheets, selectedIsrc],
+    () => sheets.find((s) => s.trackId === selectedTrackId) ?? sheets[0],
+    [sheets, selectedTrackId],
   );
 
   const executed = sheets.filter((s) => s.status === "complete").length;
@@ -55,13 +57,13 @@ export function SplitManager({ sheets, disputes }: SplitManagerProps) {
         >
           {sheets.map((option) => (
             <button
-              key={option.isrc}
+              key={option.trackId}
               type="button"
               role="tab"
-              aria-selected={option.isrc === sheet?.isrc}
-              onClick={() => setSelectedIsrc(option.isrc)}
+              aria-selected={option.trackId === sheet?.trackId}
+              onClick={() => setSelectedTrackId(option.trackId)}
               className={
-                option.isrc === sheet?.isrc
+                option.trackId === sheet?.trackId
                   ? "btn btn-primary"
                   : "btn btn-ghost"
               }
@@ -123,13 +125,14 @@ export function SplitManager({ sheets, disputes }: SplitManagerProps) {
       <DisputeAlerts
         disputes={disputes}
         heading="CMO dispute queue"
-        intro="Illustrative overlapping registrations and incomplete sheets. Clear claims before payment; this demo does not enforce royalty holds."
+        intro="Data-derived overlapping registrations and incomplete sheets. Resolve conflicting claims with the contributors; review decisions do not transfer money or overwrite their signed allocations."
       />
 
       <p className="pb-2 text-center text-[11px] text-muted">
-        Seeded sheets and disputes are illustrative. Delivered master shares and
-        local acknowledgements are retained, but are not authenticated
-        signatures or legal executions.
+        Delivered account signatures and all three rights pools remain bound to
+        their immutable agreement. Public release metadata has no inferred
+        ownership. Account authentication is not legal identity or rights
+        certification.
       </p>
     </div>
   );

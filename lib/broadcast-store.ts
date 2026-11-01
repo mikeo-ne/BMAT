@@ -49,7 +49,7 @@ export function appendCapturedSpins(
   const operation = mutations.then(async () => {
     if (incoming.some((spin) => !isStoredCapturedSpin(spin)))
       throw new Error("Only validated captured events may be persisted.");
-    await mkdir(directory(), { recursive: true });
+    await mkdir(directory(), { recursive: true, mode: 0o700 });
     const current = await readCapturedSpins();
     const byId = new Map(current.map((row) => [row.id, row]));
     let inserted = 0;
@@ -63,7 +63,11 @@ export function appendCapturedSpins(
     );
     const temporary = `${filename()}.${randomUUID()}.tmp`;
     try {
-      await writeFile(temporary, JSON.stringify(next, null, 2), "utf8");
+      await writeFile(temporary, JSON.stringify(next, null, 2), {
+        encoding: "utf8",
+        mode: 0o600,
+        flag: "wx",
+      });
       await rename(temporary, filename());
     } finally {
       await rm(temporary, { force: true });
@@ -71,5 +75,11 @@ export function appendCapturedSpins(
     return { inserted, duplicates: incoming.length - inserted };
   });
   mutations = operation.catch(() => undefined);
-  return operation;
+  return operation.then(async (result) => {
+    const { reconcileFileOutbox } = await import(
+      "@/lib/file-notification-queue"
+    );
+    await reconcileFileOutbox();
+    return result;
+  });
 }

@@ -1,161 +1,95 @@
 # East Sound
 
-A responsive **East Africa Airplay Analytics Platform**, with a Uganda-focused station directory, sourced Ugandan releases, master delivery, capture-backed reporting, and **Airplay Alerts & Webhooks**.
+An East Africa airplay workspace built with **Next.js 16, React 19, TypeScript and Tailwind CSS 4**, with authenticated Node APIs, scoped persistent storage and an opt-in PostgreSQL capture/outbox backend.
 
-Built with Next.js 16, React 19, TypeScript and Tailwind CSS 4. This is an integration-ready prototype with a default single-process file backend and an opt-in PostgreSQL capture/outbox backend—not a connected national monitoring service, rights registry or certified BMAT/UPRS product.
+## Start locally
 
-## Run locally
-
-```bash
+```sh
 npm ci
+# Optional: cp .env.example .env, then set your browser-visible origin.
 npm run dev -- --hostname 0.0.0.0
 ```
 
-Open `/dashboard/artist`. For a production server, use `npm run build` followed by `npm run start -- --hostname 0.0.0.0`.
+Open `/dashboard/charts` as Public Guest, or `/login` to create an Artist / Label Manager account. Set `EAST_SOUND_APP_ORIGIN` to the browser-visible origin when running behind a proxy. `.data/` contains private local accounts, catalogue, uploads and outbox state; keep it on a private durable volume and out of Git. Use Node 22.
 
-```bash
+**[Fullstack setup, account provisioning, security boundaries and launch checklist →](docs/fullstack-operations.md)**
+
+## Implemented workflows
+
+- **Authoritative authentication/RBAC:** email/password, salted scrypt, opaque HttpOnly sessions, CSRF/origin checks, persistent guessing limits and server-side account/station filtering. localStorage is display-only, not a role selector or bearer-token authority. Development mock Google/Microsoft OAuth is visibly simulated and disabled in production.
+- **Four security roles:** Public Guest sees national charts/statistics; Artist / Label Manager sees owned masters/analytics/preferences; Broadcaster / Station Manager sees only assigned station logs/sources/ad planning; CMO Auditor sees global allocation/audit ledgers and rights reviews. Privileged accounts are created by the operator CLI, never self-selected during sign-up.
+- **Actual MP3/WAV processing:** up to **80 MiB per file**, browser `OfflineAudioContext` decoding, waveform RMS/FFT features in a worker, full-file and feature SHA-256, and persistent unique `UG-ESD-26-XXXXX` format tags. Tags are local allocations, not official registration; features are not a licensed production recognition service or proof of rights.
+- **Independent split sign-off:** immutable source/metadata/three-pool agreements, hashed private invitations, independent account approvals and owner-only master delivery/playback/range/withdrawal. Owners cannot approve a collaborator's allocation. Material edits need fresh approvals.
+- **Monitoring/evidence:** account-persisted authorized native/HLS sources, explicit HTML5 playback, captured-only station logs and ten-second evidence playback with optional bounded SHA-256/CORS verification. Licensed feeds and upstream capture/matching remain external integrations.
+- **Automatic notifications:** account-persisted consent/subscriptions, event-driven outbox enqueue, owned-recording watch scopes, encrypted write-only webhook secrets and server-only signed/provider adapters. Leases, bounded retries, deduplication and revocation checks are implemented. Queued/accepted does not mean delivered/read. Actual sends require explicit live enable, configured providers and a supervised worker.
+- **Persistence and responsive UI:** file or PostgreSQL authority, user-scoped IndexedDB/localStorage snapshots, account-change/logout eviction, blocked-storage fallbacks, four Uganda regions, filtered/re-ranked airplay views, accessible mobile navigation and real deep links.
+- **CMO review:** capture-backed ledgers, EAT dayparts, illustrative allocation/CSV/PDF exports and immutable, idempotent CMO split-review decisions with atomic audit records. Review does not silently rewrite signed contributor shares, impose statutory holds or transfer money.
+
+## Retained data and honest simulations
+
+**Mukisa Collective, Ray Bwete, Capital FM, CBS FM and UPRS** remain in the clearly labeled demonstration studio. Hear a generated ten-second sample, open demo evidence and preview a WhatsApp phone conversation, including:
+
+> 🔥 Airplay Alert! 'Mulongo' just played on Capital FM (Kampala)
+
+These demo actions stay in memory: they do not invent live captures, royalties, provider sends, society membership or endorsements. The embedded sample is generated instrumental audio, not the named artists' music.
+
+The **12 sourced release references** for **BARANGA, MR FALLBACK, SOUNDLYKBB and TAI DAI** are preserved, with source links and unknown identifiers/rights kept unknown. [Artist research and edition matching](docs/artist-research.md). Public artist metadata and published ℗ credits do not establish ownership, licensing or airplay. No public artist recording is downloaded or rehosted. Optional Apple playback requires explicit consent and depends on the provider/account/region.
+
+Public statistics expose only the permitted minimized public scope. Private deliveries are not published to national charts unless the owner explicitly opts in. Missing capture data is labeled missing—not replaced by fabricated observed activity. The Uganda outline uses public-domain Natural Earth geometry; the four regional divisions are schematic rather than official administrative boundaries.
+
+## Accounts and integrations
+
+Artist sign-up is self-service. Use a secure local password source with the trusted provisioning CLI for other roles:
+
+```sh
+<secure-password-source> | npm run account:create -- \
+  --role broadcaster --email manager@your-domain.example \
+  --name 'Station manager' --stations capital-kla,cbs-kla
+
+<secure-password-source> | npm run account:create -- \
+  --role cmo --email auditor@your-domain.example --name 'Rights auditor'
+```
+
+Never put real passwords or provider tokens in command arguments, source, chat, browser storage or exported configs. The CLI also accepts the private process variable `EAST_SOUND_ACCOUNT_PASSWORD`. A login account is not proof of legal identity or mailbox ownership. Real OAuth, mailbox verification, recovery and MFA are not supplied by the mock flow.
+
+- [Authenticated fullstack operations and security model](docs/fullstack-operations.md)
+- [PostgreSQL migrations, capture transactions and workers](docs/postgres-and-worker.md)
+- [Capture API, notification providers, HMAC and evidence contracts](docs/notifications-and-capture.md)
+
+The default Node store is suitable for a single durable web host. The security/outbox store is locked across its local worker/CLI processes; catalogue/capture/ISRC storage is not a distributed multi-writer database. Use the opt-in PostgreSQL backend for multi-process/host production workloads. Do not infer ownership of old public/unowned rows from an artist's display name; plan any legacy backfill explicitly.
+
+## Verification
+
+```sh
 npm run typecheck
 npm run lint
 npm test
-# Disposable local PostgreSQL; no production connection or real provider sends:
 npm run test:postgres
-# With the application running and a Playwright Chromium installed:
+npm run build
+npm run build:static  # run builds serially
 npx playwright install chromium
 npm run test:browser
 ```
 
-The browser suite exercises the UI, mobile overflow, master delivery and cleanup, notification configuration, PDF downloads, source setup and intercepted test-only evidence. It does not send provider messages or write simulated broadcasts into the capture store. Use a separate `EAST_SOUND_DATA_DIR` when testing deployments.
+The authenticated browser suite starts an isolated local server on port **3010** by default, with its own ignored `.data/qa` directory. It tests real audio decoding/delivery, separate collaborator sessions, RBAC, private audio/evidence, persisted preferences, automatic test-capture jobs, cross-tab logout/cache isolation and mobile layouts. Synthetic test captures are confined to that isolated store; no external provider is sent a message. Do **not** point it at production. To use an already-running local QA server, set `EAST_SOUND_TEST_URL`, matching `EAST_SOUND_E2E_DATA_DIR` and `EAST_SOUND_E2E_INGEST_TOKEN`. PostgreSQL tests use a temporary embedded database and mocked transports, not a production database.
 
-## Workspaces
+The separate, non-mutating reference-deployment smoke suite is:
 
-The shell offers **Artist & Label Portal**, **Broadcaster Playout Log**, **CMO & UPRS Regulatory Auditor**, and **Advertiser Spot Tracker**. These are browser-saved **view preferences, not authentication or authorization**.
-
-| Route                           | Capabilities                                                                                                                         |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `/dashboard/artist`             | Overview; five KPIs; Uganda map; master delivery; real release catalogue; artist library                                             |
-| `/dashboard/artists`            | BARANGA, MR FALLBACK, SOUNDLYKBB and TAI DAI profiles, credited releases, citations, consent-based Apple Music player, reference CSV |
-| `/dashboard/playout`            | Captured FM/TV logs; search, match, station, region and period filters; ten-second evidence; logging-sheet CSV                       |
-| `/dashboard/monitoring`         | Authorized, user-configured native/HLS station playback, source management, captured activity and regional filtering                 |
-| `/dashboard/alerts`             | Subscriptions, WhatsApp binding and simulator, email/PDF digests, templates and signed webhook configuration                         |
-| `/dashboard/cmo`                | Captured rights allocations, multi-select filters, daypart policies and compliance-review exports                                    |
-| `/dashboard/splits`             | Supplied master splits and local collaborator acknowledgements                                                                       |
-| `/dashboard/analytics/regional` | Central, Eastern, Western and Northern Uganda filters, schematic map and capture-backed hub totals                                   |
-| `/dashboard/charts`             | Connected-panel rolling seven-day rankings and prior-period comparison; unknown historical peaks stay blank                          |
-| `/dashboard/royalties`          | Indicative captured-play statements; initially pending; settlement actions are explicitly local-only                                 |
-| `/dashboard/advertisers`        | Clearly labelled ad-contract/spot-audit **simulation**, not actual brand buys or detected spots                                      |
-| `/dashboard/mix-parser`         | Integration-required state; no generated real-artist identifications                                                                 |
-
-### Five shared KPIs
-
-- Total audited capture records, with matched and reporting-station counts.
-- Top performing station by matched plays.
-- Peak four-hour airplay window in East Africa Time.
-- Active notification subscriptions: enabled, valid rules with at least one locally configured, opted-in channel. **Not provider connectivity or delivery.**
-- Flagged unmatched audio, determined by catalogue match rather than by presence of an ISRC.
-
-The Uganda country outline is public-domain Natural Earth geometry. The four regional divisions are schematic—not official administrative boundaries. Streaming/search, audience measurement, cross-border monitoring and hit predictions are not inferred from public artist metadata.
-
-## Real releases, not fictional artist activity
-
-The application now starts with **12 sourced public-release references** from the four requested artist profiles. Exact co-leads, featured credits, edition dates, genres and durations are retained. The provenance registry contains 15 Apple Music sources, reviewed on **1 November 2026**; see [artist research](docs/artist-research.md).
-
-- Unknown ISRCs remain empty; reference records have no master file, format, ownership, approved signatures, spins or royalties.
-- The old seven asset-less demo catalogue rows are migrated on read. Matching legacy IDs and local tags identify those rows; genuinely stored masters and unrelated deliveries are retained. The migration is idempotent and never resets corrupt data.
-- Reference links and published ℗ credits are **not licences, endorsement or proof of ownership**. No music is downloaded or rehosted. Apple playback loads only after explicit consent; availability and playback length depend on Apple and the user's account/region.
-- Generic algorithm fixtures live only under `tests/fixtures/`. Production data paths do not generate artist airplay, default rights shares or fabricated society membership.
-
-## Delivery and rights
-
-Stage multiple **WAV/MP3 files up to 80 MiB each** (80 × 1024 × 1024 bytes). The workflow validates extensions/MIME, audio signatures and browser decoding, previews staged audio, and reserves unique local `UG-ESD-YY-XXXXX` tags. These allocations are **local identifiers, not authorized registry assignments**. Supply an existing verified ISRC when applicable.
-
-Master, performance and mechanical ownership pools must each total 100%. Add collaborators, co-writers, producers and publishers; record matching typed-name approvals after the agreement is valid. Changes clear approvals. The server revalidates files, metadata, shares and approvals before storing a master. These are local acknowledgements—not independently authenticated collaborator signatures or proof of rights.
-
-New deliveries start **processing, with zero observed spins**. Uploading a master does not capture a station, generate airplay or earn a royalty. Focusable tooltips and onboarding explain ISRC versus ISWC and performance versus mechanical rights.
-
-## Captures, playback and evidence
-
-The dashboard reads an initially empty captured-event store. A protected `POST /api/playout` accepts validated, explicitly `source: "captured"` integration records; `GET /api/playout` exposes the captured feed. See [integration contracts](docs/notifications-and-capture.md).
-
-Activity views use **the current EAT day and thirteen prior days** and poll every 15 seconds in visible tabs. Invalid/unavailable responses retain the last good snapshot with a stale-data notice. Missing data is never replaced with demo activity.
-
-Station sources are public HTTPS native/HLS URLs entered by an authorized operator and saved in their browser. No default broadcaster stream, false uptime/latency or fabricated "online" status is provided. Opening a source allows browser playback; **playback is not recording, matching or fingerprint recognition**. Provider CORS, transport format and browser support still apply.
-
-A capture can include a ten-second evidence URL and SHA-256. Missing clips disable evidence actions. The player validates the supplied duration and stops at ten seconds. An explicit, CORS-based verification downloads at most 16 MiB within 15 seconds, compares SHA-256, and plays the verified downloaded bytes when successful. A matching hash proves byte integrity only—not provenance, recognition, ownership or broadcaster attribution. Real captures never receive synthesized fallback audio.
-
-## CMO review and illustrative allocations
-
-Captured, deduplicated plays enter the allocation ledger only with a supplied valid ISRC and complete locally approved ownership. Local `ES-...` holder IDs are not verified UPRS membership. Integer remainder allocation conserves the modelled UGX pool.
-
-The default time policy is **prime 1.5× / standard 1× / night 0.8×**:
-
-- Prime: 06–10 and 16–20 EAT.
-- Standard: 10–16 and 20–22 EAT.
-- Night: 22–06 EAT.
-
-These are configurable illustrative windows/weights, not verified programme schedules or published UPRS tariffs. The monthly allocation view includes the current and five previous EAT calendar months, using actual capture timestamps rather than a synthetic monthly daypart mix. Incomplete rights/identifiers remain unallocated.
-
-Logging-sheet CSV exports include EAT times, identifiers, supplied metadata, confidence, evidence status, daypart and illustrative amounts. Unknown ISWCs, composition and programme fields remain blank for review. Exports are formula-safe, **not official UPRS filing templates, certified audit reports, payment instructions or amounts owed**. Royalty approval/"paid" marks are page-memory simulations; no bank transfer or persisted settlement is performed.
-
-## Airplay Alerts & Webhooks
-
-The dedicated notification center and global configuration modal support:
-
-- Validated international WhatsApp recipients, including **+256 plus nine subscriber digits**, explicit opt-in and customizable message templates.
-- First captured FM play, exact lifetime FM milestones (100/1,000 by default), and morning/drive-time drops on **Capital FM, CBS FM and Galaxy FM**.
-- Per-recording, station and regional scopes; create/edit/pause/resume/delete subscriptions; local persistence and cross-tab synchronization.
-- A **Test WhatsApp Notification** phone preview, clearly labelled simulated and excluded from metrics, captures and live dispatch.
-- Completed-EAT-day morning recaps and completed-seven-day regional trends, with genuine selectable-text **PDF exports** and configurable email scheduling.
-- Label webhook destinations for JSON backends, Discord and Telegram **relays**, payload previews and consented private worker-configuration downloads.
-- Server-only Meta WhatsApp template messages, Resend email/PDF attachments and signed webhook adapters, protected by explicit environment configuration and a private worker token.
-
-Saving preferences does **not** send messages, register a phone with Meta, connect a provider, or provision a scheduler. Subscriptions start at activation; pre-activation captures inform counters without retrospective sends. Editing/resuming starts a new activation window. Provider acceptance is not handset/email delivery or a read receipt.
-
-Read [notification/capture setup, environment variables, API examples, signing and retry semantics](docs/notifications-and-capture.md) before enabling any outbound integration.
-
-## Vercel deployment and release verification
-
-The repository includes a Next.js `vercel.json` and pins Node 22. Link `mikeo-ne/BMAT` to your Vercel project with `main` as the production branch. GitHub Pages remains a separate `/BMAT` static showcase.
-
-**Vercel has no durable local filesystem.** Without explicitly configured PostgreSQL, the Vercel app serves the 12 public references directly in read-only mode—no `.data` writes, fake captures or `/tmp` upload success. The dashboard displays this boundary, disables capture polling and master delivery/tag allocation, and keeps browser-local channel settings, simulations, source previews and PDF exports available. `GET /api/health` reports the deployed commit, storage mode and actual supported capabilities without secrets. Selecting PostgreSQL with bad/missing configuration fails closed instead of reverting to references.
-
-Even with PostgreSQL, Vercel master catalogue mutations stay disabled: the 80 MiB master workflow needs authenticated direct-to-object-storage uploads (Vercel function request-body limits apply), not ephemeral function disk. The existing 80 MiB workflow remains available on a properly authenticated Node host with durable storage. Do not enable live messages or import/migrate a production database merely to pass a deployment check.
-
-After a deployment, run the **Verify Vercel deployment** GitHub Actions workflow with its approved HTTPS origin and exact commit SHA, or locally with an installed Chromium:
-
-```bash
-EAST_SOUND_TEST_URL=https://<your-deployment>.vercel.app \
-EAST_SOUND_EXPECT_COMMIT=<deployed-40-character-sha> npm run test:deployment
+```sh
+EAST_SOUND_TEST_URL=https://your-approved-project.vercel.app \
+EAST_SOUND_EXPECT_COMMIT=<expected-full-git-sha> npm run test:deployment
 ```
 
-This read-only-cloud smoke suite checks health/commit identity, eleven dashboard routes, the honest catalogue/empty capture feed, rejected mutations, browser notification controls/simulator/PDF downloads and mobile delivery safeguards. It does not create a master, reserve a tag, inject a capture or send a real notification. It does not bypass deployment protection; a protected site needs authorized access before anonymous verification can pass.
+It checks public charts/statistics, capability/commit identity, unauthorized API rejection and private-page sign-in gates. It does not provision an identity, inject a capture, reserve a tag or contact a notification provider.
 
-## Persistence, deployment and boundaries
+Current local verification results and remaining security/launch boundaries are recorded in [the fullstack verification report](docs/fullstack-verification.md).
 
-By default the live Node server uses `EAST_SOUND_DATA_DIR` (default `.data/`, ignored by Git) for:
+## Deployment boundaries
 
-- `tracks.json`, `uploads/` and `isrc-reservations.json`.
-- `broadcasts.json`—captured records only, immutable by provider event ID.
-- `notification-attempts.json`—bounded delivery metadata without recipient addresses, message bodies, destination URLs or secrets.
+A **persistent Node host** supports the full 80 MiB delivery workflow: configure a private durable master volume, origin/TLS, datastore and keys; explicitly migrate/seed PostgreSQL if selected; then build/start the app and supervise the worker. See the launch checklist before enabling real sends.
 
-JSON mutations are atomic and serialised **within one Node process**. Corrupt files are not reset. Serverless/ephemeral filesystems and multiple replicas do not provide safe shared file persistence.
+**Vercel without PostgreSQL** remains a read-only reference deployment. **Vercel with PostgreSQL** can serve authenticated accounts/captures, but master uploads, reservations and deletions remain disabled until a reviewed direct-to-object-storage adapter accounts for function request-size/ephemeral-disk limits. No `/tmp` success is claimed. `/api/health` reports actual storage/capabilities without secrets. Selecting a broken PostgreSQL connection fails closed rather than falling back to JSON/references.
 
-### Optional PostgreSQL and polling worker
+`npm run build:static` creates `.static-build/out/` with `/BMAT` by default. It excludes APIs, private pages, environment files and runtime data. Only public charts/statistics and an unavailable sign-in view are exported. Static hosting cannot authenticate, deliver masters, ingest captures, store private settings or dispatch notifications.
 
-Set `EAST_SOUND_STORAGE_BACKEND=postgres`, a verified-TLS `DATABASE_URL` and a non-nil `EAST_SOUND_TENANT_ID`, then explicitly run:
-
-```bash
-npm run db:migrate
-npm run db:seed
-# Only after real provider configuration, consented rules and explicit live enable:
-npm run worker:notifications
-```
-
-The dedicated SQL migration/repositories persist catalogue, tenant-scoped captures, local ISRC reservations and a transactional notification outbox. Monthly partitions, global provider-event deduplication, atomic FM counters and complete partition-key foreign keys avoid the sample's first-spin count race. Workers use `FOR UPDATE SKIP LOCKED`, renewable/fenced leases, bounded backoff/dead letters and the existing approved-template/Resend/signed-webhook adapters. Daily/weekly HTTP digests retain their scheduler contract with shared PostgreSQL attempt leases. No mock send is recorded as success.
-
-Browser settings must be privately registered through authenticated `/api/notifications/rules`; PostgreSQL instant HTTP dispatch consumes committed jobs rather than rescan-and-send. This is opt-in: no database is provisioned, private JSON imported, capture fabricated or real message sent automatically. Existing genuine files require a reviewed import before switching. Static export remains public-reference-only.
-
-Read **[PostgreSQL setup, migration, rules, worker, retention and security boundaries](docs/postgres-and-worker.md)** before enabling it. `prisma/schema.prisma` remains an unwired historical draft, not this active SQL schema. Master bytes still require durable filesystem/object storage. Database tenant columns and worker tokens are **not end-user authentication or RLS**. Add actual access controls, authenticated approvals, licensed capture, provider callbacks, monitoring and tested backup/retention before production.
-
-`npm run build:static` creates `.static-build/out/` with the `/BMAT` base path by default. It excludes environment files, API routes and private runtime data; disables capture polling/provider readiness; and seeds only public reference metadata. Set `BASE_PATH` if needed. Static hosting cannot ingest captures, reserve server tags, store masters or dispatch messages; browser-local configuration, reference browsing and PDF export remain available.
-
-**Do not expose this prototype's catalogue/upload mutation APIs publicly without gateway authentication and tenant/access controls.** Role-view switching is not security. Before a public launch, add operational monitoring, retention policies, encrypted secret/config storage, backup/recovery and provider delivery callbacks. No real broadcaster capture, authenticated artist signature, provider account, official tariff, BMAT certification or UPRS endorsement is implied by this checkout.
+No production migration, provider send, official ISRC registration, licensed capture/recognition connection, legal rights certification, BMAT certification, society affiliation or deployment is implied by a successful build. Real launch additionally needs identity hardening, licensed upstream data, provider callbacks, observability, tested backup/retention/purge procedures, abuse controls and operational/legal review. Payment/paid markers and the existing ad-campaign planning model remain explicitly illustrative, not real settlement or ad recognition.

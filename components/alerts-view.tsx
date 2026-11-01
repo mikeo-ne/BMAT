@@ -1,4 +1,6 @@
 "use client";
+import { DemoStudio } from "@/components/demo-studio";
+import { AccountOutboxPanel } from "@/components/account-outbox-panel";
 
 import { useState } from "react";
 import {
@@ -119,13 +121,13 @@ export function AlertsView({
     ? JSON.stringify(notificationWebhookPayload(sample), null, 2)
     : null;
   const liveReady = providers.liveEnabled && providers.worker;
-  function persist(next: NotificationPreferences, message: string) {
+  async function persist(next: NotificationPreferences, message: string) {
     try {
-      const result = save(next);
+      const result = await save(next);
       setNotice(
         result.persisted
           ? message
-          : "Changes are available in this session only; browser storage is unavailable.",
+          : "The server save was not confirmed. Refresh and retry.",
       );
       return true;
     } catch (error) {
@@ -210,7 +212,7 @@ export function AlertsView({
         <span className="text-[10px] text-muted">
           {liveReady
             ? "Authenticated worker configured · provider acceptance is not a delivery receipt"
-            : "Local configuration mode · live delivery is not connected"}
+            : "Account settings · live delivery is not connected"}
         </span>
       </div>
       {(invalid || sessionOnly || feed.unavailable) && (
@@ -247,7 +249,7 @@ export function AlertsView({
               id: "email",
               title: "Email summaries",
               detail: config.email.address
-                ? "Recipient saved locally"
+                ? "Recipient saved to your account"
                 : "Daily recaps & weekly trends",
               icon: Mail,
             },
@@ -442,7 +444,7 @@ export function AlertsView({
                               {!sub.enabled
                                 ? "Paused"
                                 : ready
-                                  ? "Active · locally ready"
+                                  ? "Active · account configured"
                                   : "Setup needed"}
                             </span>
                           </div>
@@ -495,7 +497,7 @@ export function AlertsView({
                                 className={`flex items-center gap-1 text-[10px] ${channelReady(config, channel) ? "text-brand" : "text-muted"}`}
                                 title={
                                   channelReady(config, channel)
-                                    ? "Recipient/endpoint configured locally"
+                                    ? "Recipient/endpoint saved to your account"
                                     : "Configure this channel before dispatch"
                                 }
                               >
@@ -730,8 +732,8 @@ export function AlertsView({
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-[10px] text-muted">
         <span className="flex items-center gap-1.5">
           <ShieldCheck size={12} />
-          Recipients and subscriptions are saved in this browser, not an
-          authenticated cloud account.
+          Recipients and subscriptions are saved to your private account.
+          Browser caches never grant authorization.
         </span>
         <span>
           {canPoll
@@ -746,12 +748,14 @@ export function AlertsView({
           onSaved={setNotice}
         />
       )}
+      <AccountOutboxPanel />
+      <DemoStudio phoneOnly />
       {editing && (
         <NotificationSubscriptionDialog
           initial={editing}
           catalogue={catalogue}
           onClose={() => setEditing(null)}
-          onSave={(subscription) => {
+          onSave={async (subscription) => {
             subscription = {
               ...subscription,
               activatedAt: new Date().toISOString(),
@@ -761,7 +765,7 @@ export function AlertsView({
               (sub) => sub.id === subscription.id,
             );
             if (
-              persist(
+              await persist(
                 {
                   ...current,
                   subscriptions: existing
@@ -770,7 +774,7 @@ export function AlertsView({
                       )
                     : [...current.subscriptions, subscription],
                 },
-                "Subscription saved. Only valid, opted-in channels count as locally active.",
+                "Subscription saved. Only valid, opted-in channels count as active for your account.",
               )
             )
               setEditing(null);
@@ -784,7 +788,7 @@ export function AlertsView({
         >
           <p className="text-xs leading-relaxed text-muted">
             Remove <strong className="text-foreground">{removing.name}</strong>{" "}
-            from this browser? This does not delete any music, capture evidence
+            from your account? This does not delete any music, capture evidence
             or server delivery history.
           </p>
           <div className="mt-5 flex flex-wrap justify-end gap-2">
@@ -798,10 +802,10 @@ export function AlertsView({
             <button
               type="button"
               className="btn btn-primary !text-xs"
-              onClick={() => {
+              onClick={async () => {
                 const current = readNotificationPreferences();
                 if (
-                  persist(
+                  await persist(
                     {
                       ...current,
                       subscriptions: current.subscriptions.filter(

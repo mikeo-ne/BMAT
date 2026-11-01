@@ -79,7 +79,7 @@ describe("safe Vercel deployment without durable storage", () => {
     ).rejects.toThrow(/disabled/);
     expect(await readdir(directory)).toEqual([]);
   });
-  it("blocks master POST before multipart buffering and blocks PUT/DELETE with an actionable 503", async () => {
+  it("blocks master POST before multipart buffering and blocks PUT/DELETE before persistence is available", async () => {
     const api = await import("@/app/api/tracks/route"),
       item = await import("@/app/api/tracks/[id]/route");
     const body = new Request("https://app.example.com/api/tracks", {
@@ -88,16 +88,16 @@ describe("safe Vercel deployment without durable storage", () => {
     });
     const parse = vi.spyOn(body, "formData");
     const response = await api.POST(body);
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(401);
     expect(parse).not.toHaveBeenCalled();
-    expect((await response.json()).error).toContain("durable storage");
+    expect((await response.json()).error).toContain("Sign in");
     expect(
       (
         await api.PUT(
           new Request("https://app.example.com/api/tracks", { method: "PUT" }),
         )
       ).status,
-    ).toBe(503);
+    ).toBe(401);
     expect(
       (
         await item.DELETE(
@@ -107,7 +107,7 @@ describe("safe Vercel deployment without durable storage", () => {
           { params: Promise.resolve({ id: "ref_baranga-salo" }) },
         )
       ).status,
-    ).toBe(503);
+    ).toBe(401);
     expect(await readdir(directory)).toEqual([]);
   });
   it("blocks authorized ingestion and dispatch before parsing payloads when persistence is unavailable", async () => {

@@ -2,7 +2,7 @@ import { capturePollingAvailable } from "@/lib/runtime-storage";
 import type { Metadata } from "next";
 
 import { RegionalAnalytics } from "@/components/regional-analytics";
-import { readWorkspaceData } from "@/lib/workspace-data";
+import { readPageWorkspace } from "@/lib/workspace-data";
 
 export const metadata: Metadata = {
   title: "Airplay Geography & Hit Velocity",
@@ -13,7 +13,10 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RegionalAnalyticsPage() {
-  const data = await readWorkspaceData();
+  const data = await readPageWorkspace(
+    ["artist"],
+    "/dashboard/analytics/regional",
+  );
   return (
     <RegionalAnalytics
       catalogue={data.catalogue}

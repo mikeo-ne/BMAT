@@ -1,4 +1,10 @@
 "use client";
+import { DemoStudio } from "@/components/demo-studio";
+import { useAuth } from "@/components/auth-provider";
+import { authFetch, PRIVATE_EVICT } from "@/lib/auth-client";
+import { sessionScope } from "@/lib/auth-types";
+import { browserSession } from "@/lib/auth-client";
+import { cacheSnapshot } from "@/lib/browser-cache";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   ExternalLink,
@@ -31,6 +37,7 @@ interface StreamSource {
 }
 const KEY = "east-sound:streams:v1";
 const CHANGED = "east-sound:streams-changed";
+const sourceMemory = new Map<string, string>();
 const DIRECTORY = [
   ...FM_STATIONS.map((station) => ({ ...station, medium: "FM" as const })),
   {
@@ -44,14 +51,22 @@ const DIRECTORY = [
 const subscribe = (callback: () => void) => {
   window.addEventListener("storage", callback);
   window.addEventListener(CHANGED, callback);
+  const evict = (event: Event) => {
+    for (const key of sourceMemory.keys())
+      if (key.endsWith(":" + (event as CustomEvent<string>).detail))
+        sourceMemory.delete(key);
+    callback();
+  };
+  window.addEventListener(PRIVATE_EVICT, evict);
   return () => {
     window.removeEventListener("storage", callback);
     window.removeEventListener(CHANGED, callback);
+    window.removeEventListener(PRIVATE_EVICT, evict);
   };
 };
-const getStored = () => {
+const getStored = (key: string) => {
   try {
-    return localStorage.getItem(KEY);
+    return sourceMemory.get(key) ?? localStorage.getItem(key);
   } catch {
     return null;
   }
@@ -191,14 +206,50 @@ export function LiveBroadcastMonitor({
   initialEvents,
   now,
   canPoll,
+  allowedStationIds,
 }: {
   catalogue: Track[];
   initialEvents: BroadcastSpin[];
   now: string;
   canPoll: boolean;
+  allowedStationIds?: string[];
 }) {
-  const raw = useSyncExternalStore(subscribe, getStored, () => null);
-  const sources = parseSources(raw);
+  const directory = allowedStationIds
+    ? DIRECTORY.filter((s) => allowedStationIds.includes(s.id))
+    : DIRECTORY;
+  const { session } = useAuth();
+  const scope = sessionScope(session.user);
+  const storageKey = KEY + ":" + (session.user?.id ?? "guest");
+  const raw = useSyncExternalStore(
+    subscribe,
+    () => getStored(storageKey),
+    () => null,
+  );
+  const sources = parseSources(raw).filter(
+    (source) =>
+      !allowedStationIds || allowedStationIds.includes(source.stationId),
+  );
+  useEffect(() => {
+    if (!session.user) return;
+    let closed = false;
+    void authFetch("/api/station-sources")
+      .then(async (response) => {
+        if (!response.ok) return;
+        const body = await response.json();
+        if (!closed && sessionScope(browserSession().user) === scope) {
+          sourceMemory.set(storageKey, JSON.stringify(body.sources));
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(body.sources));
+          } catch {}
+          window.dispatchEvent(new Event(CHANGED));
+          void cacheSnapshot(session.user!.id, "stations", body.sources, scope);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      closed = true;
+    };
+  }, [storageKey, session.user, scope]);
   const feed = useCapturedFeed(initialEvents, now, canPoll);
   const events = currentCapturedWindow(feed.events, new Date(feed.now));
   const [region, setRegion] = useState<Region | "All">("All");
@@ -214,7 +265,7 @@ export function LiveBroadcastMonitor({
       (region === "All" || event.region === region) &&
       (medium === "All" || event.medium === medium),
   );
-  const stations = DIRECTORY.filter(
+  const stations = directory.filter(
     (station) =>
       (region === "All" || station.region === region) &&
       (medium === "All" || station.medium === medium) &&
@@ -222,13 +273,34 @@ export function LiveBroadcastMonitor({
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
-  function saveSources(next: StreamSource[]) {
+  async function saveSources(next: StreamSource[]) {
     try {
-      localStorage.setItem(KEY, JSON.stringify(next));
+      const response = await authFetch("/api/station-sources", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sources: next }),
+      });
+      const body = await response.json();
+      if (!response.ok)
+        throw new Error(body.error ?? "Station sources could not be saved.");
+      if (sessionScope(browserSession().user) !== scope)
+        throw new Error(
+          "Your account changed while saving. Refresh the workspace.",
+        );
+      sourceMemory.set(storageKey, JSON.stringify(body.sources));
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(body.sources));
+      } catch {}
+      if (session.user)
+        void cacheSnapshot(session.user.id, "stations", body.sources, scope);
       window.dispatchEvent(new Event(CHANGED));
       return true;
-    } catch {
-      setError("Browser storage is unavailable. The source was not saved.");
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "The station source could not be saved.",
+      );
       return false;
     }
   }
@@ -242,9 +314,10 @@ export function LiveBroadcastMonitor({
           <button
             type="button"
             className="btn btn-primary !text-xs"
+            disabled={!directory.length}
             onClick={() => {
               setEditing({
-                stationId: DIRECTORY[0].id,
+                stationId: directory[0]?.id ?? "",
                 url: "",
                 format: "native",
               });
@@ -266,7 +339,7 @@ export function LiveBroadcastMonitor({
         <p className="flex items-center gap-2 text-[11px] text-brand">
           <Signal size={15} />
           {sources.length} configured source{sources.length === 1 ? "" : "s"} in
-          this browser · {events.length} captured records in the current window
+          your account · {events.length} captured records in the current window
         </p>
         <span className="text-[10px] text-muted">
           {feed.unavailable
@@ -409,9 +482,9 @@ export function LiveBroadcastMonitor({
                         type="button"
                         className="icon-btn !h-8 !w-8"
                         aria-label={`Remove ${station.name} source`}
-                        onClick={() => {
+                        onClick={async () => {
                           if (
-                            saveSources(
+                            await saveSources(
                               sources.filter(
                                 (entry) => entry.stationId !== station.id,
                               ),
@@ -420,7 +493,7 @@ export function LiveBroadcastMonitor({
                             if (active?.stationId === station.id)
                               setActive(null);
                             setNotice(
-                              `${station.name} source removed from this browser.`,
+                              `${station.name} source removed from your account.`,
                             );
                           }
                         }}
@@ -461,6 +534,7 @@ export function LiveBroadcastMonitor({
           integration is absent.
         </p>
       </section>
+      <DemoStudio stationIds={allowedStationIds} />
       {editing && (
         <Dialog
           title="Connect authorised station source"
@@ -468,7 +542,7 @@ export function LiveBroadcastMonitor({
         >
           <form
             className="space-y-4"
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
               if (!publicHttpsUrl(editing.url)) {
                 setError(
@@ -483,7 +557,7 @@ export function LiveBroadcastMonitor({
                 return;
               }
               if (
-                saveSources([
+                await saveSources([
                   ...sources.filter(
                     (source) => source.stationId !== editing.stationId,
                   ),
@@ -491,7 +565,7 @@ export function LiveBroadcastMonitor({
                 ])
               ) {
                 setNotice(
-                  "Station source saved locally. Use Open feed to connect to the external provider.",
+                  "Station source saved to your private account. Use Open feed to connect to the external provider.",
                 );
                 setEditing(null);
               }
@@ -511,7 +585,7 @@ export function LiveBroadcastMonitor({
                   setEditing({ ...editing, stationId: event.target.value })
                 }
               >
-                {DIRECTORY.map((station) => (
+                {directory.map((station) => (
                   <option key={station.id} value={station.id}>
                     {station.name} · {station.medium}
                   </option>

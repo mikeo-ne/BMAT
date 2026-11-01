@@ -33,7 +33,8 @@ export interface LeasedNotification {
 const eligible = `EXISTS (SELECT 1 FROM east_sound.notification_rules r JOIN east_sound.tracks t ON t.tenant_id=r.tenant_id AND t.id=o.track_id
   JOIN east_sound.subscriber_track_access a ON a.tenant_id=r.tenant_id AND a.user_id=r.user_id AND a.track_id=o.track_id
   WHERE r.tenant_id=o.tenant_id AND r.id=o.rule_id AND r.generation=o.rule_generation AND r.is_active AND r.consented_at IS NOT NULL
-    AND r.channel=o.channel AND r.destination=o.destination AND t.deleted_at IS NULL)`;
+    AND r.channel=o.channel AND r.destination=o.destination AND t.deleted_at IS NULL
+    AND NOT EXISTS(SELECT 1 FROM east_sound.auth_users u WHERE u.id=r.user_id AND u.tenant_id=r.tenant_id AND (u.disabled OR u.mock OR u.role<>'artist' OR t.metadata->>'ownerId' IS DISTINCT FROM u.id::text)))`;
 
 /** Each statement commits before any network I/O. No pooled client is held during provider calls. */
 export async function claimPostgresNotifications(
@@ -227,6 +228,28 @@ export async function sendPostgresNotification(
       enabled: true,
       kind: row.payload.webhookKind as WebhookDestination["kind"],
     };
+    const principal = await postgresPool().query(
+      "SELECT user_id FROM east_sound.notification_rules WHERE tenant_id=$1 AND id=$2",
+      [row.tenant_id, row.rule_id],
+    );
+    if (principal.rows[0]) {
+      const { deliveryPreferences } = await import(
+        "@/lib/account-notifications"
+      );
+      const preferences = await deliveryPreferences(principal.rows[0].user_id);
+      if (preferences) {
+        const configured = preferences.webhooks.find(
+          (h) => h.enabled && h.url === row.destination,
+        );
+        if (!configured)
+          return {
+            accepted: false,
+            retryable: false,
+            code: "destination_withdrawn",
+          };
+        webhook = { ...webhook, secret: configured.secret };
+      }
+    }
     config.webhooks = [webhook];
   }
   return sendAlert(event, config, webhook);

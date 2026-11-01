@@ -13,7 +13,7 @@ Set these **server-side** variables in your secret manager or ignored `.env` fil
 | `EAST_SOUND_STORAGE_BACKEND=postgres` | Required explicit selection. Unset/`file` preserves the existing JSON backend.                                                                                         |
 | `DATABASE_URL`                        | PostgreSQL URL. Non-loopback hosts **must** specify `sslmode=verify-full`; configure a trusted CA as required by your provider. No disabling certificate verification. |
 | `EAST_SOUND_TENANT_ID`                | Non-nil UUID for this deployment's workspace.                                                                                                                          |
-| `EAST_SOUND_NOTIFICATION_USER_ID`     | Non-nil external principal UUID used by the private rule-registration API. An operator must bind this to a verified identity before serving end users.                 |
+| `EAST_SOUND_NOTIFICATION_USER_ID`     | Non-nil external principal UUID for separately managed administrative rule-registration only; not an end-user role or account ID.                                      |
 | `EAST_SOUND_INGEST_TOKEN`             | Independent random Bearer secret of at least 32 characters for capture ingestion.                                                                                      |
 | `EAST_SOUND_NOTIFICATION_TOKEN`       | Independent random Bearer secret of at least 32 characters for private rule registration/status/HTTP dispatch.                                                         |
 | `EAST_SOUND_LIVE_NOTIFICATIONS`       | Leave unset/`false` until consent, real providers and destinations are configured. Must be exactly `true` to send.                                                     |
@@ -32,7 +32,7 @@ npm run db:migrate
 npm run db:seed
 ```
 
-- `db/migrations/001_capture_outbox.sql` creates the dedicated `east_sound` schema. The old `prisma/schema.prisma` is an **unwired historical draft**, not the active schema; do not `prisma db push` it over this integration.
+- `db/migrations/001_capture_outbox.sql` creates the dedicated `east_sound` schema; **002** adds accounts, hashed sessions, owner documents, security audit and the unique delivery-contract constraint. Apply both before serving the authenticated app. The old `prisma/schema.prisma` is an **unwired historical draft**, not the active schema; do not `prisma db push` it over this integration.
 - Migrations are explicit, advisory-locked, transactional and SHA-256 recorded in `public.east_sound_schema_migrations`. Requests never run migrations. A modified/unknown applied migration fails closed; add a new migration instead. The initial migration deliberately refuses to overwrite an unrelated existing `east_sound` schema.
 - Native `gen_random_uuid()` avoids unnecessary `uuid-ossp`/`btree_gist` extension permissions. The requested enums and UUID relationships are retained; external string keys preserve the app's existing `ref_...` / `trk_...` / station identifiers.
 - Seeding creates the configured workspace, the known FM/TV **disconnected directory**, and the 12 sourced public-release references. It inserts no captures, masters, ownership, notifications or invented ISRCs. Repeating the seed does not overwrite existing records. Unknown ISRCs and stream URLs remain `NULL`.
@@ -43,7 +43,13 @@ Use a migration owner for DDL; provision restricted runtime roles according to y
 
 ## 3. Register opted-in rules privately
 
-The existing notification UI remains browser-local. Export its private worker configuration only after confirming consent. Then a **trusted administrative integration**, not the browser, registers it:
+### Authenticated account watches (default application flow)
+
+The notification UI saves to session/CSRF-protected `/api/preferences`. Saving atomically updates the account document and its owner-bound SQL rules; new captures then queue jobs without a browser export or operator token. Endpoint secrets are encrypted in account documents and decrypted only by the worker. `/api/notifications/outbox` returns that signed-in artist's redacted job status. Provision real accounts and apply migrations **001 and 002** as described in [fullstack operations](fullstack-operations.md).
+
+### Separately privileged integration watches
+
+The older **trusted administrative integration** remains available for explicitly managed watches. It is not called by the account settings UI:
 
 ```http
 POST /api/notifications/rules
@@ -55,7 +61,7 @@ Content-Type: application/json
 
 The raw exported configuration object is also accepted. The server always uses its configured tenant/principal UUIDs; body-supplied `tenant_id`/`user_id` values cannot change that scope. The endpoint validates catalogue/station scope, channel consent and configuration shape. It expands subscriptions to at most 1,000 channel/trigger/destination rules and creates explicit per-recording watch entitlements. `track_id IS NULL` means **this principal's entitled workspace tracks**, never every artist in the database. “All” snapshots currently known catalogue tracks; resync after new recordings are added.
 
-Registration is transactional and sends nothing. Semantically unchanged exported settings preserve the activation/generation. A changed configuration (including an edit/resume activation marker) replaces that principal's managed watch rules, uses a new **server-clock activation window**, and invalidates old queued generations. Browser timestamps cannot backdate activation. Reapply an export after browser edits; saving browser settings alone does not activate/revoke the server configuration.
+Registration is transactional and sends nothing. Semantically unchanged exported settings preserve the activation/generation. A changed configuration (including an edit/resume activation marker) replaces that principal's managed watch rules, uses a new **server-clock activation window**, and invalidates old queued generations. Browser timestamps cannot backdate activation. Reapply this administrative configuration after its own edits. Authenticated account settings have separate principals and are synchronized immediately by `/api/preferences`; do not register overlapping administrative copies of those watches.
 
 The UI-managed API supports first-spin, milestone and prime-time rules. The database also supports operator-managed `custom_threshold` (an exact positive integer FM count, not arbitrary executable code) and optional every-N `milestone_step`. Keep custom SQL-managed rules under a separate principal/configuration lifecycle: syncing a principal replaces its managed rules. Manage and audit consent and watch entitlements explicitly; do not blindly turn on every database rule.
 
@@ -68,7 +74,7 @@ Authorization: Bearer <EAST_SOUND_NOTIFICATION_TOKEN>
 
 Returns aggregate outbox status counts only, not contacts, payloads or credentials. `sent` means **provider-accepted**, not delivery/read confirmation. Invalid/unconfigured auth fails closed; validation and storage failures do not reset rules.
 
-**Security boundary:** the current Bearer API is an administrative integration for a configured workspace/principal. It is not end-user login, row-level security, artist ownership verification, a consent-verification service or a full multi-tenant SaaS authorization system. The public catalogue/upload/capture-read APIs and role selector still need real gateway/session authorization before exposure. Tenant columns/composite foreign keys and watch checks prevent accidental cross-workspace joins; they do not protect against a database owner or a stolen operator token.
+**Security boundary:** the current Bearer API is an administrative integration for a configured workspace/principal. It is not end-user login, row-level security, artist ownership verification, a consent-verification service or a full multi-tenant SaaS authorization system. The app now has independent email/password sessions, CSRF and authoritative server-side RBAC/owner/station isolation; the static role selector has been removed. These account sessions do not grant integration-token authority, and a browser cannot self-select a tenant or privileged role. Tenant columns/composite foreign keys and watch checks prevent accidental cross-workspace joins; they do not protect against a database owner or a stolen operator token.
 
 ## 4. Ingest real captures; queue in the same transaction
 
@@ -137,11 +143,11 @@ The file backend retains its existing instant/digest scheduler behavior. Do not 
   ```
 
 - The log primary key is `(tenant_id, played_at, id)`, and outbox/dedup foreign keys include the **complete partition key**. A global tenant/provider registry prevents cross-month duplicate IDs. There is no automatic partition dropping or destructive purge. Those foreign keys deliberately prevent accidental loss of referenced evidence/jobs; design and test an archive/retention procedure with DBA/legal review before dropping partitions. Keep dedup keys/counters consistent with retained history.
-- **PostgreSQL rules/outbox contain private destinations and rendered-message inputs.** This differs from the file attempt ledger, which contains metadata only. Restrict database/backup access, use encrypted transport/storage/backups, define purpose/retention policies, and never commit a production dump or browser export. Provider tokens/HMAC secrets stay in runtime configuration, not these tables. Status/log responses exclude contacts.
+- **PostgreSQL rules/outbox contain private destinations and rendered-message inputs.** This differs from the file attempt ledger, which contains metadata only. Restrict database/backup access, use encrypted transport/storage/backups, define purpose/retention policies, and never commit a production dump or browser export. Provider tokens stay in runtime configuration. Per-account HMAC secrets are encrypted in owner documents, never plaintext outbox rows; protect and back up the separately managed `EAST_SOUND_SECRET_KEY`. Legacy integration HMAC secrets remain in runtime configuration. Status/log responses exclude contacts.
 - PostgreSQL persists catalogue, captures, reservations, instantaneous outbox jobs and digest attempt metadata. Master bytes are still on the configured filesystem. Multiple web replicas/serverless hosting need shared durable upload/object storage and proper authenticated download access; a database alone does not provide that.
 - Reporting currently materializes workspace capture history in application memory. Partitioned writes, indexed counters and queue claims do **not** make every dashboard query million-row optimized. Add time-window SQL aggregation/pagination and load tests before high-volume deployment.
-- No capture daemon, fingerprint matcher, station licensing, real identity service, verified collaborator signature, official ISRC/CMO registration, tariff certification, scheduler service or delivery callback endpoint is provisioned here.
-- On Vercel without PostgreSQL, runtime reads serve public references directly and perform no local filesystem writes. Configured PostgreSQL enables durable capture/outbox paths, but Vercel master catalogue mutations remain disabled pending authenticated direct-to-object-storage support; an ephemeral directory is never treated as durable storage. See the README release-verification section.
+- No capture daemon, licensed fingerprint matcher, station licence, verified legal identity/mailbox, official ISRC/CMO registration, tariff certification, external scheduler service or delivery callback endpoint is provisioned here. The app implements password accounts and independent immutable account-bound approvals; those are not legal identity, regulated e-signature or rights certification.
+- On Vercel without PostgreSQL, runtime reads serve public references directly and perform no local filesystem writes. Configured PostgreSQL enables durable capture/outbox paths, but Vercel master catalogue mutations remain disabled pending authenticated direct-to-object-storage support; an ephemeral directory is never treated as durable storage. See the README deployment and verification sections.
 - Static export forces the file/public-reference path and strips APIs/private data/worker entrypoints. It cannot connect a database or deliver notifications.
 
 ## 8. Verification

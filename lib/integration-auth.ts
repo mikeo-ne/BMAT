@@ -65,7 +65,7 @@ export async function readBoundedJson(
       if (done) break;
       size += value.byteLength;
       if (size > limit) {
-        await reader.cancel();
+        await reader.cancel().catch(() => undefined);
         throw new RequestBodyError("Request body too large.", 413);
       }
       chunks.push(value);
@@ -75,6 +75,69 @@ export async function readBoundedJson(
     if (error instanceof RequestBodyError) throw error;
     throw new RequestBodyError("Malformed JSON body.", 400);
   } finally {
+    reader.releaseLock();
+  }
+}
+
+/** Bound streamed uploads without making additional full-size application buffers. */
+export async function readBoundedFormData(
+  request: Request,
+  limit: number,
+): Promise<FormData> {
+  const contentType = request.headers.get("content-type");
+  if (!contentType?.toLowerCase().startsWith("multipart/form-data;"))
+    throw new RequestBodyError(
+      "Use multipart/form-data with an audio master.",
+      415,
+    );
+  if (Number(request.headers.get("content-length")) > limit)
+    throw new RequestBodyError("Request exceeds the 80 MB audio budget.", 413);
+  const reader = request.body?.getReader();
+  if (!reader)
+    throw new RequestBodyError("An audio request body is required.", 400);
+  let size = 0;
+  const bounded = new ReadableStream<Uint8Array>(
+    {
+      async pull(controller) {
+        try {
+          const { done, value } = await reader.read();
+          if (done) {
+            controller.close();
+            return;
+          }
+          size += value.byteLength;
+          if (size > limit) {
+            controller.error(
+              new RequestBodyError(
+                "Request exceeds the 80 MB audio budget.",
+                413,
+              ),
+            );
+            await reader.cancel().catch(() => undefined);
+            return;
+          }
+          controller.enqueue(value);
+        } catch {
+          controller.error(
+            new RequestBodyError("Incomplete multipart audio request.", 400),
+          );
+        }
+      },
+      async cancel(reason) {
+        await reader.cancel(reason).catch(() => undefined);
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  try {
+    return await new Response(bounded, {
+      headers: { "content-type": contentType },
+    }).formData();
+  } catch (error) {
+    if (error instanceof RequestBodyError) throw error;
+    throw new RequestBodyError("Malformed multipart audio request.", 400);
+  } finally {
+    await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
 }
