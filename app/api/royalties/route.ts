@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { buildRoyaltiesModel } from "@/lib/royalties";
-import { readTracks } from "@/lib/store";
+import { buildCapturedRoyaltiesModel } from "@/lib/royalties";
+import { readWorkspaceData } from "@/lib/workspace-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,10 +16,17 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rawMonths = Number(searchParams.get("months") ?? "6");
-  const months = Number.isFinite(rawMonths) ? Math.min(12, Math.max(1, Math.round(rawMonths))) : 6;
+  const months = Number.isFinite(rawMonths)
+    ? Math.min(12, Math.max(1, Math.round(rawMonths)))
+    : 6;
 
-  const catalogue = await readTracks();
-  const model = buildRoyaltiesModel(catalogue, new Date(), months);
+  const data = await readWorkspaceData();
+  const model = buildCapturedRoyaltiesModel(
+    data.catalogue,
+    data.history,
+    new Date(),
+    months,
+  );
 
   return NextResponse.json({
     generatedAt: new Date().toISOString(),

@@ -34,8 +34,8 @@ export function registrantCode(registrant?: string): string {
   const cleaned = (registrant ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
   if (cleaned.length >= 3) {
-    // Prefer the leading letters of the first three words ("Nyege Nyege Tapes"
-    // -> "NNT") because that is how imprint codes are conventionally read.
+    // Prefer the leading letters of the first three words ("Quality Test Label"
+    // -> "QTL") because that is how imprint codes are conventionally read.
     const initials = (registrant ?? "")
       .toUpperCase()
       .split(/[^A-Za-z0-9]+/)
@@ -110,7 +110,11 @@ export function checkIsrc(value: string): IsrcCheck {
   const trimmed = (value ?? "").trim();
 
   if (trimmed.length === 0) {
-    return { valid: false, canonical: null, message: "Generate one or paste an existing code." };
+    return {
+      valid: false,
+      canonical: null,
+      message: "Generate one or paste an existing code.",
+    };
   }
 
   if (!isValidIsrc(trimmed)) {

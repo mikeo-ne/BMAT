@@ -9,6 +9,8 @@ import {
   type DistributionReport,
   type PlayRow,
 } from "@/lib/uprs";
+import { capturedPlayLedger } from "@/lib/compliance";
+import type { BroadcastSpin } from "@/lib/playout";
 import type { Track } from "@/lib/types";
 
 /**
@@ -86,7 +88,11 @@ export function statusFor(
   period: string,
   months: string[],
   now: Date,
-): { status: StatementStatus; approvedAt: string | null; paidAt: string | null } {
+): {
+  status: StatementStatus;
+  approvedAt: string | null;
+  paidAt: string | null;
+} {
   const year = now.getUTCFullYear();
   const index = months.indexOf(period);
 
@@ -107,10 +113,18 @@ export function statusFor(
 
   const ageInPeriods = months.length - 1 - index;
   if (ageInPeriods >= 3 && payment.getTime() <= now.getTime()) {
-    return { status: "paid", approvedAt: approval.toISOString(), paidAt: payment.toISOString() };
+    return {
+      status: "paid",
+      approvedAt: approval.toISOString(),
+      paidAt: payment.toISOString(),
+    };
   }
   if (ageInPeriods >= 1) {
-    return { status: "approved", approvedAt: approval.toISOString(), paidAt: null };
+    return {
+      status: "approved",
+      approvedAt: approval.toISOString(),
+      paidAt: null,
+    };
   }
 
   return { status: "pending", approvedAt: null, paidAt: null };
@@ -119,13 +133,15 @@ export function statusFor(
 /** Batch status is driven by its member statements. */
 export function batchStatusFor(statements: RoyaltyStatement[]): PayoutStatus {
   if (statements.some((s) => s.status === "blocked")) return "blocked";
-  if (statements.length > 0 && statements.every((s) => s.status === "paid")) return "paid";
-  if (statements.length > 0 && statements.every((s) => s.status === "approved")) return "approved";
+  if (statements.length > 0 && statements.every((s) => s.status === "paid"))
+    return "paid";
+  if (statements.length > 0 && statements.every((s) => s.status === "approved"))
+    return "approved";
   return "draft";
 }
 
 export function paymentReferenceFor(memberId: string, period: string): string {
-  return `UPRS-${period.replace("-", "")}-${memberId.slice(-4)}`;
+  return `LOCAL-${period.replace("-", "")}-${memberId.slice(-4)}`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -138,20 +154,28 @@ export function buildStatements(
   months: string[],
   now: Date,
 ): RoyaltyStatement[] {
-  const byMemberPeriod = new Map<string, { memberId: string; artist: string; plays: number; stations: Set<string>; works: Set<string>; amountUgx: number }>();
+  const byMemberPeriod = new Map<
+    string,
+    {
+      memberId: string;
+      artist: string;
+      plays: number;
+      stations: Set<string>;
+      works: Set<string>;
+      amountUgx: number;
+    }
+  >();
 
   for (const row of rows) {
     const key = `${row.memberId}:${row.period}`;
-    const bucket =
-      byMemberPeriod.get(key) ??
-      {
-        memberId: row.memberId,
-        artist: row.artist,
-        plays: 0,
-        stations: new Set<string>(),
-        works: new Set<string>(),
-        amountUgx: 0,
-      };
+    const bucket = byMemberPeriod.get(key) ?? {
+      memberId: row.memberId,
+      artist: row.artist,
+      plays: 0,
+      stations: new Set<string>(),
+      works: new Set<string>(),
+      amountUgx: 0,
+    };
     bucket.plays += row.plays;
     bucket.stations.add(row.stationId);
     bucket.works.add(row.isrc);
@@ -159,7 +183,10 @@ export function buildStatements(
     byMemberPeriod.set(key, bucket);
   }
 
-  const totalPool = [...byMemberPeriod.values()].reduce((a, b) => a + b.amountUgx, 0);
+  const totalPool = [...byMemberPeriod.values()].reduce(
+    (a, b) => a + b.amountUgx,
+    0,
+  );
 
   const statements = [...byMemberPeriod.entries()]
     .map(([key, bucket]) => {
@@ -183,7 +210,9 @@ export function buildStatements(
         approvedAt: timing.approvedAt,
         paidAt: timing.paidAt,
         paymentReference:
-          timing.status === "paid" ? paymentReferenceFor(memberId, period) : null,
+          timing.status === "paid"
+            ? paymentReferenceFor(memberId, period)
+            : null,
       } satisfies RoyaltyStatement;
     })
     .sort((a, b) => b.allocationUgx - a.allocationUgx);
@@ -192,7 +221,9 @@ export function buildStatements(
 }
 
 /** Group statements into one payout batch per period. */
-export function buildPayoutBatches(statements: RoyaltyStatement[]): PayoutBatch[] {
+export function buildPayoutBatches(
+  statements: RoyaltyStatement[],
+): PayoutBatch[] {
   const byPeriod = new Map<string, RoyaltyStatement[]>();
 
   for (const statement of statements) {
@@ -228,7 +259,9 @@ export function buildRoyaltiesModel(
   months = 6,
 ): RoyaltiesModel {
   const periodList = Array.from({ length: months }, (_, i) => {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1 - i), 1));
+    const d = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1 - i), 1),
+    );
     return d.toISOString().slice(0, 7);
   });
 
@@ -267,10 +300,13 @@ export interface RoyaltyTotals {
 }
 
 export function totals(model: RoyaltiesModel): RoyaltyTotals {
-  const sum = (list: RoyaltyStatement[]) => list.reduce((a, s) => a + s.allocationUgx, 0);
+  const sum = (list: RoyaltyStatement[]) =>
+    list.reduce((a, s) => a + s.allocationUgx, 0);
 
   const paid = model.statements.filter((s) => s.status === "paid");
-  const pending = model.statements.filter((s) => s.status === "pending" || s.status === "approved");
+  const pending = model.statements.filter(
+    (s) => s.status === "pending" || s.status === "approved",
+  );
   const blocked = model.statements.filter((s) => s.status === "blocked");
 
   return {
@@ -283,7 +319,9 @@ export function totals(model: RoyaltiesModel): RoyaltyTotals {
     blockedUgx: sum(blocked),
     blockedUsd: sum(blocked) / UGX_PER_USD,
     approvedUgx: sum(model.statements.filter((s) => s.status === "approved")),
-    approvedUsd: sum(model.statements.filter((s) => s.status === "approved")) / UGX_PER_USD,
+    approvedUsd:
+      sum(model.statements.filter((s) => s.status === "approved")) /
+      UGX_PER_USD,
     paidCount: paid.length,
     pendingCount: pending.length,
     blockedCount: blocked.length,
@@ -382,3 +420,47 @@ export const PAYOUT_STATUS_LABEL: Record<PayoutStatus, string> = {
   paid: "Paid",
   blocked: "Blocked",
 };
+
+/** Captured rows only; all amounts are indicative and every settlement starts pending. */
+export function buildCapturedRoyaltiesModel(
+  catalogue: Track[],
+  captures: BroadcastSpin[],
+  now = new Date(),
+  months = 6,
+): RoyaltiesModel {
+  const model = buildRoyaltiesModel(catalogue, now, months);
+  const rows = capturedPlayLedger(captures, catalogue).filter((row) =>
+    model.months.includes(row.period),
+  );
+  const statements = buildStatements(rows, model.months, now).map(
+    (statement) => ({
+      ...statement,
+      status: "pending" as const,
+      approvedAt: null,
+      paidAt: null,
+      paymentReference: null,
+    }),
+  );
+  return {
+    ...model,
+    report: buildReport(rows, EMPTY_FILTERS, now),
+    statements,
+    batches: buildPayoutBatches(statements),
+    members: [
+      ...new Map(
+        rows.map((row) => [
+          row.memberId,
+          {
+            memberId: row.memberId,
+            name: row.artist,
+            works: new Set(
+              rows
+                .filter((entry) => entry.memberId === row.memberId)
+                .map((entry) => entry.isrc),
+            ).size,
+          },
+        ]),
+      ).values(),
+    ],
+  };
+}

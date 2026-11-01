@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSeedTracks } from "@/lib/catalog";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 import {
   buildDisputes,
   buildSplitSheet,
@@ -37,7 +37,9 @@ describe("split sheets", () => {
   });
 
   it("gives featured artists an equal block", () => {
-    const withFeatured = SHEETS.find((s) => s.parties.filter((p) => p.role === "Featured artist").length >= 2);
+    const withFeatured = SHEETS.find(
+      (s) => s.parties.filter((p) => p.role === "Featured artist").length >= 2,
+    );
     if (!withFeatured) return;
 
     const shares = withFeatured.parties
@@ -87,7 +89,9 @@ describe("disputes", () => {
     expect(overlap).toBeTruthy();
     expect(overlap!.claimants).toHaveLength(2);
     expect(overlap!.claimants.every((c) => c.claimPct === 100)).toBe(true);
-    expect(overlap!.claimants.every((c) => c.rightType === "mechanical")).toBe(true);
+    expect(overlap!.claimants.every((c) => c.rightType === "mechanical")).toBe(
+      true,
+    );
     expect(overlap!.overlapPct).toBe(100);
     expect(overlap!.severity).toBe("critical");
   });

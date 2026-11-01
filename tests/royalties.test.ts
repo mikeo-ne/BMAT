@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSeedTracks } from "@/lib/catalog";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 import {
   batchesToCsv,
   buildRoyaltiesModel,
@@ -27,7 +27,9 @@ describe("statementId", () => {
 describe("buildStatements", () => {
   it("groups the ledger into one statement per member period", () => {
     expect(MODEL.statements.length).toBeGreaterThan(10);
-    const keys = new Set(MODEL.statements.map((s) => `${s.memberId}:${s.period}`));
+    const keys = new Set(
+      MODEL.statements.map((s) => `${s.memberId}:${s.period}`),
+    );
     expect(keys.size).toBe(MODEL.statements.length);
   });
 
@@ -36,13 +38,19 @@ describe("buildStatements", () => {
     const rows = LEDGER.filter(
       (r) => r.memberId === sample.memberId && r.period === sample.period,
     );
-    expect(sample.allocationUgx).toBe(rows.reduce((a, r) => a + r.allocationUgx, 0));
+    expect(sample.allocationUgx).toBe(
+      rows.reduce((a, r) => a + r.allocationUgx, 0),
+    );
     expect(sample.plays).toBe(rows.reduce((a, r) => a + r.plays, 0));
   });
 
   it("moves older periods toward paid and the latest toward pending", () => {
-    const newest = MODEL.statements.filter((s) => s.period === MODEL.months.at(-1));
-    const oldest = MODEL.statements.filter((s) => s.period === MODEL.months.at(0));
+    const newest = MODEL.statements.filter(
+      (s) => s.period === MODEL.months.at(-1),
+    );
+    const oldest = MODEL.statements.filter(
+      (s) => s.period === MODEL.months.at(0),
+    );
 
     expect(newest.some((s) => s.status === "pending")).toBe(true);
     expect(oldest.filter((s) => s.status === "paid").length).toBeGreaterThan(0);
@@ -54,11 +62,15 @@ describe("buildPayoutBatches", () => {
     expect(MODEL.batches.length).toBe(6);
 
     for (const batch of MODEL.batches) {
-      expect(batch.members).toBe(new Set(batch.statements.map((s) => s.memberId)).size);
+      expect(batch.members).toBe(
+        new Set(batch.statements.map((s) => s.memberId)).size,
+      );
       expect(batch.allocationUgx).toBe(
         batch.statements.reduce((a, s) => a + s.allocationUgx, 0),
       );
-      expect(batch.plays).toBe(batch.statements.reduce((a, s) => a + s.plays, 0));
+      expect(batch.plays).toBe(
+        batch.statements.reduce((a, s) => a + s.plays, 0),
+      );
     }
   });
 
@@ -76,9 +88,11 @@ describe("totals", () => {
     const summary = totals(MODEL);
     const stated = summary.paidUgx + summary.pendingUgx + summary.blockedUgx;
     expect(stated).toBe(summary.poolUgx);
-    expect(summary.pendingCount).toBe(MODEL.statements.filter(
-      (s) => s.status === "approved" || s.status === "pending",
-    ).length);
+    expect(summary.pendingCount).toBe(
+      MODEL.statements.filter(
+        (s) => s.status === "approved" || s.status === "pending",
+      ).length,
+    );
   });
 });
 
@@ -115,6 +129,8 @@ describe("labels", () => {
   });
 
   it("builds a stable payment reference", () => {
-    expect(paymentReferenceFor("UPRS-12345", "2026-08")).toBe("UPRS-202608-2345");
+    expect(paymentReferenceFor("UPRS-12345", "2026-08")).toBe(
+      "LOCAL-202608-2345",
+    );
   });
 });

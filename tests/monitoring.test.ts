@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSeedTracks } from "@/lib/catalog";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 import {
   driftTelemetry,
   generateTelemetry,
@@ -20,7 +20,9 @@ import {
 const NOW = new Date("2026-09-03T12:00:00Z");
 const CATALOGUE = buildSeedTracks(NOW);
 
-function allTelemetry(status?: StationTelemetry["status"]): Record<string, StationTelemetry> {
+function allTelemetry(
+  status?: StationTelemetry["status"],
+): Record<string, StationTelemetry> {
   return Object.fromEntries(
     MONITORED_STATIONS.map((s) => [
       s.id,
@@ -40,35 +42,58 @@ function allTelemetry(status?: StationTelemetry["status"]): Record<string, Stati
 
 describe("MONITORED_STATIONS", () => {
   it("has unique ids", () => {
-    expect(new Set(MONITORED_STATIONS.map((s) => s.id)).size).toBe(MONITORED_STATIONS.length);
+    expect(new Set(MONITORED_STATIONS.map((s) => s.id)).size).toBe(
+      MONITORED_STATIONS.length,
+    );
   });
 
   it("carries the stations and frequencies the brief names", () => {
-    expect(stationById("capital-kla")).toMatchObject({ name: "Capital FM", frequency: "91.3 MHz", medium: "FM" });
-    expect(stationById("cbs-kla")).toMatchObject({ name: "CBS FM", frequency: "89.2 MHz" });
-    expect(stationById("galaxy-kla")).toMatchObject({ name: "Galaxy FM", frequency: "100.2 MHz" });
-    expect(stationById("nbs-tv-kla")).toMatchObject({ name: "NBS TV", medium: "TV" });
+    expect(stationById("capital-kla")).toMatchObject({
+      name: "Capital FM",
+      frequency: "91.3 MHz",
+      medium: "FM",
+    });
+    expect(stationById("cbs-kla")).toMatchObject({
+      name: "CBS FM",
+      frequency: "89.2 MHz",
+    });
+    expect(stationById("galaxy-kla")).toMatchObject({
+      name: "Galaxy FM",
+      frequency: "100.2 MHz",
+    });
+    expect(stationById("nbs-tv-kla")).toMatchObject({
+      name: "NBS TV",
+      medium: "TV",
+    });
   });
 
   it("covers all four Ugandan regions", () => {
     const regions = new Set(MONITORED_STATIONS.map((s) => s.region));
-    expect(regions).toEqual(new Set(["Central", "Eastern", "Western", "Northern"]));
+    expect(regions).toEqual(
+      new Set(["Central", "Eastern", "Western", "Northern"]),
+    );
   });
 
   it("counts by medium", () => {
     expect(monitoredCount()).toBe(MONITORED_STATIONS.length);
-    expect(monitoredCount("FM") + monitoredCount("TV")).toBe(MONITORED_STATIONS.length);
+    expect(monitoredCount("FM") + monitoredCount("TV")).toBe(
+      MONITORED_STATIONS.length,
+    );
     expect(monitoredCount("TV")).toBeGreaterThan(0);
   });
 });
 
 describe("generateTelemetry", () => {
   it("is deterministic per station", () => {
-    expect(generateTelemetry("capital-kla", NOW)).toEqual(generateTelemetry("capital-kla", NOW));
+    expect(generateTelemetry("capital-kla", NOW)).toEqual(
+      generateTelemetry("capital-kla", NOW),
+    );
   });
 
   it("differs between stations", () => {
-    expect(generateTelemetry("capital-kla", NOW)).not.toEqual(generateTelemetry("cbs-kla", NOW));
+    expect(generateTelemetry("capital-kla", NOW)).not.toEqual(
+      generateTelemetry("cbs-kla", NOW),
+    );
   });
 
   it("stays inside its stated ranges", () => {
@@ -87,9 +112,9 @@ describe("generateTelemetry", () => {
   });
 
   it("reports no latency or level for an offline feed", () => {
-    const offline = MONITORED_STATIONS.map((s) => generateTelemetry(s.id, NOW)).find(
-      (t) => t.status === "offline",
-    );
+    const offline = MONITORED_STATIONS.map((s) =>
+      generateTelemetry(s.id, NOW),
+    ).find((t) => t.status === "offline");
 
     if (offline) {
       expect(offline.latencyMs).toBe(0);
@@ -107,12 +132,16 @@ describe("driftTelemetry", () => {
     const next = driftTelemetry("capital-kla", start, 1, NOW);
 
     expect(next.level).toHaveLength(LEVEL_HISTORY);
-    expect(next.level[next.level.length - 1]).not.toBe(start.level[start.level.length - 1]);
+    expect(next.level[next.level.length - 1]).not.toBe(
+      start.level[start.level.length - 1],
+    );
   });
 
   it("is deterministic for a given tick", () => {
     const start = generateTelemetry("cbs-kla", NOW);
-    expect(driftTelemetry("cbs-kla", start, 7, NOW)).toEqual(driftTelemetry("cbs-kla", start, 7, NOW));
+    expect(driftTelemetry("cbs-kla", start, 7, NOW)).toEqual(
+      driftTelemetry("cbs-kla", start, 7, NOW),
+    );
   });
 
   it("changes over successive ticks", () => {
@@ -145,7 +174,8 @@ describe("driftTelemetry", () => {
     let current = generateTelemetry("mega-gul", NOW);
     for (let tick = 1; tick <= 20; tick++) {
       current = driftTelemetry("mega-gul", current, tick, NOW);
-      if (current.status !== "offline") expect(current.latencyMs).toBeGreaterThan(0);
+      if (current.status !== "offline")
+        expect(current.latencyMs).toBeGreaterThan(0);
     }
   });
 });
@@ -162,7 +192,9 @@ describe("simulateScan", () => {
     });
 
     expect(detections).toHaveLength(MONITORED_STATIONS.length);
-    expect(new Set(detections.map((d) => d.stationId)).size).toBe(MONITORED_STATIONS.length);
+    expect(new Set(detections.map((d) => d.stationId)).size).toBe(
+      MONITORED_STATIONS.length,
+    );
   });
 
   it("skips stations whose feed is down", () => {
@@ -244,11 +276,15 @@ describe("simulateScan", () => {
       now: NOW,
     };
 
-    expect(simulateScan({ ...input, seed: "same" })).toEqual(simulateScan({ ...input, seed: "same" }));
+    expect(simulateScan({ ...input, seed: "same" })).toEqual(
+      simulateScan({ ...input, seed: "same" }),
+    );
 
     const other = simulateScan({ ...input, seed: "different" });
     const first = simulateScan({ ...input, seed: "same" });
-    expect(other.map((d) => d.confidence)).not.toEqual(first.map((d) => d.confidence));
+    expect(other.map((d) => d.confidence)).not.toEqual(
+      first.map((d) => d.confidence),
+    );
   });
 
   it("produces a mix of matched and unmatched over enough scans", () => {
@@ -282,7 +318,9 @@ describe("simulateScan", () => {
 
     const tv = detections.find((d) => d.medium === "TV")!;
     expect(tv.method).toMatch(/video audio bus/);
-    expect(detections.find((d) => d.medium === "FM")!.method).toMatch(/spectral peak/);
+    expect(detections.find((d) => d.medium === "FM")!.method).toMatch(
+      /spectral peak/,
+    );
   });
 });
 
@@ -303,12 +341,17 @@ describe("summariseMonitor", () => {
     const summary = summariseMonitor(telemetry, detections);
 
     expect(summary.stations).toBe(MONITORED_STATIONS.length);
-    expect(summary.online + summary.degraded + summary.offline).toBe(summary.stations);
+    expect(summary.online + summary.degraded + summary.offline).toBe(
+      summary.stations,
+    );
     expect(summary.degraded).toBe(1);
     expect(summary.offline).toBe(1);
     expect(summary.detections).toBe(detections.length);
     expect(summary.matched + summary.unmatched).toBe(summary.detections);
-    expect(summary.matchRate).toBeCloseTo(summary.matched / summary.detections, 6);
+    expect(summary.matchRate).toBeCloseTo(
+      summary.matched / summary.detections,
+      6,
+    );
   });
 
   it("avoids dividing by zero with no detections", () => {

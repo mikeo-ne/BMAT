@@ -6,8 +6,10 @@ import { FM_STATIONS, REGIONS, type Region, type Station } from "@/lib/regions";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-interface PanelStation extends Station {
+interface PanelStation extends Omit<Station, "reach"> {
+  reach: number | null;
   monitored: boolean;
+  frequencyVerified: boolean;
   medium: "FM" | "TV";
 }
 
@@ -21,11 +23,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const region = searchParams.get("region");
 
-  const monitoredById = new Map(MONITORED_STATIONS.map((s) => [s.id, s]));
-
   const stations: PanelStation[] = FM_STATIONS.map((station) => ({
     ...station,
-    monitored: monitoredById.has(station.id),
+    reach: null,
+    monitored: false,
+    frequencyVerified: false,
     medium: "FM",
   }));
 
@@ -37,8 +39,9 @@ export async function GET(request: Request) {
         region: tv.region,
         location: tv.location,
         frequency: tv.frequency,
-        reach: 0,
-        monitored: true,
+        reach: null,
+        monitored: false,
+        frequencyVerified: false,
         medium: "TV",
       });
     }
@@ -52,7 +55,10 @@ export async function GET(request: Request) {
   return NextResponse.json({
     regions: REGIONS,
     stations: filtered,
-    monitoredCount: MONITORED_STATIONS.length,
+    monitoredCount: 0,
+    source: "station-directory-only",
+    notice:
+      "Directory metadata is not live connectivity, an audience source or verified frequency licensing. Browser-configured playback is separate from capture.",
     panelSize: FM_STATIONS.length,
   });
 }

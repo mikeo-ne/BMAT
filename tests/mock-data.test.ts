@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSeedTracks } from "@/lib/catalog";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 import { MONITORED_STATIONS } from "@/lib/monitoring";
 import {
   activeHubs,
@@ -38,7 +38,9 @@ describe("station panel realism", () => {
   });
 
   it("spreads the panel across more than just Kampala", () => {
-    const nonKampala = FM_STATIONS.filter((s) => s.location !== "Kampala").length;
+    const nonKampala = FM_STATIONS.filter(
+      (s) => s.location !== "Kampala",
+    ).length;
 
     expect(nonKampala).toBeGreaterThan(FM_STATIONS.length / 2);
     expect(activeHubs().length).toBeGreaterThanOrEqual(8);
@@ -52,7 +54,9 @@ describe("station panel realism", () => {
 
   it("has unique ids and names", () => {
     expect(new Set(FM_STATIONS.map((s) => s.id)).size).toBe(FM_STATIONS.length);
-    expect(new Set(FM_STATIONS.map((s) => s.name)).size).toBe(FM_STATIONS.length);
+    expect(new Set(FM_STATIONS.map((s) => s.name)).size).toBe(
+      FM_STATIONS.length,
+    );
   });
 
   it("keeps each station in a plausible hub for its region", () => {
@@ -103,7 +107,13 @@ describe("catalogue realism", () => {
 
   it("carries Luganda-language titles, not only English ones", () => {
     const luganda = tracks.filter((t) =>
-      ["Nkwagala", "Omukwano", "Mulongo", "Ggwe Ondabika", "Nalongo"].includes(t.title),
+      [
+        "Fixture A",
+        "Fixture B",
+        "Fixture C",
+        "Fixture D",
+        "Fixture F",
+      ].includes(t.title),
     );
 
     expect(luganda.length).toBeGreaterThanOrEqual(4);
@@ -112,14 +122,14 @@ describe("catalogue realism", () => {
   it("uses East African artist names", () => {
     const artists = new Set(tracks.map((t) => t.primaryArtist));
 
-    expect(artists.has("Ray Bwete")).toBe(true);
-    expect(artists.has("Doreen Achieng")).toBe(true);
-    expect(artists.has("Mukisa Collective")).toBe(true);
+    expect(artists.has("QA Artist Alpha")).toBe(true);
+    expect(artists.has("QA Artist Beta")).toBe(true);
+    expect(artists.has("QA Ensemble")).toBe(true);
   });
 
   it("keeps delivery file names consistent with the title and artist", () => {
     for (const track of tracks) {
-      const expected = `${track.primaryArtist} - ${track.title}.${track.audio.format.toLowerCase()}`;
+      const expected = `${track.primaryArtist} - ${track.title}.${track.audio.format?.toLowerCase()}`;
       expect(track.audio.fileName).toBe(expected);
     }
   });

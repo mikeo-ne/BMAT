@@ -17,9 +17,9 @@ export interface ChartEntry {
   spinsPrev7d: number;
   /** Week-on-week spin change, -1..n; null when last week was silent. */
   changePct: number | null;
-  weeksOnChart: number;
-  /** Best historical position; never worse than the current rank. */
-  peakPosition: number;
+  weeksOnChart: number | null;
+  /** Unknown for production captures until a chart-history store exists. */
+  peakPosition: number | null;
   dominantRegion: Region;
   /** 14-day combined curve for the sparkline. */
   trend: number[];
@@ -40,7 +40,11 @@ export function weekStartIso(now: Date = new Date()): string {
   const day = now.getUTCDay(); // 0 Sun .. 6 Sat
   const offset = (day + 6) % 7; // days since Monday
   const monday = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - offset),
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() - offset,
+    ),
   );
   return monday.toISOString().slice(0, 10);
 }
@@ -56,12 +60,14 @@ function daysBetween(aIso: string, now: Date): number {
  * reporting days, ranked by those spins.
  *
  * Last week's ranking comes from the seven days before that, so movement and
- * debuts are read straight off the airplay curve rather than invented. Peak
- * position is the one fixture element — the prototype only keeps fourteen days
- * of history — and is bounded above by the current rank so a peak can never be
- * worse than where the record sits today.
+ * debuts are read straight off the airplay curve rather than invented. All-time
+ * peak and weeks-on-chart remain unknown for actual releases. The test-only
+ * fixture branch retains stable historical examples for algorithm regression tests.
  */
-export function buildWeeklyChart(catalogue: Track[], now: Date = new Date()): WeeklyChart {
+export function buildWeeklyChart(
+  catalogue: Track[],
+  now: Date = new Date(),
+): WeeklyChart {
   const weekStart = weekStartIso(now);
 
   const scored = catalogue
@@ -74,42 +80,64 @@ export function buildWeeklyChart(catalogue: Track[], now: Date = new Date()): We
     .filter((row) => row.spins7d > 0);
 
   const current = [...scored].sort(
-    (a, b) => b.spins7d - a.spins7d || a.track.title.localeCompare(b.track.title),
+    (a, b) =>
+      b.spins7d - a.spins7d || a.track.title.localeCompare(b.track.title),
   );
 
-  const prior = scored
+  const prior = catalogue
+    .map((track) => ({
+      track,
+      spinsPrev7d: trendFor(track, "All")
+        .slice(-14, -7)
+        .reduce((a, b) => a + b, 0),
+    }))
     .filter((row) => row.spinsPrev7d > 0)
-    .sort((a, b) => b.spinsPrev7d - a.spinsPrev7d || a.track.title.localeCompare(b.track.title));
-  const previousRankOf = new Map(prior.map((row, index) => [row.track.id, index + 1]));
+    .sort(
+      (a, b) =>
+        b.spinsPrev7d - a.spinsPrev7d ||
+        a.track.title.localeCompare(b.track.title),
+    );
+  const previousRankOf = new Map(
+    prior.map((row, index) => [row.track.id, index + 1]),
+  );
 
-  const entries: ChartEntry[] = current.slice(0, CHART_SIZE).map((row, index) => {
-    const rank = index + 1;
-    const previousRank = previousRankOf.get(row.track.id) ?? null;
-    const days = Math.max(daysBetween(row.track.releaseDate, now), 0);
+  const entries: ChartEntry[] = current
+    .slice(0, CHART_SIZE)
+    .map((row, index) => {
+      const rank = index + 1;
+      const previousRank = previousRankOf.get(row.track.id) ?? null;
+      const days = Math.max(daysBetween(row.track.releaseDate, now), 0);
 
-    // Bounded fixture peak: a record's best-ever slot cannot be worse than now.
-    const peakPosition = 1 + (hashSeed(`${row.track.isrc}:peak`) % rank);
+      // Bounded fixture peak: a record's best-ever slot cannot be worse than now.
+      const fixture = row.track.origin === "test-fixture";
+      const peakPosition = fixture
+        ? 1 + (hashSeed(`${row.track.isrc}:peak`) % rank)
+        : null;
 
-    return {
-      rank,
-      previousRank,
-      movement: previousRank === null ? null : previousRank - rank,
-      track: row.track,
-      spins7d: row.spins7d,
-      spinsPrev7d: row.spinsPrev7d,
-      changePct:
-        row.spinsPrev7d === 0 ? null : (row.spins7d - row.spinsPrev7d) / row.spinsPrev7d,
-      weeksOnChart: Math.min(Math.floor(days / 7) + 1, 52),
-      peakPosition,
-      dominantRegion: dominantRegion(row.track),
-      trend: row.trend,
-    };
-  });
+      return {
+        rank,
+        previousRank,
+        movement: previousRank === null ? null : previousRank - rank,
+        track: row.track,
+        spins7d: row.spins7d,
+        spinsPrev7d: row.spinsPrev7d,
+        changePct:
+          row.spinsPrev7d === 0
+            ? null
+            : (row.spins7d - row.spinsPrev7d) / row.spinsPrev7d,
+        weeksOnChart: fixture ? Math.min(Math.floor(days / 7) + 1, 52) : null,
+        peakPosition,
+        dominantRegion: dominantRegion(row.track),
+        trend: row.trend,
+      };
+    });
 
   const climbers = entries.filter((e) => e.movement !== null);
   const biggestClimber = climbers.reduce<ChartEntry | null>(
     (best, entry) =>
-      best === null || (entry.movement ?? 0) > (best.movement ?? 0) ? entry : best,
+      best === null || (entry.movement ?? 0) > (best.movement ?? 0)
+        ? entry
+        : best,
     null,
   );
 
@@ -118,7 +146,10 @@ export function buildWeeklyChart(catalogue: Track[], now: Date = new Date()): We
     weekLabel: `Week of ${weekStart}`,
     entries,
     newEntries: entries.filter((e) => e.previousRank === null).length,
-    biggestClimber: biggestClimber && (biggestClimber.movement ?? 0) > 0 ? biggestClimber : null,
+    biggestClimber:
+      biggestClimber && (biggestClimber.movement ?? 0) > 0
+        ? biggestClimber
+        : null,
     totalSpins: entries.reduce((sum, e) => sum + e.spins7d, 0),
   };
 }

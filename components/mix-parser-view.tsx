@@ -24,7 +24,9 @@ interface MixParserViewProps {
 const ADMIN_NAME = "A&R Desk";
 
 export function MixParserView({ catalogue }: MixParserViewProps) {
-  const [stationId, setStationId] = useState(MONITORED_STATIONS[0]?.id ?? "capital-kla");
+  const [stationId, setStationId] = useState(
+    MONITORED_STATIONS[0]?.id ?? "capital-kla",
+  );
   const [currentSecond, setCurrentSecond] = useState(0);
   const [tagging, setTagging] = useState<MixSegment | null>(null);
   const [links, setLinks] = useState<ManualLink[]>([]);
@@ -35,19 +37,28 @@ export function MixParserView({ catalogue }: MixParserViewProps) {
   );
   const waveform = useMemo(() => buildMixWaveform(segments), [segments]);
   const transitions = useMemo(() => buildTransitions(segments), [segments]);
-  const unidentified = useMemo(() => buildUnidentifiedQueue(segments), [segments]);
+  const unidentified = useMemo(
+    () => buildUnidentifiedQueue(segments),
+    [segments],
+  );
 
-  const station = MONITORED_STATIONS.find((s) => s.id === stationId) ?? MONITORED_STATIONS[0];
+  const station =
+    MONITORED_STATIONS.find((s) => s.id === stationId) ?? MONITORED_STATIONS[0];
 
   const currentSegment = useMemo(
     () =>
-      segments.find((s) => currentSecond >= s.startSec && currentSecond < s.endSec) ??
+      segments.find(
+        (s) => currentSecond >= s.startSec && currentSecond < s.endSec,
+      ) ??
       segments[segments.length - 1] ??
       null,
     [segments, currentSecond],
   );
 
-  const handleSeek = useCallback((second: number) => setCurrentSecond(second), []);
+  const handleSeek = useCallback(
+    (second: number) => setCurrentSecond(second),
+    [],
+  );
 
   function handleLink(segment: MixSegment, track: Track) {
     const link: ManualLink = {
@@ -61,17 +72,23 @@ export function MixParserView({ catalogue }: MixParserViewProps) {
       priorConfidence: segment.confidence,
     };
 
-    setLinks((prev) => [...prev.filter((l) => l.segmentId !== segment.id), link]);
+    setLinks((prev) => [
+      ...prev.filter((l) => l.segmentId !== segment.id),
+      link,
+    ]);
   }
 
   return (
     <div className="flex flex-col gap-4 pb-8">
       <section className="panel flex flex-wrap items-center justify-between gap-4 p-4">
         <div>
-          <h2 className="text-sm font-semibold tracking-tight">Capture source</h2>
+          <h2 className="text-sm font-semibold tracking-tight">
+            Capture source
+          </h2>
           <p className="mt-1 text-xs text-muted">
-            One continuous hour per station, parsed into segments and run through the fingerprint
-            matcher.
+            Connect a licensed continuous-capture and matching integration to
+            analyse a station hour. No track matches or transitions are
+            fabricated for the real catalogue.
           </p>
         </div>
 
@@ -97,19 +114,26 @@ export function MixParserView({ catalogue }: MixParserViewProps) {
       <MixTimeline
         segments={segments}
         waveform={waveform}
-        stationName={station ? `${station.name} (${station.frequency} ${station.location})` : "Station"}
+        stationName={
+          station
+            ? `${station.name} (${station.frequency} ${station.location})`
+            : "Station"
+        }
         onSeek={handleSeek}
         currentSegment={currentSegment}
         currentSecond={currentSecond}
       />
 
       <section className="panel p-4" aria-labelledby="transitions-heading">
-        <h2 id="transitions-heading" className="text-sm font-semibold tracking-tight">
+        <h2
+          id="transitions-heading"
+          className="text-sm font-semibold tracking-tight"
+        >
           Auto-detected track transitions
         </h2>
         <p className="mt-1 text-xs text-muted">
-          {transitions.length} hand-overs in the hour. A gap over a few seconds is dead air worth
-          raising with the station.
+          {transitions.length} hand-overs in the hour. A gap over a few seconds
+          is dead air worth raising with the station.
         </p>
 
         <ol className="mt-4 grid grid-cols-1 gap-2 lg:grid-cols-2">
@@ -127,7 +151,9 @@ export function MixParserView({ catalogue }: MixParserViewProps) {
                   {formatTimeline(transition.atSec)}
                 </button>
                 {transition.gapSec > 3 ? (
-                  <span className="chip text-brand">{transition.gapSec}s dead air</span>
+                  <span className="chip text-brand">
+                    {transition.gapSec}s dead air
+                  </span>
                 ) : null}
               </div>
 
@@ -138,7 +164,9 @@ export function MixParserView({ catalogue }: MixParserViewProps) {
                 ends
               </p>
               <p className="text-muted">
-                <span className="text-foreground">{transition.to.title ?? "Unknown audio"}</span>{" "}
+                <span className="text-foreground">
+                  {transition.to.title ?? "Unknown audio"}
+                </span>{" "}
                 starts{transition.to.artist ? ` — ${transition.to.artist}` : ""}
               </p>
             </li>
@@ -163,8 +191,9 @@ export function MixParserView({ catalogue }: MixParserViewProps) {
       ) : null}
 
       <p className="pb-2 text-center text-[11px] text-muted">
-        The hour is generated deterministically per station and the excerpt audio is synthesised
-        locally. No live broadcast capture or reference index is wired up in this prototype.
+        The hour is generated deterministically per station and the excerpt
+        audio is synthesised locally. No live broadcast capture or reference
+        index is wired up in this prototype.
       </p>
     </div>
   );

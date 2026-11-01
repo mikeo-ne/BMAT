@@ -15,7 +15,9 @@ function Movement({ entry }: { entry: ChartEntry }) {
   }
   const up = entry.movement > 0;
   return (
-    <span className={`font-mono text-[11px] ${up ? "text-accent" : "text-brand"}`}>
+    <span
+      className={`font-mono text-[11px] ${up ? "text-accent" : "text-brand"}`}
+    >
       {up ? "▲" : "▼"} {Math.abs(entry.movement)}
     </span>
   );
@@ -28,11 +30,20 @@ function Sparkline({ values, label }: { values: number[]; label: string }) {
   const step = width / Math.max(values.length - 1, 1);
 
   const points = values
-    .map((v, i) => `${(i * step).toFixed(1)},${(height - (v / max) * (height - 3) - 1.5).toFixed(1)}`)
+    .map(
+      (v, i) =>
+        `${(i * step).toFixed(1)},${(height - (v / max) * (height - 3) - 1.5).toFixed(1)}`,
+    )
     .join(" ");
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label}>
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label={label}
+    >
       <polyline
         points={points}
         fill="none"
@@ -62,25 +73,37 @@ export function NationalCharts({ chart }: NationalChartsProps) {
       <section className="panel p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold tracking-tight">Uganda national airplay chart</h2>
+            <h2 className="text-sm font-semibold tracking-tight">
+              Uganda national airplay chart
+            </h2>
             <p className="mt-1 text-xs text-muted">
-              {chart.weekLabel} · ranked by verified spins across the FM panel over the last seven
-              reporting days.
+              {chart.weekLabel} · ranked by captured spins in the connected FM panel
+              over the last seven reporting days.
             </p>
           </div>
 
           <dl className="grid grid-cols-3 gap-3 text-center">
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-muted">Entries</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-muted">
+                Entries
+              </dt>
               <dd className="font-mono text-lg">{chart.entries.length}</dd>
             </div>
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-muted">New</dt>
-              <dd className="font-mono text-lg text-accent">{chart.newEntries}</dd>
+              <dt className="text-[11px] uppercase tracking-wider text-muted">
+                New
+              </dt>
+              <dd className="font-mono text-lg text-accent">
+                {chart.newEntries}
+              </dd>
             </div>
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-muted">Spins</dt>
-              <dd className="font-mono text-lg">{chart.totalSpins.toLocaleString("en-UG")}</dd>
+              <dt className="text-[11px] uppercase tracking-wider text-muted">
+                Spins
+              </dt>
+              <dd className="font-mono text-lg">
+                {chart.totalSpins.toLocaleString("en-UG")}
+              </dd>
             </div>
           </dl>
         </div>
@@ -88,7 +111,9 @@ export function NationalCharts({ chart }: NationalChartsProps) {
         {chart.biggestClimber ? (
           <p className="mt-3 rounded border border-line bg-surface-2 px-3 py-2 text-xs text-muted">
             Biggest climber:{" "}
-            <span className="font-medium text-foreground">{chart.biggestClimber.track.title}</span>{" "}
+            <span className="font-medium text-foreground">
+              {chart.biggestClimber.track.title}
+            </span>{" "}
             — {chart.biggestClimber.track.primaryArtist}, up{" "}
             {chart.biggestClimber.movement} to #{chart.biggestClimber.rank}.
           </p>
@@ -96,14 +121,19 @@ export function NationalCharts({ chart }: NationalChartsProps) {
       </section>
 
       {/* Podium */}
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Top three">
+      <section
+        className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+        aria-label="Top three"
+      >
         {podium.map((entry, i) => (
           <article key={entry.track.id} className="panel p-4">
             <div className="flex items-start justify-between gap-2">
               <span className="chip text-brand">{MEDAL[i]}</span>
               <Movement entry={entry} />
             </div>
-            <h3 className="mt-2 text-base font-semibold tracking-tight">{entry.track.title}</h3>
+            <h3 className="mt-2 text-base font-semibold tracking-tight">
+              {entry.track.title}
+            </h3>
             <p className="mt-0.5 text-xs text-muted">
               {entry.track.primaryArtist}
               {entry.track.featuredArtists.length > 0
@@ -117,7 +147,8 @@ export function NationalCharts({ chart }: NationalChartsProps) {
               />
             </div>
             <p className="mt-2 font-mono text-xs text-muted">
-              {entry.spins7d.toLocaleString("en-UG")} spins · {entry.dominantRegion} led
+              {entry.spins7d.toLocaleString("en-UG")} spins ·{" "}
+              {entry.dominantRegion} led
             </p>
           </article>
         ))}
@@ -125,7 +156,10 @@ export function NationalCharts({ chart }: NationalChartsProps) {
 
       {/* Full chart */}
       <section className="panel p-4" aria-labelledby="full-chart-heading">
-        <h2 id="full-chart-heading" className="text-sm font-semibold tracking-tight">
+        <h2
+          id="full-chart-heading"
+          className="text-sm font-semibold tracking-tight"
+        >
           Full chart
         </h2>
 
@@ -138,40 +172,75 @@ export function NationalCharts({ chart }: NationalChartsProps) {
             <table className="w-full min-w-[680px] border-collapse text-xs">
               <thead>
                 <tr className="text-left text-muted">
-                  <th scope="col" className="px-2 py-2 font-medium">#</th>
-                  <th scope="col" className="px-2 py-2 font-medium">Move</th>
-                  <th scope="col" className="px-2 py-2 font-medium">Track</th>
-                  <th scope="col" className="px-2 py-2 font-medium">Region</th>
-                  <th scope="col" className="px-2 py-2 font-medium">14 days</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">Spins</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">W/w</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">Weeks</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">Peak</th>
+                  <th scope="col" className="px-2 py-2 font-medium">
+                    #
+                  </th>
+                  <th scope="col" className="px-2 py-2 font-medium">
+                    Move
+                  </th>
+                  <th scope="col" className="px-2 py-2 font-medium">
+                    Track
+                  </th>
+                  <th scope="col" className="px-2 py-2 font-medium">
+                    Region
+                  </th>
+                  <th scope="col" className="px-2 py-2 font-medium">
+                    14 days
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    Spins
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    W/w
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    Weeks
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    Peak
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {rest.map((entry) => (
                   <tr key={entry.track.id} className="border-t border-line">
-                    <td className="px-2 py-2 font-mono text-muted">{entry.rank}</td>
+                    <td className="px-2 py-2 font-mono text-muted">
+                      {entry.rank}
+                    </td>
                     <td className="px-2 py-2">
                       <Movement entry={entry} />
                     </td>
                     <td className="px-2 py-2">
-                      <span className="font-medium text-foreground">{entry.track.title}</span>
-                      <span className="ml-1.5 text-muted">{entry.track.primaryArtist}</span>
+                      <span className="font-medium text-foreground">
+                        {entry.track.title}
+                      </span>
+                      <span className="ml-1.5 text-muted">
+                        {entry.track.primaryArtist}
+                      </span>
                     </td>
-                    <td className="px-2 py-2 text-muted">{entry.dominantRegion}</td>
+                    <td className="px-2 py-2 text-muted">
+                      {entry.dominantRegion}
+                    </td>
                     <td className="px-2 py-2">
-                      <Sparkline values={entry.trend} label={`14-day curve, ${entry.track.title}`} />
+                      <Sparkline
+                        values={entry.trend}
+                        label={`14-day curve, ${entry.track.title}`}
+                      />
                     </td>
                     <td className="px-2 py-2 text-right font-mono">
                       {entry.spins7d.toLocaleString("en-UG")}
                     </td>
                     <td className="px-2 py-2 text-right font-mono">
-                      {entry.changePct === null ? "—" : formatPercent(entry.changePct, 0)}
+                      {entry.changePct === null
+                        ? "—"
+                        : formatPercent(entry.changePct, 0)}
                     </td>
-                    <td className="px-2 py-2 text-right font-mono">{entry.weeksOnChart}</td>
-                    <td className="px-2 py-2 text-right font-mono">{entry.peakPosition}</td>
+                    <td className="px-2 py-2 text-right font-mono">
+                      {entry.weeksOnChart ?? "—"}
+                    </td>
+                    <td className="px-2 py-2 text-right font-mono">
+                      {entry.peakPosition ?? "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -181,9 +250,10 @@ export function NationalCharts({ chart }: NationalChartsProps) {
       </section>
 
       <p className="pb-2 text-center text-[11px] text-muted">
-        Chart positions are computed from the simulated national airplay model. Peak position is a
-        fixture — the prototype keeps only fourteen days of history. No public chart is published
-        outside this dashboard.
+        Rankings reflect captured plays in this connected panel, not all Ugandan
+        broadcasts. The rolling seven-day comparison uses a 14-day history;
+        all-time peak positions and weeks on chart remain unknown. No
+        independent national chart is implied.
       </p>
     </div>
   );

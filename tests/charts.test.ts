@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildWeeklyChart, CHART_SIZE, weekStartIso } from "@/lib/charts";
-import { buildSeedTracks } from "@/lib/catalog";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 
 const NOW = new Date("2026-09-03T00:00:00Z");
 const CHART = buildWeeklyChart(buildSeedTracks(NOW), NOW);
@@ -25,7 +25,9 @@ describe("buildWeeklyChart", () => {
 
   it("ranks by seven-day spins with contiguous ranks", () => {
     for (let i = 1; i < CHART.entries.length; i++) {
-      expect(CHART.entries[i - 1].spins7d).toBeGreaterThanOrEqual(CHART.entries[i].spins7d);
+      expect(CHART.entries[i - 1].spins7d).toBeGreaterThanOrEqual(
+        CHART.entries[i].spins7d,
+      );
     }
     CHART.entries.forEach((entry, i) => expect(entry.rank).toBe(i + 1));
   });
@@ -54,7 +56,9 @@ describe("buildWeeklyChart", () => {
   });
 
   it("reports totals consistent with the entries", () => {
-    expect(CHART.totalSpins).toBe(CHART.entries.reduce((s, e) => s + e.spins7d, 0));
+    expect(CHART.totalSpins).toBe(
+      CHART.entries.reduce((s, e) => s + e.spins7d, 0),
+    );
     expect(CHART.newEntries).toBe(
       CHART.entries.filter((e) => e.previousRank === null).length,
     );

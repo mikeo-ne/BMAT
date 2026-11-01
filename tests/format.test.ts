@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { formatBytes, formatCompact, formatDate, formatDuration, formatNumber, formatPercent, initials, isValidIsoDate, lastNDaysIso, todayIso, formatShare } from "@/lib/format";
+import {
+  formatBytes,
+  formatCompact,
+  formatDate,
+  formatDuration,
+  formatNumber,
+  formatPercent,
+  initials,
+  isValidIsoDate,
+  lastNDaysIso,
+  todayIso,
+  formatShare,
+} from "@/lib/format";
 
 describe("formatNumber / formatCompact", () => {
   it("groups thousands", () => {
@@ -85,7 +97,7 @@ describe("date helpers", () => {
 
 describe("initials", () => {
   it("takes up to two initials", () => {
-    expect(initials("Boda Boda Anthem")).toBe("BB");
+    expect(initials("Fixture E")).toBe("FE");
     expect(initials("Nile")).toBe("N");
   });
 });

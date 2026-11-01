@@ -3,12 +3,13 @@
 # GitHub Pages cannot run the Node server (API routes, SSR, the .data store),
 # so this builds a static export via scripts/build-static.sh and publishes it.
 # The full app with uploads + persistence should run on a Node host
-# (Vercel/Netlify); this workflow publishes the read-only showcase.
+# with durable storage; Vercel defaults to safe public-reference mode.
+# This workflow publishes the read-only static showcase.
 name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [arena/01a066f0-bmat, main]
+    branches: ["arena/**", main]
   workflow_dispatch:
 
 permissions:
@@ -33,6 +34,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Validate types, lint and unit tests
+        run: npm run typecheck && npm run lint && npm test
+
+      - name: Validate PostgreSQL transactions and worker concurrency
+        run: npm run test:postgres
 
       - name: Build static export
         run: bash scripts/build-static.sh

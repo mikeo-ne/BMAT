@@ -10,34 +10,47 @@ import {
   webhookPayload,
   whatsappMessage,
 } from "@/lib/alerts";
-import { buildSeedTracks } from "@/lib/catalog";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 
 const NOW = new Date("2026-09-03T12:00:00Z");
 const CATALOGUE = buildSeedTracks(NOW);
 const RULES = buildDefaultRules(CATALOGUE);
-const STATION = { id: "capital-kla", name: "Capital FM", frequency: "91.3 MHz", hub: "Kampala" };
+const STATION = {
+  id: "capital-kla",
+  name: "Capital FM",
+  frequency: "91.3 MHz",
+  hub: "Kampala",
+};
 
 describe("alert message copy", () => {
-  it("matches the shipped push format exactly", () => {
-    expect(whatsappMessage("Katono", STATION, "2026-09-03T12:42:00Z")).toBe(
-      "🔥 AIRPLAY ALERT: Your track 'Katono' was just played on Capital FM (91.3 Kampala) at 15:42 EAT! Verified by the UPRS registry.",
+  it("identifies simulated pushes without claiming official verification", () => {
+    expect(whatsappMessage("Fixture G", STATION, "2026-09-03T12:42:00Z")).toBe(
+      "🔥 AIRPLAY ALERT (DEMO): A simulated play of 'Fixture G' on Capital FM (91.3 Kampala) at 15:42 EAT. Not independently verified or UPRS-endorsed.",
     );
   });
 
   it("renders the air time in East Africa Time, not UTC", () => {
-    const message = whatsappMessage("Katono", STATION, "2026-09-03T00:15:00Z");
+    const message = whatsappMessage(
+      "Fixture G",
+      STATION,
+      "2026-09-03T00:15:00Z",
+    );
     expect(message).toContain("03:15 EAT");
   });
 
   it("drops the frequency when a station has none", () => {
     const bare = { ...STATION, frequency: "—" };
-    expect(whatsappMessage("Katono", bare, "2026-09-03T12:42:00Z")).toContain(
-      "on Capital FM (Kampala)",
-    );
+    expect(
+      whatsappMessage("Fixture G", bare, "2026-09-03T12:42:00Z"),
+    ).toContain("on Capital FM (Kampala)");
   });
 
   it("flags an unverified play differently", () => {
-    const message = unverifiedMessage("Katono", STATION, "2026-09-03T12:42:00Z");
+    const message = unverifiedMessage(
+      "Fixture G",
+      STATION,
+      "2026-09-03T12:42:00Z",
+    );
     expect(message).toContain("⚠️ UNVERIFIED AIRPLAY");
     expect(message).toContain("Not billable until resolved.");
     expect(message).not.toContain("🔥 AIRPLAY ALERT");
@@ -134,12 +147,23 @@ describe("event simulation", () => {
 });
 
 describe("webhook payload", () => {
+  it("does not mark a simulated unmatched event as verified", () => {
+    const [event] = simulateAlertEvents(RULES, CATALOGUE, NOW);
+    const payload = webhookPayload({ ...event, verified: false });
+    expect(payload.event).toBe("airplay.unverified");
+    expect(payload.demo).toBe(true);
+    expect(payload.independently_verified).toBe(false);
+  });
   it("carries everything a subscriber needs to reconcile a play", () => {
     const [event] = simulateAlertEvents(RULES, CATALOGUE, NOW);
     const payload = webhookPayload(event);
     const station = payload.station as Record<string, string>;
 
-    expect(payload.event).toBe("airplay.verified");
+    expect(payload.event).toBe(
+      event.verified ? "airplay.verified" : "airplay.unverified",
+    );
+    expect(payload.demo).toBe(true);
+    expect(payload.independently_verified).toBe(false);
     expect(payload.occurred_at).toBe(event.atIso);
     expect(payload.track_id).toBe(event.trackId);
     expect(payload.title).toBe(event.title);

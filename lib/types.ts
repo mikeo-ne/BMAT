@@ -1,8 +1,9 @@
 import { REGIONS, type Region } from "@/lib/regions";
+import type { DeliveryOwnership } from "@/lib/delivery-splits";
 
 export type AudioFormat = "MP3" | "WAV";
 
-export type TrackStatus = "processing" | "live" | "rejected";
+export type TrackStatus = "processing" | "live" | "rejected" | "reference";
 
 export interface RegionAirplay {
   region: Region;
@@ -15,7 +16,7 @@ export interface RegionAirplay {
 
 export interface TrackAudio {
   fileName: string;
-  format: AudioFormat;
+  format: AudioFormat | null;
   mimeType: string;
   sizeBytes: number;
   durationSec: number | null;
@@ -27,12 +28,16 @@ export interface TrackAudio {
 
 export interface Track {
   id: string;
+  origin?: "public-reference" | "delivered" | "test-fixture";
+  referenceId?: string;
+  primaryArtists?: string[];
   title: string;
   primaryArtist: string;
   featuredArtists: string[];
   /** Ugandan radio format the recording is worked to, e.g. "Kidandali". */
   genre?: string;
   releaseDate: string;
+  /** Empty until provided by an authoritative source; never inferred from a platform ID. */
   isrc: string;
   audio: TrackAudio;
   status: TrackStatus;
@@ -41,6 +46,8 @@ export interface Track {
   totalSpins: number;
   reportingStations: number;
   airplay: RegionAirplay[];
+  /** Approved delivery splits; absent on the original seeded catalogue. */
+  ownership?: DeliveryOwnership;
 }
 
 export interface CatalogSummary {
@@ -53,7 +60,13 @@ export interface CatalogSummary {
 }
 
 export function emptyRegionAirplay(region: Region): RegionAirplay {
-  return { region, spins: 0, stations: 0, audience: 0, trend: Array.from({ length: 14 }, () => 0) };
+  return {
+    region,
+    spins: 0,
+    stations: 0,
+    audience: 0,
+    trend: Array.from({ length: 14 }, () => 0),
+  };
 }
 
 export function blankAirplay(): RegionAirplay[] {
@@ -62,25 +75,30 @@ export function blankAirplay(): RegionAirplay[] {
 
 /** Spins recorded in the last 7 reporting days, summed across regions. */
 export function last7DaysSpins(track: Track): number {
-  return track.airplay.reduce((sum, r) => sum + r.trend.slice(-7).reduce((a, b) => a + b, 0), 0);
+  return track.airplay.reduce(
+    (sum, r) => sum + r.trend.slice(-7).reduce((a, b) => a + b, 0),
+    0,
+  );
 }
 
 /** Region contributing the most spins to a track; Central as a tie-break. */
 export function dominantRegion(track: Track): Region {
-  return track.airplay.reduce<Region>(
-    (best, entry) => {
-      const bestSpins = track.airplay.find((a) => a.region === best)?.spins ?? 0;
-      return entry.spins > bestSpins ? entry.region : best;
-    },
-    "Central" as Region,
-  );
+  return track.airplay.reduce<Region>((best, entry) => {
+    const bestSpins = track.airplay.find((a) => a.region === best)?.spins ?? 0;
+    return entry.spins > bestSpins ? entry.region : best;
+  }, "Central" as Region);
 }
 
 /** Combined 14-day curve for a track, optionally limited to one region. */
 export function trendFor(track: Track, region: Region | "All"): number[] {
-  const entries = region === "All" ? track.airplay : track.airplay.filter((a) => a.region === region);
+  const entries =
+    region === "All"
+      ? track.airplay
+      : track.airplay.filter((a) => a.region === region);
   const length = Math.max(0, ...entries.map((e) => e.trend.length));
-  return Array.from({ length }, (_, i) => entries.reduce((sum, e) => sum + (e.trend[i] ?? 0), 0));
+  return Array.from({ length }, (_, i) =>
+    entries.reduce((sum, e) => sum + (e.trend[i] ?? 0), 0),
+  );
 }
 
 export function spinsFor(track: Track, region: Region | "All"): number {
@@ -96,8 +114,14 @@ export function stationsFor(track: Track, region: Region | "All"): number {
 }
 
 export function weekOverWeek(track: Track): number | null {
-  const recent = track.airplay.reduce((s, r) => s + r.trend.slice(-7).reduce((a, b) => a + b, 0), 0);
-  const prior = track.airplay.reduce((s, r) => s + r.trend.slice(-14, -7).reduce((a, b) => a + b, 0), 0);
+  const recent = track.airplay.reduce(
+    (s, r) => s + r.trend.slice(-7).reduce((a, b) => a + b, 0),
+    0,
+  );
+  const prior = track.airplay.reduce(
+    (s, r) => s + r.trend.slice(-14, -7).reduce((a, b) => a + b, 0),
+    0,
+  );
   if (prior === 0) return recent > 0 ? null : 0;
   return (recent - prior) / prior;
 }

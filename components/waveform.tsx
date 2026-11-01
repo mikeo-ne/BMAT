@@ -42,7 +42,10 @@ export function Waveform({
       const width = canvas.clientWidth;
       const cssHeight = canvas.clientHeight;
 
-      if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(cssHeight * dpr)) {
+      if (
+        canvas.width !== Math.round(width * dpr) ||
+        canvas.height !== Math.round(cssHeight * dpr)
+      ) {
         canvas.width = Math.round(width * dpr);
         canvas.height = Math.round(cssHeight * dpr);
       }
@@ -61,7 +64,9 @@ export function Waveform({
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.strokeStyle = color;
+      ctx.strokeStyle = color.startsWith("var(")
+        ? getComputedStyle(canvas).getPropertyValue(color.slice(4, -1)).trim()
+        : color;
       ctx.lineWidth = 1.6;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
@@ -90,12 +95,20 @@ export function Waveform({
         ctx.shadowBlur = 0;
       }
 
-      frameRef.current = requestAnimationFrame(draw);
+      if (analyser && active) frameRef.current = requestAnimationFrame(draw);
     };
 
     frameRef.current = requestAnimationFrame(draw);
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            if (!active) draw();
+          })
+        : null;
+    observer?.observe(canvas);
 
     return () => {
+      observer?.disconnect();
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
       frameRef.current = null;
     };
@@ -116,7 +129,7 @@ export function Waveform({
           active ? "bg-brand/15 text-brand" : "bg-surface-2 text-muted",
         ].join(" ")}
       >
-        {active ? "live" : "idle"}
+        {active ? "demo signal" : "idle"}
       </span>
     </div>
   );

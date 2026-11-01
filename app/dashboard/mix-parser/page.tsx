@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { MixParserView } from "@/components/mix-parser-view";
-import { readTracks } from "@/lib/store";
+import { readAnalyticsTracks as readTracks } from "@/lib/workspace-data";
 
 export const metadata: Metadata = {
   title: "Unidentified Audio & DJ Mix Parser",

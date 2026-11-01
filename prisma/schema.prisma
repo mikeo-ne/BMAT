@@ -1,13 +1,7 @@
-// East Sound — persistence target for the prototype.
-//
-// The running prototype keeps its catalogue in `.data/tracks.json` behind
-// lib/store.ts, whose read/write surface already mirrors a real repository so
-// this schema is a drop-in migration target. Nothing here is generated or wired
-// yet; it exists so the move to Postgres is a reviewed, validated artefact.
-//
-// Every model maps to an in-memory counterpart that is exercised by the test
-// suite (lib/types.ts, lib/regions.ts, lib/uprs.ts, lib/advertising.ts,
-// lib/mix-parser.ts, lib/splits.ts), so the field list is not aspirational.
+// Historical, unwired Prisma design (validated for reference only).
+// Active optional PostgreSQL persistence uses db/migrations and lib/postgres,
+// with a dedicated east_sound schema. Do NOT prisma db push this draft over it.
+// See docs/postgres-and-worker.md for migration/seed/worker commands and boundaries.
 
 generator client {
   provider = "prisma-client-js"

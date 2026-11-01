@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { SplitManager } from "@/components/split-manager";
 import { buildDisputes, buildSplitSheets } from "@/lib/splits";
-import { readTracks } from "@/lib/store";
+import { readAnalyticsTracks as readTracks } from "@/lib/workspace-data";
 
 export const metadata: Metadata = {
   title: "Rights & Split-Sheet Management",

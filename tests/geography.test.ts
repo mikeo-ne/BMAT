@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSeedTracks } from "@/lib/catalog";
+import { buildFixtureTracks as buildSeedTracks } from "@/tests/fixtures/catalogue";
 import {
   buildHitPredictor,
   buildHubMetrics,
@@ -19,7 +19,15 @@ const METRICS = buildHubMetrics(CATALOGUE);
 describe("hub panel", () => {
   it("covers the five Ugandan hubs and both cross-border markets", () => {
     const names = GEO_HUBS.map((h) => h.name);
-    for (const hub of ["Kampala", "Jinja", "Mbarara", "Gulu", "Mbale", "Nairobi", "Dar es Salaam"]) {
+    for (const hub of [
+      "Kampala",
+      "Jinja",
+      "Mbarara",
+      "Gulu",
+      "Mbale",
+      "Nairobi",
+      "Dar es Salaam",
+    ]) {
       expect(names).toContain(hub);
     }
     expect(UGANDA_HUBS).toHaveLength(5);
@@ -58,7 +66,8 @@ describe("hub metrics", () => {
   it("computes growth as the week-on-week change", () => {
     for (const metric of METRICS) {
       if (metric.spinsPrev7d === 0) continue;
-      const expected = (metric.spins7d - metric.spinsPrev7d) / metric.spinsPrev7d;
+      const expected =
+        (metric.spins7d - metric.spinsPrev7d) / metric.spinsPrev7d;
       expect(metric.growthRate!).toBeCloseTo(expected, 10);
     }
   });
@@ -88,13 +97,17 @@ describe("A&R hit predictor", () => {
 
   it("only promotes tracks that cleared the secondary-market floor", () => {
     for (const candidate of candidates) {
-      expect(candidate.secondarySpins).toBeGreaterThanOrEqual(EMERGING_SPIN_FLOOR);
+      expect(candidate.secondarySpins).toBeGreaterThanOrEqual(
+        EMERGING_SPIN_FLOOR,
+      );
     }
   });
 
   it("ranks by breakout score, descending", () => {
     for (let i = 1; i < candidates.length; i++) {
-      expect(candidates[i - 1].score).toBeGreaterThanOrEqual(candidates[i].score);
+      expect(candidates[i - 1].score).toBeGreaterThanOrEqual(
+        candidates[i].score,
+      );
     }
   });
 

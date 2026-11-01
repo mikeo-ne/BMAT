@@ -13,7 +13,7 @@ import {
 
 describe("registrantCode", () => {
   it("uses the leading letter of the first three words", () => {
-    expect(registrantCode("Nyege Nyege Tapes")).toBe("NNT");
+    expect(registrantCode("Quality Test Label")).toBe("QTL");
   });
 
   it("falls back to the first three characters for a single word", () => {
@@ -31,7 +31,9 @@ describe("registrantCode", () => {
   });
 
   it("is deterministic", () => {
-    expect(registrantCode("Ray Bwete")).toBe(registrantCode("ray bwete"));
+    expect(registrantCode("QA Artist Alpha")).toBe(
+      registrantCode("qa artist alpha"),
+    );
   });
 });
 
@@ -61,22 +63,34 @@ describe("padDesignation", () => {
 
 describe("generateIsrc", () => {
   it("produces a canonical Ugandan ISRC", () => {
-    expect(generateIsrc({ registrant: "Nyege Nyege Tapes", year: 2026, designation: 7 })).toBe(
-      "UG-NNT-26-00007",
-    );
+    expect(
+      generateIsrc({
+        registrant: "Quality Test Label",
+        year: 2026,
+        designation: 7,
+      }),
+    ).toBe("UG-QTL-26-00007");
   });
 
   it("takes the year block from the release year", () => {
-    const isrc = generateIsrc({ registrant: "Ray Bwete", year: 2031, designation: 1 });
+    const isrc = generateIsrc({
+      registrant: "QA Artist Alpha",
+      year: 2031,
+      designation: 1,
+    });
     expect(parseIsrc(isrc)?.year).toBe("31");
   });
 
   it("always yields a code that validates", () => {
-    const isrc = generateIsrc({ registrant: "Kasese Sound System", year: 2026, designation: 42 });
+    const isrc = generateIsrc({
+      registrant: "QA Artist Gamma",
+      year: 2026,
+      designation: 42,
+    });
     expect(isValidIsrc(isrc)).toBe(true);
     expect(parseIsrc(isrc)).toEqual({
       country: "UG",
-      registrant: "KSS",
+      registrant: "QAG",
       year: "26",
       designation: "00042",
     });

@@ -1,15 +1,24 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Headphones } from "lucide-react";
+import { EvidenceModal } from "@/components/evidence-modal";
+import { evidenceFromDetection, type BroadcastSpin } from "@/lib/playout";
 
 import { formatClock, timeAgo } from "@/lib/format";
-import { MATCH_THRESHOLD, isMatched, stationById, type Detection } from "@/lib/monitoring";
+import {
+  MATCH_THRESHOLD,
+  isMatched,
+  stationById,
+  type Detection,
+} from "@/lib/monitoring";
 
 type FeedFilter = "all" | "matched" | "unmatched";
 
 interface DetectionFeedProps {
   detections: Detection[];
   onClear: () => void;
+  onOpenEvidence?: () => void;
 }
 
 const FILTERS: { id: FeedFilter; label: string }[] = [
@@ -18,7 +27,12 @@ const FILTERS: { id: FeedFilter; label: string }[] = [
   { id: "unmatched", label: "Unmatched" },
 ];
 
-export function DetectionFeed({ detections, onClear }: DetectionFeedProps) {
+export function DetectionFeed({
+  detections,
+  onClear,
+  onOpenEvidence,
+}: DetectionFeedProps) {
+  const [evidence, setEvidence] = useState<BroadcastSpin | null>(null);
   const [filter, setFilter] = useState<FeedFilter>("all");
 
   const rows = useMemo(() => {
@@ -37,14 +51,21 @@ export function DetectionFeed({ detections, onClear }: DetectionFeedProps) {
   );
 
   return (
-    <section className="panel flex min-h-0 flex-col" aria-labelledby="feed-heading">
+    <section
+      className="panel flex min-h-0 flex-col"
+      aria-labelledby="feed-heading"
+    >
       <header className="flex flex-wrap items-end justify-between gap-3 border-b border-line px-4 py-3.5">
         <div>
-          <h2 id="feed-heading" className="text-sm font-semibold tracking-tight">
+          <h2
+            id="feed-heading"
+            className="text-sm font-semibold tracking-tight"
+          >
             Live detection feed
           </h2>
           <p className="text-xs text-muted">
-            Fingerprint matches against the delivered catalogue, newest first.
+            Demo matches against the delivered catalogue, newest first ·
+            timestamps UTC.
           </p>
         </div>
 
@@ -64,7 +85,9 @@ export function DetectionFeed({ detections, onClear }: DetectionFeedProps) {
                 ].join(" ")}
               >
                 {option.label}
-                <span className="ml-1 font-mono tabular-nums opacity-70">{counts[option.id]}</span>
+                <span className="ml-1 font-mono tabular-nums opacity-70">
+                  {counts[option.id]}
+                </span>
               </button>
             ))}
           </div>
@@ -83,7 +106,9 @@ export function DetectionFeed({ detections, onClear }: DetectionFeedProps) {
       {rows.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-5 py-14 text-center">
           <p className="text-sm font-medium">
-            {detections.length === 0 ? "No detections yet" : "Nothing matches that filter"}
+            {detections.length === 0
+              ? "No detections yet"
+              : "Nothing matches that filter"}
           </p>
           <p className="max-w-xs text-xs text-muted">
             {detections.length === 0
@@ -98,7 +123,10 @@ export function DetectionFeed({ detections, onClear }: DetectionFeedProps) {
             const matched = isMatched(detection);
 
             return (
-              <li key={detection.id} className="animate-rise px-4 py-3 hover:bg-surface-2/40">
+              <li
+                key={detection.id}
+                className="animate-rise px-4 py-3 hover:bg-surface-2/40"
+              >
                 <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -121,17 +149,27 @@ export function DetectionFeed({ detections, onClear }: DetectionFeedProps) {
                     </div>
 
                     <p className="mt-1 truncate text-sm font-medium">
-                      {detection.track ? detection.track.title : "Unidentified audio"}
+                      {detection.track
+                        ? detection.track.title
+                        : "Unidentified audio"}
                     </p>
 
                     <p className="truncate text-[11px] text-muted">
                       {detection.stationName}
-                      {station && <span className="font-mono"> · {station.frequency}</span>}
+                      {station && (
+                        <span className="font-mono">
+                          {" "}
+                          · {station.frequency}
+                        </span>
+                      )}
                       {detection.track && (
                         <>
                           {" · "}
                           {detection.track.primaryArtist}
-                          <span className="font-mono"> · {detection.track.isrc}</span>
+                          <span className="font-mono">
+                            {" "}
+                            · {detection.track.isrc}
+                          </span>
                         </>
                       )}
                     </p>
@@ -141,7 +179,7 @@ export function DetectionFeed({ detections, onClear }: DetectionFeedProps) {
                     </p>
                   </div>
 
-                  <div className="w-32 shrink-0">
+                  <div className="flex w-36 shrink-0 flex-col gap-2">
                     <div className="flex items-baseline justify-between">
                       <span className="text-[10px] uppercase tracking-wider text-muted">
                         confidence
@@ -170,12 +208,31 @@ export function DetectionFeed({ detections, onClear }: DetectionFeedProps) {
                         title={`Match threshold ${(MATCH_THRESHOLD * 100).toFixed(0)}%`}
                       />
                     </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost !gap-1.5 !py-1.5 !text-[10px]"
+                      onClick={() => {
+                        onOpenEvidence?.();
+                        setEvidence(evidenceFromDetection(detection));
+                      }}
+                      aria-label={`Open audible evidence for ${detection.stationName}`}
+                    >
+                      <Headphones size={12} />
+                      10s audible snippet
+                    </button>
                   </div>
                 </div>
               </li>
             );
           })}
         </ol>
+      )}
+      {evidence && (
+        <EvidenceModal
+          key={evidence.id}
+          spin={evidence}
+          onClose={() => setEvidence(null)}
+        />
       )}
     </section>
   );
