@@ -19,6 +19,8 @@ Set these **server-side** variables in your secret manager or ignored `.env` fil
 | `EAST_SOUND_LIVE_NOTIFICATIONS`       | Leave unset/`false` until consent, real providers and destinations are configured. Must be exactly `true` to send.                                                     |
 | `EAST_SOUND_DATA_DIR`                 | Still required as durable storage for `uploads/` even when catalogue/airplay/attempts use PostgreSQL.                                                                  |
 
+For an integration-managed connection string that uses `sslmode=require` and cannot be edited, explicitly set `EAST_SOUND_POSTGRES_TLS=verify-full`. The adapter changes only that mode to `verify-full` in memory before constructing the pool, preserving credentials, host and other parameters. It does not decrypt/export or change the provider's saved secret, and it still rejects missing, disabled, `prefer`, `verify-ca` and `no-verify` remote TLS modes. Without this opt-in, the original strict URL requirement remains unchanged.
+
 Generate workspace/principal UUIDs with `node -e "console.log(require('node:crypto').randomUUID())"`. Tokens must be separately generated cryptographically random secrets, not UUIDs or the placeholders in this documentation. A UUID column does not authenticate anybody.
 
 Pool connections are lazy (maximum 10 per process), with 5-second connection, 30-second statement and 10-second lock timeouts. Size the database for **all web and worker processes**. No remote connection is opened just by importing a module. Choosing PostgreSQL never silently falls back to private JSON if the database fails.
