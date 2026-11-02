@@ -22,6 +22,7 @@ Open `/dashboard/charts` as Public Guest, or `/login` to create an Artist / Labe
 - **Independent split sign-off:** immutable source/metadata/three-pool agreements, hashed private invitations, independent account approvals and owner-only master delivery/playback/range/withdrawal. Owners cannot approve a collaborator's allocation. Material edits need fresh approvals.
 - **Monitoring/evidence:** account-persisted authorized native/HLS sources, explicit HTML5 playback, captured-only station logs and ten-second evidence playback with optional bounded SHA-256/CORS verification. Licensed feeds and upstream capture/matching remain external integrations.
 - **Automatic notifications:** account-persisted consent/subscriptions, event-driven outbox enqueue, owned-recording watch scopes, encrypted write-only webhook secrets and server-only signed/provider adapters. Leases, bounded retries, deduplication and revocation checks are implemented. Queued/accepted does not mean delivered/read. Actual sends require explicit live/worker enable and configured, approved providers. Post-capture dispatch and authenticated daily retry/cleanup are implemented; prompt retries need a more frequent external scheduler or supervised worker.
+- **Private integration setup/inbox:** operator guidance for Meta Cloud API and Resend, per-artist encrypted one-time webhook keys, HMAC/timestamp checks, durable signed-ID deduplication, rotation/disable and minimized private receipts. Incoming claims/configuration tests never become captures or outbound sends; migration 003 is required for this receiver.
 - **Persistence and responsive UI:** file or PostgreSQL authority, user-scoped IndexedDB/localStorage snapshots, account-change/logout eviction, blocked-storage fallbacks, four Uganda regions, filtered/re-ranked airplay views, accessible mobile navigation and real deep links.
 - **CMO review:** capture-backed ledgers, EAT dayparts, illustrative allocation/CSV/PDF exports and immutable, idempotent CMO split-review decisions with atomic audit records. Review does not silently rewrite signed contributor shares, impose statutory holds or transfer money.
 
@@ -52,6 +53,7 @@ Artist sign-up is self-service. Use a secure local password source with the trus
 
 Never put real passwords or provider tokens in command arguments, source, chat, browser storage or exported configs. The CLI also accepts the private process variable `EAST_SOUND_ACCOUNT_PASSWORD`. A login account is not proof of legal identity or mailbox ownership. Real OAuth, mailbox verification, recovery and MFA are not supplied by the mock flow.
 
+- [WhatsApp/email onboarding and private webhook inbox](docs/notification-onboarding-and-inbox.md)
 - [Private cloud master uploads and live-delivery setup](docs/cloud-masters-and-live-delivery.md)
 - [Authenticated fullstack operations and security model](docs/fullstack-operations.md)
 - [PostgreSQL migrations, capture transactions and workers](docs/postgres-and-worker.md)
@@ -83,7 +85,7 @@ EAST_SOUND_EXPECT_COMMIT=<expected-full-git-sha> npm run test:deployment
 
 It checks public charts/statistics, capability/commit identity, unauthorized API rejection and private-page sign-in gates. It does not provision an identity, inject a capture, reserve a tag or contact a notification provider.
 
-Cloud-adapter and notification-execution checks are recorded in [the cloud delivery verification report](docs/cloud-delivery-verification.md). The earlier [fullstack verification report](docs/fullstack-verification.md) retains the historical baseline checks and launch boundaries.
+The new provider-onboarding/private-inbox checks are recorded in [the notification setup verification report](docs/notification-onboarding-verification.md). Cloud-adapter and notification-execution checks are recorded in [the cloud delivery verification report](docs/cloud-delivery-verification.md). The earlier [fullstack verification report](docs/fullstack-verification.md) retains the historical baseline checks and launch boundaries.
 
 ## Deployment boundaries
 

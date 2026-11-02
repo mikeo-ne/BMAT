@@ -43,6 +43,8 @@ npm run db:seed
 
 Use a migration owner for DDL; provision restricted runtime roles according to your deployment. The app needs its record/sequence/function permissions, and either pre-created partitions or permission to create them. Functions are **not security-definer shortcuts** and no superuser extensions are installed.
 
+Migration **003_webhook_receivers.sql** adds the optional private signed-inbox receiver and durable receipt/deduplication tables with composite tenant/owner foreign keys. Apply it explicitly before enabling that feature. It does not change captures, master ownership, the outbox, or the existing 001/002 checksums. See [onboarding and receiver security](notification-onboarding-and-inbox.md).
+
 ## 3. Register opted-in rules privately
 
 ### Authenticated account watches (default application flow)

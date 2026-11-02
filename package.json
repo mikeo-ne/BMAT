@@ -18,7 +18,8 @@
     "worker:notifications": "node --conditions=react-server --import tsx scripts/notification-worker.ts",
     "test:postgres": "vitest run --config vitest.postgres.config.mts",
     "test:deployment": "playwright test --config playwright.deployment.config.ts",
-    "account:create": "node --conditions=react-server --import tsx scripts/account.ts"
+    "account:create": "node --conditions=react-server --import tsx scripts/account.ts",
+    "test:integrations": "playwright test --config playwright.integrations.config.ts"
   },
   "dependencies": {
     "@vercel/blob": "2.8.2",

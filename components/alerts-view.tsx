@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { DemoStudio } from "@/components/demo-studio";
 import { AccountOutboxPanel } from "@/components/account-outbox-panel";
 
@@ -179,6 +180,13 @@ export function AlertsView({
         description="From the first captured spin to the next milestone. Put the right update in the right hands, across WhatsApp, email and your label’s own tools."
         actions={
           <>
+            <Link
+              href="/dashboard/alerts/setup"
+              className="btn btn-ghost !text-xs"
+            >
+              <ShieldCheck size={15} />
+              Integration setup
+            </Link>
             <button
               type="button"
               className="btn btn-ghost !text-xs"

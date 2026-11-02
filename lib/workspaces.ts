@@ -11,6 +11,7 @@ export type ModuleId =
   | "catalogue"
   | "delivery"
   | "alerts"
+  | "integration-setup"
   | "charts"
   | "stats"
   | "station-overview"
@@ -70,6 +71,7 @@ export const WORKSPACES: readonly Workspace[] = [
       "catalogue",
       "delivery",
       "alerts",
+      "integration-setup",
       "charts",
       "regional",
       "rights",
@@ -171,6 +173,13 @@ export const WORKSPACE_MODULES: readonly WorkspaceModule[] = [
     href: "/dashboard/alerts",
     label: "WhatsApp & webhooks",
     title: "Live Airplay Alerts & Webhooks",
+    owner: "artist",
+  },
+  {
+    id: "integration-setup",
+    href: "/dashboard/alerts/setup",
+    label: "Integration setup",
+    title: "Notification Integration Setup",
     owner: "artist",
   },
   {

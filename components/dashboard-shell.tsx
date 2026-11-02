@@ -58,6 +58,7 @@ const ICONS: Record<ModuleId, LucideIcon> = {
   catalogue: FileMusic,
   delivery: Upload,
   alerts: Bell,
+  "integration-setup": ShieldCheck,
   charts: ChartNoAxesCombined,
   stats: Globe2,
   "station-overview": Radio,

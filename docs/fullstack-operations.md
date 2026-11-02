@@ -92,6 +92,10 @@ Build/test with the development toolchain, then use production-only runtime depe
 
 Before real launch, additionally configure mailbox verification/password recovery/MFA or a real identity provider, licensed recognition/evidence, provider delivery callbacks, TLS/edge abuse controls, monitoring, backup/retention/purge and data-subject procedures, operational security review and any required rights/society/legal agreements. Repository tests do not certify those external or operational prerequisites.
 
+## Provider onboarding and signed webhook inbox
+
+The private `/dashboard/alerts/setup` page separates operator-only provider credentials from per-account inbox management. See [the onboarding/inbox guide](notification-onboarding-and-inbox.md). Additive migration **003** is explicit and creates receiver/receipt tables only; no DDL runs on requests or normal builds. Receivers require PostgreSQL, owner/role/CSRF checks, encrypted one-time keys and valid HMAC/time windows. Signed external claims remain unverified integration data, never captures, royalties or outgoing queue jobs. The local verifier button is in-process, not a provider/network delivery test. Meta/Resend approvals, a verified sending domain, consent and deliberate live activation remain external setup tasks.
+
 ## Verification
 
 ```sh

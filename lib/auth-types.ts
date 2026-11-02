@@ -33,6 +33,7 @@ const PRIVATE: Record<AccountRole, string[]> = {
     "/dashboard/artist/catalogue",
     "/dashboard/artist/delivery",
     "/dashboard/alerts",
+    "/dashboard/alerts/setup",
     "/dashboard/analytics/regional",
     "/dashboard/splits",
   ],
