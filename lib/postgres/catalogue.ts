@@ -84,8 +84,11 @@ export async function readPostgresTracks(): Promise<Track[]> {
   );
   return result.rows.map((row) => row.metadata);
 }
-export async function addPostgresTrack(track: Track): Promise<Track> {
-  await insertTrack(postgresPool(), postgresTenant(), track);
+export async function addPostgresTrack(
+  track: Track,
+  db: Database = postgresPool(),
+): Promise<Track> {
+  await insertTrack(db, postgresTenant(), track);
   return track;
 }
 export async function deletePostgresTrack(

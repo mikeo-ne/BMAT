@@ -1,3 +1,4 @@
+import { masterDeliveryMode } from "@/lib/master-storage-config";
 import { readBoundedFormData } from "@/lib/integration-auth";
 import { createHash } from "node:crypto";
 import { guardedApi, HttpError, tokenHash } from "@/lib/auth-core";
@@ -47,6 +48,11 @@ export async function POST(request: Request) {
       );
     if (!masterUploadsAvailable())
       return Response.json({ error: MASTER_STORAGE_NOTICE }, { status: 503 });
+    if (masterDeliveryMode() !== "local")
+      throw new HttpError(
+        409,
+        "Use the authenticated direct cloud upload flow; master bytes must not pass through a serverless multipart request.",
+      );
     const length = Number(request.headers.get("content-length"));
     if (Number.isFinite(length) && length > MAX_UPLOAD_BYTES + 1024 * 1024)
       throw new HttpError(413, "The request exceeds the 80 MB audio budget.");

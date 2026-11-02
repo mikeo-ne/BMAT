@@ -1,8 +1,8 @@
+import { masterDeliveryMode } from "@/lib/master-storage-config";
 import "server-only";
 import {
   referenceStorageOnly,
   assertMutableStorage,
-  masterUploadsAvailable,
   MASTER_STORAGE_NOTICE,
 } from "@/lib/runtime-storage";
 import { postgresStorageEnabled } from "@/lib/postgres/pool";
@@ -31,7 +31,7 @@ import {
 import type { DeliveryOwnership } from "@/lib/delivery-splits";
 import type { AudioSignature, Track } from "@/lib/types";
 
-/** Explicit SQL repository or single-process JSON store. Master bytes remain filesystem-backed. */
+/** Explicit SQL repository or single-process JSON store. Local masters use the private filesystem; cloud object metadata is stored in PostgreSQL. */
 export const DATA_DIR =
   process.env.EAST_SOUND_DATA_DIR ?? path.join(process.cwd(), ".data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -256,7 +256,7 @@ export async function saveUpload(
   buffer: Uint8Array,
   fileName: string,
 ): Promise<string> {
-  if (!masterUploadsAvailable()) throw new Error(MASTER_STORAGE_NOTICE);
+  if (masterDeliveryMode() !== "local") throw new Error(MASTER_STORAGE_NOTICE);
   await ensureDirs();
   const storedName = `${randomUUID()}${path.extname(fileName).toLowerCase()}`;
   await writeFile(path.join(UPLOAD_DIR, storedName), buffer, {

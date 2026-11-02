@@ -1,3 +1,4 @@
+import { privateMasterResponse } from "@/lib/private-blob";
 import { guardedApi } from "@/lib/auth-core";
 import {
   masterUploadsAvailable,
@@ -9,6 +10,7 @@ import { deleteTrack, readTracks } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export async function DELETE(
   request: Request,
@@ -56,6 +58,7 @@ export async function GET(
     const track = (await readTracks()).find(
       (t) => t.id === id && t.ownerId === actor.id,
     );
+    if (track?.audio.blob) return privateMasterResponse(request, track);
     if (!track?.audio.storedName)
       return Response.json({ error: "Master not found." }, { status: 404 });
     const { readFile } = await import("node:fs/promises"),

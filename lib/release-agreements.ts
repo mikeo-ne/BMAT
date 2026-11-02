@@ -350,36 +350,12 @@ export async function claimAgreement(
     KIND,
     id,
     (current) => {
-      live(current);
-      if (
-        current.status === "delivered" ||
-        (current.status === "delivering" &&
-          Date.parse(current.claimUntil ?? "") > Date.now())
-      )
-        throw new HttpError(
-          409,
-          "This agreement is already delivered or delivery is in progress.",
-        );
-      if (!allApproved(current))
-        throw new HttpError(
-          422,
-          "Every collaborator must sign in and approve before release.",
-        );
-      if (
-        current.bindingDigest !==
-        digest(
-          agreementPayload(
-            metadata,
-            current.parties,
-            sourceSha256,
-            fingerprintDigest,
-          ),
-        )
-      )
-        throw new HttpError(
-          409,
-          "Audio or recording metadata changed after sign-off. Create a new agreement and collect fresh approvals.",
-        );
+      assertDeliveryAgreement(
+        current,
+        metadata,
+        sourceSha256,
+        fingerprintDigest,
+      );
       return {
         ...current,
         status: "delivering",
@@ -387,28 +363,69 @@ export async function claimAgreement(
       };
     },
   );
+  return { agreement, ownership: agreementOwnership(agreement) };
+}
+export function assertDeliveryAgreement(
+  current: ReleaseAgreement | null,
+  metadata: AgreementMetadata,
+  sourceSha256: string,
+  fingerprintDigest: string,
+  allowDelivered = false,
+): asserts current is ReleaseAgreement {
+  live(current);
+  if (
+    (current.status === "delivered" && !allowDelivered) ||
+    (current.status === "delivering" &&
+      Date.parse(current.claimUntil ?? "") > Date.now())
+  )
+    throw new HttpError(
+      409,
+      "This agreement is already delivered or delivery is in progress.",
+    );
+  if (!allApproved(current))
+    throw new HttpError(
+      422,
+      "Every collaborator must sign in and approve before release.",
+    );
+  if (
+    current.bindingDigest !==
+    digest(
+      agreementPayload(
+        metadata,
+        current.parties,
+        sourceSha256,
+        fingerprintDigest,
+      ),
+    )
+  )
+    throw new HttpError(
+      409,
+      "Audio or recording metadata changed after sign-off. Create a new agreement and collect fresh approvals.",
+    );
+}
+export function agreementOwnership(
+  agreement: ReleaseAgreement,
+): DeliveryOwnership {
   return {
-    agreement,
-    ownership: {
-      version: 1,
-      approvalMethod: "authenticated-account",
-      agreementId: id,
-      bindingDigest: agreement.bindingDigest,
-      parties: agreement.parties.map((p) => {
-        const approval = agreement.approvals.find((a) => a.partyId === p.id)!;
-        return {
-          ...p,
-          signature: {
-            typedName: approval.typedName,
-            signedAt: approval.signedAt,
-            userId: approval.userId,
-            accountEmail: approval.accountEmail,
-          },
-        };
-      }),
-    },
+    version: 1,
+    approvalMethod: "authenticated-account",
+    agreementId: agreement.id,
+    bindingDigest: agreement.bindingDigest,
+    parties: agreement.parties.map((p) => {
+      const approval = agreement.approvals.find((a) => a.partyId === p.id)!;
+      return {
+        ...p,
+        signature: {
+          typedName: approval.typedName,
+          signedAt: approval.signedAt,
+          userId: approval.userId,
+          accountEmail: approval.accountEmail,
+        },
+      };
+    }),
   };
 }
+
 export async function finishAgreement(
   actor: SessionUser,
   id: string,
