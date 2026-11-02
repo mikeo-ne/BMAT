@@ -33,6 +33,17 @@ export function createPostgresPool(
   if (!["postgres:", "postgresql:"].includes(url.protocol))
     throw new Error("Use a PostgreSQL DATABASE_URL.");
   const local = ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
+  // Provider-managed URLs cannot always be edited. This explicit opt-in only
+  // strengthens `require` to certificate AND hostname verification; it never
+  // permits plaintext, verify-ca, or no-verify connections.
+  if (
+    !local &&
+    url.searchParams.get("sslmode") === "require" &&
+    process.env.EAST_SOUND_POSTGRES_TLS === "verify-full"
+  ) {
+    url.searchParams.set("sslmode", "verify-full");
+    connectionString = url.toString();
+  }
   if (!local && url.searchParams.get("sslmode") !== "verify-full")
     throw new Error(
       "Remote PostgreSQL connections require sslmode=verify-full.",

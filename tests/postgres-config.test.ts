@@ -71,6 +71,48 @@ describe("explicit PostgreSQL configuration boundaries", () => {
     expect(pool.totalCount).toBe(0);
     await pool.end();
   });
+  it("explicitly strengthens a provider-managed require URL without changing its credentials or destination", async () => {
+    vi.stubEnv("EAST_SOUND_POSTGRES_TLS", "verify-full");
+    const original =
+      "postgresql://qa:fixture-secret@remote.example.com:5432/private-db?sslmode=require&channel_binding=require";
+    const pool = createPostgresPool(original);
+    const verified = new URL(pool.options.connectionString!);
+    expect(verified.searchParams.get("sslmode")).toBe("verify-full");
+    expect(verified.searchParams.get("channel_binding")).toBe("require");
+    expect(verified.hostname).toBe("remote.example.com");
+    expect(verified.port).toBe("5432");
+    expect(verified.pathname).toBe("/private-db");
+    expect(verified.username).toBe("qa");
+    expect(verified.password).toBe("fixture-secret");
+    expect(original).toContain("sslmode=require");
+    expect(pool.totalCount).toBe(0);
+    await pool.end();
+  });
+  it.each([
+    "",
+    "?sslmode=disable",
+    "?sslmode=prefer",
+    "?sslmode=verify-ca",
+    "?sslmode=no-verify",
+  ])(
+    "never relaxes unsafe or missing TLS modes with the provider opt-in (%s)",
+    (suffix) => {
+      vi.stubEnv("EAST_SOUND_POSTGRES_TLS", "verify-full");
+      expect(() =>
+        createPostgresPool(
+          "postgresql://qa:fixture-secret@remote.example.com/db" + suffix,
+        ),
+      ).toThrow(/sslmode=verify-full/);
+    },
+  );
+  it("does not rewrite an already fully verified URL with the provider opt-in", async () => {
+    vi.stubEnv("EAST_SOUND_POSTGRES_TLS", "verify-full");
+    const original =
+      "postgresql://qa:fixture-secret@remote.example.com/db?sslmode=verify-full";
+    const pool = createPostgresPool(original);
+    expect(pool.options.connectionString).toBe(original);
+    await pool.end();
+  });
   it("sanitizes invalid connection configuration instead of exposing URL credentials", () => {
     vi.stubEnv("DATABASE_URL", undefined);
     expect(() => createPostgresPool()).toThrow(/Configure DATABASE_URL/);
