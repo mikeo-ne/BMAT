@@ -1,3 +1,4 @@
+import { masterDeliveryMode } from "@/lib/master-storage-config";
 import { ArtistPortal } from "@/components/artist-portal";
 import { PANEL_SIZE } from "@/lib/catalog";
 import {
@@ -31,6 +32,7 @@ export async function ArtistWorkspace({
       now={data.now}
       canPoll={capturePollingAvailable()}
       deliveryAvailable={masterUploadsAvailable() && !data.actor.mock}
+      cloudDelivery={masterDeliveryMode() === "direct-blob"}
     />
   );
 }

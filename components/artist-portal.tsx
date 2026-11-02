@@ -5,7 +5,7 @@ import { useAuth } from "@/components/auth-provider";
 import { sessionScope } from "@/lib/auth-types";
 import { ReleaseAgreementPanel } from "@/components/authenticated-splits";
 import { cacheSnapshot } from "@/lib/browser-cache";
-import { authFetch } from "@/lib/auth-client";
+import { authFetch, browserSession } from "@/lib/auth-client";
 import { MasterSignaturePreview } from "@/components/master-signature-preview";
 import { useArtistNavigation } from "@/components/artist-navigation";
 import type { ArtistView } from "@/lib/workspaces";
@@ -78,6 +78,7 @@ interface ArtistPortalProps {
   initialEvents?: BroadcastSpin[];
   canPoll?: boolean;
   deliveryAvailable?: boolean;
+  cloudDelivery?: boolean;
   initialView?: View;
 }
 interface Notice {
@@ -116,6 +117,7 @@ export function ArtistPortal({
   initialEvents = [],
   canPoll = false,
   deliveryAvailable = true,
+  cloudDelivery = false,
   initialView = "overview",
 }: ArtistPortalProps) {
   const { session } = useAuth();
@@ -157,6 +159,8 @@ export function ArtistPortal({
     { fileName: string; reason: string }[]
   >([]);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const uploadAbort = useRef<AbortController | null>(null);
   const [allocating, setAllocating] = useState<string[]>([]);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [focusRegion, setFocusRegion] = useState<Region | "All">("All");
@@ -167,6 +171,7 @@ export function ArtistPortal({
   useEffect(() => {
     const urls = previewUrls.current;
     return () => {
+      uploadAbort.current?.abort();
       for (const url of urls) URL.revokeObjectURL(url);
     };
   }, []);
@@ -436,6 +441,10 @@ export function ArtistPortal({
     setErrors(validation);
     if (Object.keys(validation).length) return;
     setSubmitting(true);
+    setUploadProgress(0);
+    uploadAbort.current = new AbortController();
+    const isCurrentOwner = () =>
+      sessionScope(browserSession().user) === dataScope;
     setNotice(null);
     const form = new FormData();
     form.set("audio", active.file, active.fileName);
@@ -457,19 +466,36 @@ export function ArtistPortal({
       }),
     );
     try {
-      const response = await authFetch("/api/tracks", {
-        method: "POST",
-        body: form,
-      });
-      const result = (await response.json()) as {
-        track?: Track;
-        error?: string;
-        errors?: MetadataErrors;
-      };
-      if (!response.ok || !result.track) {
-        setErrors(result.errors ?? {});
-        throw new Error(result.error ?? "Delivery failed.");
+      let result: { track?: Track; error?: string; errors?: MetadataErrors };
+      if (cloudDelivery) {
+        const { deliverCloudMaster } = await import(
+          "@/lib/cloud-master-client"
+        );
+        result = {
+          track: await deliverCloudMaster(
+            active,
+            activeMeta,
+            agreementId!,
+            sharePublic,
+            setUploadProgress,
+            uploadAbort.current.signal,
+          ),
+        };
+      } else {
+        const response = await authFetch("/api/tracks", {
+          method: "POST",
+          body: form,
+          signal: uploadAbort.current.signal,
+        });
+        result = await response.json();
+        if (!response.ok || !result.track) {
+          if (isCurrentOwner()) setErrors(result.errors ?? {});
+          throw new Error(result.error ?? "Delivery failed.");
+        }
       }
+      if (!isCurrentOwner()) return;
+      if (!result.track)
+        throw new Error("The delivery returned no verified recording.");
       setTracks((previous) => [result.track!, ...previous]);
       removeStaged(active.id);
       setNotice({
@@ -478,15 +504,16 @@ export function ArtistPortal({
       });
       setView("catalogue");
     } catch (error) {
-      setNotice({
-        tone: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Delivery failed. Your staged master is still available.",
-      });
+      if (isCurrentOwner())
+        setNotice({
+          tone: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Delivery failed. Your staged master is still available.",
+        });
     } finally {
-      setSubmitting(false);
+      if (isCurrentOwner()) setSubmitting(false);
     }
   }, [
     active,
@@ -497,13 +524,15 @@ export function ArtistPortal({
     removeStaged,
     submitting,
     deliveryAvailable,
+    cloudDelivery,
+    dataScope,
     setView,
   ]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (
       !window.confirm(
-        "Withdraw this recording from the catalogue? Its locally stored master and approved split sheet will also be removed.",
+        "Withdraw this recording from the catalogue? Playback access will be revoked; retained master bytes follow the configured storage retention policy.",
       )
     )
       return;
@@ -1007,6 +1036,24 @@ export function ArtistPortal({
                       !!agreementId
                     }
                   >
+                    {cloudDelivery && submitting && (
+                      <div
+                        role="status"
+                        className="rounded-xl border border-brand/20 bg-brand/5 p-3 text-xs"
+                      >
+                        <p>
+                          {uploadProgress < 99
+                            ? `Private cloud upload · ${uploadProgress}%`
+                            : "Verifying the stored checksum and collaborator approvals…"}
+                        </p>
+                        <progress
+                          aria-label="Private master upload progress"
+                          className="mt-2 h-2 w-full accent-emerald-400"
+                          value={uploadProgress}
+                          max={100}
+                        />
+                      </div>
+                    )}
                     {active?.fingerprint && (
                       <MasterSignaturePreview signature={active.fingerprint} />
                     )}

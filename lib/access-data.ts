@@ -12,6 +12,11 @@ export function allowedArtistTracks(
 ): Track[] {
   return tracks.filter((track) => ownsTrack(user, track));
 }
+export function clientTrack(track: Track): Track {
+  const { blob: _object, ...audio } = track.audio;
+  void _object;
+  return { ...track, audio: { ...audio, storedName: null } };
+}
 function redactMaster(track: Track, rights = false): Track {
   const {
     ownerId: _owner,
@@ -25,7 +30,7 @@ function redactMaster(track: Track, rights = false): Track {
   void _fingerprint;
   return {
     ...rest,
-    audio: { ...track.audio, storedName: null, fileName: "", sizeBytes: 0 },
+    audio: { ...clientTrack(track).audio, fileName: "", sizeBytes: 0 },
     ...(rights && ownership ? { ownership } : {}),
   };
 }
@@ -58,13 +63,7 @@ export function isolateWorkspace(
       .filter((t) => t.origin === "public-reference")
       .map((t) => redactMaster(t));
     return {
-      tracks: [
-        ...owned.map((t) => ({
-          ...t,
-          audio: { ...t.audio, storedName: null },
-        })),
-        ...references,
-      ],
+      tracks: [...owned.map(clientTrack), ...references],
       history: history.filter((e) => e.trackId !== null && ids.has(e.trackId)),
     };
   }
@@ -81,10 +80,7 @@ export function isolateWorkspace(
     };
   }
   return {
-    tracks: tracks.map((t) => ({
-      ...t,
-      audio: { ...t.audio, storedName: null },
-    })),
+    tracks: tracks.map(clientTrack),
     history,
   };
 }

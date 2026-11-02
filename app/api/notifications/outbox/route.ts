@@ -1,3 +1,4 @@
+import { notificationExecutionReadiness } from "@/lib/notification-runtime";
 import { guardedApi } from "@/lib/auth-core";
 import { fileOutbox } from "@/lib/file-notification-queue";
 import {
@@ -11,17 +12,16 @@ export async function GET(request: Request) {
   return guardedApi(request, ["artist"], false, async (actor) => {
     if (!postgresStorageEnabled())
       return Response.json({
-        jobs: (await fileOutbox(actor.id))
-          .slice(0, 100)
-          .map((j) => ({
-            id: j.id,
-            channel: j.event.channel,
-            message: j.event.message,
-            status: j.status,
-            attempts: j.attempts,
-            queuedAt: j.queuedAt,
-            code: j.code,
-          })),
+        execution: notificationExecutionReadiness(),
+        jobs: (await fileOutbox(actor.id)).slice(0, 100).map((j) => ({
+          id: j.id,
+          channel: j.event.channel,
+          message: j.event.message,
+          status: j.status,
+          attempts: j.attempts,
+          queuedAt: j.queuedAt,
+          code: j.code,
+        })),
         notice:
           "Queued is not sent. Accepted is provider acceptance, not a delivery/read receipt.",
       });
@@ -33,6 +33,7 @@ export async function GET(request: Request) {
       [postgresTenant(), actor.id],
     );
     return Response.json({
+      execution: notificationExecutionReadiness(),
       jobs: result.rows.map((j) => ({
         ...j,
         status: j.status === "sent" ? "accepted" : j.status,

@@ -1,3 +1,4 @@
+import { dispatchAfterCaptureCommit } from "@/lib/notification-runtime";
 import { guardedApi, HttpError } from "@/lib/auth-core";
 import { readWorkspaceData } from "@/lib/workspace-data";
 import { referenceStorageOnly } from "@/lib/runtime-storage";
@@ -13,6 +14,7 @@ import { CaptureIdentityConflict } from "@/lib/postgres/captures";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 export async function GET(request?: Request) {
   return guardedApi(
     request,
@@ -63,9 +65,9 @@ export async function POST(request: Request) {
         { error: "Capture validation failed.", errors: parsed.errors },
         { status: 422 },
       );
-    return Response.json(await appendCapturedSpins(parsed.spins), {
-      status: 201,
-    });
+    const saved = await appendCapturedSpins(parsed.spins);
+    dispatchAfterCaptureCommit();
+    return Response.json(saved, { status: 201 });
   } catch (error) {
     if (error instanceof CaptureIdentityConflict)
       return Response.json({ error: error.message }, { status: 409 });

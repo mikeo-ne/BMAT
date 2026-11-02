@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -339,7 +340,7 @@ export async function mutateAccountDocument<T>(
   ownerId: string,
   kind: string,
   key: string,
-  update: (existing: T | null) => T,
+  update: (existing: T | null, client?: PoolClient) => T | Promise<T>,
   auditEntry?: {
     actorId: string;
     action: string;
@@ -348,12 +349,12 @@ export async function mutateAccountDocument<T>(
   },
 ): Promise<T> {
   if (!postgresStorageEnabled())
-    return mutate((state) => {
+    return mutate(async (state) => {
       const index = state.documents.findIndex(
         (d) => d.ownerId === ownerId && d.kind === kind && d.key === key,
       );
       const previous = index < 0 ? null : (state.documents[index].value as T);
-      const next = update(previous);
+      const next = await update(previous);
       if (auditEntry && next !== previous)
         state.audit.push({ ...auditEntry, at: new Date().toISOString() });
       const row = {
@@ -378,7 +379,7 @@ export async function mutateAccountDocument<T>(
       [postgresTenant(), ownerId, kind, key],
     );
     const previous = result.rows[0]?.value ?? null;
-    const next = update(previous);
+    const next = await update(previous, client);
     if (auditEntry && next !== previous)
       await client.query(
         "INSERT INTO east_sound.security_audit(tenant_id,actor_id,action,object_key,detail) VALUES($1,$2,$3,$4,$5::jsonb)",

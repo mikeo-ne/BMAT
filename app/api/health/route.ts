@@ -1,3 +1,4 @@
+import { masterDeliveryMode } from "@/lib/master-storage-config";
 import {
   referenceStorageOnly,
   masterUploadsAvailable,
@@ -29,6 +30,7 @@ export async function GET() {
         status: "ok",
         storage: reference ? "reference" : postgres ? "postgres" : "file",
         masterDelivery: masterUploadsAvailable(),
+        masterStorage: masterDeliveryMode(),
         capturePolling: capturePollingAvailable(),
         commit: commit && /^[a-f\d]{40}$/i.test(commit) ? commit : null,
         notice: reference

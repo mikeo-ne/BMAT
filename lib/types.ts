@@ -22,6 +22,8 @@ export interface TrackAudio {
   durationSec: number | null;
   /** Server-side stored name under `.data/uploads/`, null for seeded fixtures. */
   storedName: string | null;
+  /** Opaque server-side object reference; stripped from every client/API projection. */
+  blob?: { provider: "vercel-blob"; uploadId: string; etag: string };
   /** Object URL for the staged file, client-side only. */
   previewUrl?: string;
 }

@@ -21,7 +21,7 @@ Open `/dashboard/charts` as Public Guest, or `/login` to create an Artist / Labe
 - **Actual MP3/WAV processing:** up to **80 MiB per file**, browser `OfflineAudioContext` decoding, waveform RMS/FFT features in a worker, full-file and feature SHA-256, and persistent unique `UG-ESD-26-XXXXX` format tags. Tags are local allocations, not official registration; features are not a licensed production recognition service or proof of rights.
 - **Independent split sign-off:** immutable source/metadata/three-pool agreements, hashed private invitations, independent account approvals and owner-only master delivery/playback/range/withdrawal. Owners cannot approve a collaborator's allocation. Material edits need fresh approvals.
 - **Monitoring/evidence:** account-persisted authorized native/HLS sources, explicit HTML5 playback, captured-only station logs and ten-second evidence playback with optional bounded SHA-256/CORS verification. Licensed feeds and upstream capture/matching remain external integrations.
-- **Automatic notifications:** account-persisted consent/subscriptions, event-driven outbox enqueue, owned-recording watch scopes, encrypted write-only webhook secrets and server-only signed/provider adapters. Leases, bounded retries, deduplication and revocation checks are implemented. Queued/accepted does not mean delivered/read. Actual sends require explicit live enable, configured providers and a supervised worker.
+- **Automatic notifications:** account-persisted consent/subscriptions, event-driven outbox enqueue, owned-recording watch scopes, encrypted write-only webhook secrets and server-only signed/provider adapters. Leases, bounded retries, deduplication and revocation checks are implemented. Queued/accepted does not mean delivered/read. Actual sends require explicit live/worker enable and configured, approved providers. Post-capture dispatch and authenticated daily retry/cleanup are implemented; prompt retries need a more frequent external scheduler or supervised worker.
 - **Persistence and responsive UI:** file or PostgreSQL authority, user-scoped IndexedDB/localStorage snapshots, account-change/logout eviction, blocked-storage fallbacks, four Uganda regions, filtered/re-ranked airplay views, accessible mobile navigation and real deep links.
 - **CMO review:** capture-backed ledgers, EAT dayparts, illustrative allocation/CSV/PDF exports and immutable, idempotent CMO split-review decisions with atomic audit records. Review does not silently rewrite signed contributor shares, impose statutory holds or transfer money.
 
@@ -52,6 +52,7 @@ Artist sign-up is self-service. Use a secure local password source with the trus
 
 Never put real passwords or provider tokens in command arguments, source, chat, browser storage or exported configs. The CLI also accepts the private process variable `EAST_SOUND_ACCOUNT_PASSWORD`. A login account is not proof of legal identity or mailbox ownership. Real OAuth, mailbox verification, recovery and MFA are not supplied by the mock flow.
 
+- [Private cloud master uploads and live-delivery setup](docs/cloud-masters-and-live-delivery.md)
 - [Authenticated fullstack operations and security model](docs/fullstack-operations.md)
 - [PostgreSQL migrations, capture transactions and workers](docs/postgres-and-worker.md)
 - [Capture API, notification providers, HMAC and evidence contracts](docs/notifications-and-capture.md)
@@ -82,13 +83,13 @@ EAST_SOUND_EXPECT_COMMIT=<expected-full-git-sha> npm run test:deployment
 
 It checks public charts/statistics, capability/commit identity, unauthorized API rejection and private-page sign-in gates. It does not provision an identity, inject a capture, reserve a tag or contact a notification provider.
 
-Current local verification results and remaining security/launch boundaries are recorded in [the fullstack verification report](docs/fullstack-verification.md).
+Cloud-adapter and notification-execution checks are recorded in [the cloud delivery verification report](docs/cloud-delivery-verification.md). The earlier [fullstack verification report](docs/fullstack-verification.md) retains the historical baseline checks and launch boundaries.
 
 ## Deployment boundaries
 
 A **persistent Node host** supports the full 80 MiB delivery workflow: configure a private durable master volume, origin/TLS, datastore and keys; explicitly migrate/seed PostgreSQL if selected; then build/start the app and supervise the worker. See the launch checklist before enabling real sends.
 
-**Vercel without PostgreSQL** remains a read-only reference deployment. **Vercel with PostgreSQL** can serve authenticated accounts/captures, but master uploads, reservations and deletions remain disabled until a reviewed direct-to-object-storage adapter accounts for function request-size/ephemeral-disk limits. No `/tmp` success is claimed. `/api/health` reports actual storage/capabilities without secrets. Selecting a broken PostgreSQL connection fails closed rather than falling back to JSON/references.
+**Vercel without PostgreSQL** remains a read-only reference deployment. **Vercel with PostgreSQL and an explicitly configured PRIVATE Blob store** supports authenticated direct multipart master delivery up to 80 MiB, server-side streamed checksum validation, atomic agreement/catalogue/audit completion, and owner-only range playback. Missing/unsafe storage still disables delivery. Raw masters never pass through a serverless upload request or `/tmp` success path. [Cloud setup, retention, consent and scheduler limits](docs/cloud-masters-and-live-delivery.md). `/api/health` reports actual storage/capabilities without secrets. Selecting a broken PostgreSQL connection fails closed rather than falling back to JSON/references.
 
 `npm run build:static` creates `.static-build/out/` with `/BMAT` by default. It excludes APIs, private pages, environment files and runtime data. Only public charts/statistics and an unavailable sign-in view are exported. Static hosting cannot authenticate, deliver masters, ingest captures, store private settings or dispatch notifications.
 

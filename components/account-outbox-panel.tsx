@@ -1,4 +1,5 @@
 "use client";
+import type { NotificationExecutionReadiness } from "@/lib/notification-execution-types";
 import { useEffect, useState } from "react";
 import { Inbox, RefreshCw } from "lucide-react";
 import { authFetch } from "@/lib/auth-client";
@@ -13,6 +14,8 @@ interface Job {
   code?: string;
 }
 export function AccountOutboxPanel() {
+  const [execution, setExecution] =
+    useState<NotificationExecutionReadiness | null>(null);
   const [jobs, setJobs] = useState<Job[] | null>(null),
     [error, setError] = useState("");
   async function refresh() {
@@ -20,6 +23,7 @@ export function AccountOutboxPanel() {
       body = await response.json();
     if (!response.ok) throw new Error(body.error ?? "Outbox unavailable.");
     setJobs(body.jobs);
+    setExecution(body.execution ?? null);
     setError("");
   }
   useEffect(() => {
@@ -32,6 +36,7 @@ export function AccountOutboxPanel() {
             throw new Error(body.error ?? "Outbox unavailable.");
           if (!closed) {
             setJobs(body.jobs);
+            setExecution(body.execution ?? null);
             setError("");
           }
         })
@@ -72,6 +77,38 @@ export function AccountOutboxPanel() {
           Refresh
         </button>
       </div>
+      {execution && (
+        <div
+          role="status"
+          className="mt-4 rounded-xl border border-line bg-surface-raised p-3 text-xs"
+        >
+          <p className="font-medium">
+            {execution.immediateDispatchReady
+              ? "Automatic live dispatch configured"
+              : "Live delivery is waiting for operator configuration"}
+          </p>
+          <p className="mt-1 text-[11px] text-muted">
+            WhatsApp:{" "}
+            {execution.providers.whatsapp ? "configured" : "not configured"} ·
+            Email: {execution.providers.email ? "configured" : "not configured"}{" "}
+            · Webhook:{" "}
+            {execution.providers.webhook ? "configured" : "not configured"}
+          </p>
+          {execution.missing.length > 0 && (
+            <ul className="mt-2 list-inside list-disc text-[11px] text-amber-200">
+              {execution.missing.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-[10px] text-muted">
+            A captured event triggers a bounded dispatch attempt. Daily cron is
+            a retry safety net; timely retries require a more frequent external
+            scheduler or the persistent worker. Provider configuration does not
+            prove provider approval or successful delivery.
+          </p>
+        </div>
+      )}
       {error && (
         <p role="status" className="mt-3 text-xs text-amber-200">
           {error}

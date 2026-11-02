@@ -108,6 +108,8 @@ EAST_SOUND_WEBHOOK_ALLOWLIST=["https://your-relay.com/airplay"]
 
 Readiness checks only validate the presence/shape of configuration. No credentials, template approval, sender verification or external connection are independently tested by loading the UI. Provider failures are recorded rather than treated as success.
 
+The [cloud/live execution guide](cloud-masters-and-live-delivery.md) describes post-commit dispatch attempts, protected maintenance, readiness reporting and the daily Hobby-compatible retry safety net. Live flags, provider approval and consent remain explicit prerequisites.
+
 ## 4. Legacy administrative scheduler and scheduled digests (file backend)
 
 PostgreSQL instant alerts instead use the registered-rule/transactional-outbox flow in [postgres-and-worker.md](postgres-and-worker.md); do not submit the following legacy instant payload there. Daily/weekly requests below also work in PostgreSQL mode with a shared database lease ledger.
