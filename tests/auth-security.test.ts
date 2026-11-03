@@ -231,3 +231,73 @@ describe("authoritative authentication and session security", () => {
     expect(await auth.sessionForToken(actor.token)).toBeNull();
   });
 });
+
+describe("request origin follows the addressed host, not the bind address", () => {
+  it("resolves the expected origin from the Host header when Next binds 0.0.0.0", async () => {
+    const auth = await import("@/lib/auth");
+    // Next.js builds request.url from the bound interface; the browser
+    // addresses the server by the Host header instead.
+    const request = new Request("http://0.0.0.0:3000/api/auth/login", {
+      headers: {
+        host: "localhost:3000",
+        origin: "http://localhost:3000",
+        "x-forwarded-proto": "http",
+      },
+    });
+    expect(auth.requestOrigin(request)).toBe("http://localhost:3000");
+    expect(() => auth.assertSameOrigin(request)).not.toThrow();
+  });
+  it("accepts the preview host and uses the forwarded protocol for https", async () => {
+    const auth = await import("@/lib/auth");
+    const preview = "https://3000-abc123.e2b.app";
+    const request = new Request("http://0.0.0.0:3000/api/playout", {
+      headers: {
+        "x-forwarded-host": "3000-abc123.e2b.app",
+        "x-forwarded-proto": "https",
+        origin: preview,
+      },
+    });
+    expect(auth.requestOrigin(request)).toBe(preview);
+    expect(() => auth.assertSameOrigin(request)).not.toThrow();
+  });
+  it("still rejects a mismatched origin", async () => {
+    const auth = await import("@/lib/auth");
+    const request = new Request("http://0.0.0.0:3000/api/auth/login", {
+      headers: {
+        host: "localhost:3000",
+        origin: "http://evil.example",
+      },
+    });
+    expect(auth.requestOrigin(request)).toBe("http://localhost:3000");
+    expect(() => auth.assertSameOrigin(request)).toThrow(/Cross-origin/);
+  });
+  it("keeps the configured EAST_SOUND_APP_ORIGIN override authoritative", async () => {
+    const auth = await import("@/lib/auth");
+    vi.stubEnv("EAST_SOUND_APP_ORIGIN", "https://fixed.example");
+    const request = new Request("http://0.0.0.0:3000/api/auth/login", {
+      headers: { host: "localhost:3000", origin: "https://fixed.example" },
+    });
+    expect(auth.requestOrigin(request)).toBe("https://fixed.example");
+    expect(() => auth.assertSameOrigin(request)).not.toThrow();
+    vi.unstubAllEnvs();
+  });
+  it("derives cookie Secure policy from the addressed host", async () => {
+    const auth = await import("@/lib/auth");
+    const expires = new Date(Date.now() + 3_600_000).toISOString();
+    const localhostRequest = new Request("http://0.0.0.0:3000/api/auth/login", {
+      headers: { host: "localhost:3000", "x-forwarded-proto": "http" },
+    });
+    const httpsRequest = new Request("http://0.0.0.0:3000/api/auth/login", {
+      headers: {
+        "x-forwarded-host": "3000-abc123.e2b.app",
+        "x-forwarded-proto": "https",
+      },
+    });
+    expect(auth.cookieHeader(localhostRequest, "a".repeat(64), expires)).not.toContain(
+      "Secure",
+    );
+    expect(auth.cookieHeader(httpsRequest, "a".repeat(64), expires)).toContain(
+      "Secure",
+    );
+  });
+});

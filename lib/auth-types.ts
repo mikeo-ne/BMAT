@@ -39,6 +39,7 @@ const PRIVATE: Record<AccountRole, string[]> = {
   broadcaster: [
     "/dashboard/playout",
     "/dashboard/monitoring",
+    "/dashboard/reportal",
     "/dashboard/advertisers",
   ],
   cmo: [
