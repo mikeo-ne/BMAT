@@ -3,6 +3,11 @@ import { NextResponse } from "next/server";
 
 import { MONITORED_STATIONS } from "@/lib/monitoring";
 import { FM_STATIONS, REGIONS, type Region, type Station } from "@/lib/regions";
+import {
+  MONITORED_FEEDS,
+  REFERENCE_FEEDS,
+} from "@/lib/station-feeds";
+import { readStationHealth } from "@/lib/station-health-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,11 +59,17 @@ export async function GET(request: Request) {
         ? stations.filter((s) => s.region === (region as Region))
         : stations;
 
+    const health = await readStationHealth();
+
     return NextResponse.json({
       regions: REGIONS,
       stations: filtered.filter((station) =>
         actor.stationIds.includes(station.id),
       ),
+      realFeeds: [...MONITORED_FEEDS, ...REFERENCE_FEEDS].map((feed) => ({
+        ...feed,
+        health: health.get(feed.id) ?? null,
+      })),
       monitoredCount: 0,
       source: "station-directory-only",
       notice:

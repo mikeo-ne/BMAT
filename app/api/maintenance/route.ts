@@ -2,6 +2,7 @@ import { integrationAuth } from "@/lib/integration-auth";
 import { referenceStorageOnly } from "@/lib/runtime-storage";
 import { cleanupMasterUploads } from "@/lib/cloud-masters";
 import { runNotificationBatch } from "@/lib/notification-runtime";
+import { refreshStationHealth } from "@/lib/station-health-store";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -9,9 +10,15 @@ export const maxDuration = 300;
 export async function GET(request: Request) {
   const denied = integrationAuth(request, "CRON_SECRET");
   if (denied) return denied;
+  // Stream health telemetry is storage-independent: probe it before the
+  // durable-storage guard so reference deployments still refresh health.
+  const stations = await refreshStationHealth().catch(() => null);
   if (referenceStorageOnly())
     return Response.json(
-      { error: "Maintenance requires durable configured storage." },
+      {
+        stations,
+        error: "Maintenance requires durable configured storage.",
+      },
       { status: 503, headers: { "cache-control": "no-store" } },
     );
   try {
@@ -21,6 +28,7 @@ export async function GET(request: Request) {
       {
         uploads,
         notifications,
+        stations,
         notice:
           "Provider acceptance is not a delivery/read receipt. Daily scheduling is a retry safety net, not an instant retry guarantee.",
       },

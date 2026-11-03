@@ -1,5 +1,6 @@
 import { DEMO_CHART_ROWS } from "@/lib/site-content";
 import { PublicChartsBrowser } from "@/components/public-charts";
+import { PanelHealthStrip } from "@/components/panel-health-strip";
 import { weekStartIso } from "@/lib/charts";
 
 export default function PublicChartsPage() {
@@ -27,6 +28,9 @@ export default function PublicChartsPage() {
         broadcasts. All-time peak positions are unknown for production
         releases.
       </p>
+      <div className="mt-12">
+        <PanelHealthStrip />
+      </div>
     </section>
   );
 }
