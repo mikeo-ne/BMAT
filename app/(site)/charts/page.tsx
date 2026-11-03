@@ -1,6 +1,7 @@
 import { DEMO_CHART_ROWS } from "@/lib/site-content";
 import { PublicChartsBrowser } from "@/components/public-charts";
 import { PanelHealthStrip } from "@/components/panel-health-strip";
+import { RegionVelocityHeatmap } from "@/components/region-velocity-heatmap";
 import { weekStartIso } from "@/lib/charts";
 
 export default function PublicChartsPage() {
@@ -22,6 +23,9 @@ export default function PublicChartsPage() {
       </div>
       <div className="mt-10">
         <PublicChartsBrowser rows={DEMO_CHART_ROWS} />
+      </div>
+      <div className="mt-8">
+        <RegionVelocityHeatmap />
       </div>
       <p className="mt-8 max-w-2xl text-xs leading-relaxed text-slate-600">
         Rankings reflect captured plays in the connected panel, not all Ugandan

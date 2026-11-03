@@ -13,11 +13,55 @@ import { useLanguage } from "@/components/language-provider";
 function LogoMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
-      <rect x="1" y="13" width="3" height="6" rx="1.5" fill="#34d399" />
-      <rect x="6.5" y="9" width="3" height="14" rx="1.5" fill="#34d399" />
-      <rect x="12" y="4" width="3" height="24" rx="1.5" fill="#34d399" />
-      <rect x="17.5" y="9" width="3" height="14" rx="1.5" fill="#34d399" />
-      <rect x="23" y="13" width="3" height="6" rx="1.5" fill="#34d399" />
+      <rect
+        x="1"
+        y="13"
+        width="3"
+        height="6"
+        rx="1.5"
+        fill="#34d399"
+        className="animate-badge-rise"
+      />
+      <rect
+        x="6.5"
+        y="9"
+        width="3"
+        height="14"
+        rx="1.5"
+        fill="#34d399"
+        className="animate-badge-rise"
+        style={{ animationDelay: "0.1s" }}
+      />
+      <rect
+        x="12"
+        y="4"
+        width="3"
+        height="24"
+        rx="1.5"
+        fill="#34d399"
+        className="animate-badge-rise"
+        style={{ animationDelay: "0.2s" }}
+      />
+      <rect
+        x="17.5"
+        y="9"
+        width="3"
+        height="14"
+        rx="1.5"
+        fill="#34d399"
+        className="animate-badge-rise"
+        style={{ animationDelay: "0.3s" }}
+      />
+      <rect
+        x="23"
+        y="13"
+        width="3"
+        height="6"
+        rx="1.5"
+        fill="#34d399"
+        className="animate-badge-rise"
+        style={{ animationDelay: "0.4s" }}
+      />
     </svg>
   );
 }
@@ -140,6 +184,15 @@ export function SiteNav() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Live station counter badge */}
+          <span className="hidden items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300 lg:flex">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            </span>
+            32 streams · 150+ venues
+          </span>
+
           {/* Language selector (cycles EN → SW → LU) */}
           <button
             type="button"

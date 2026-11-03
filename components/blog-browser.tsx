@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Clock, Sparkles } from "lucide-react";
+import { Clock, Search, Sparkles } from "lucide-react";
 import {
   ARTICLES,
   ARTICLE_CATEGORIES,
@@ -16,41 +16,63 @@ const CATEGORY_STYLES: Record<ArticleCategory, string> = {
   "UPRS & Rights": "border-sky-500/30 bg-sky-500/10 text-sky-300",
   "Music Tech": "border-violet-500/30 bg-violet-500/10 text-violet-300",
   "Ad Auditing": "border-amber-500/30 bg-amber-500/10 text-amber-300",
+  "Platform Updates": "border-rose-500/30 bg-rose-500/10 text-rose-300",
 };
 
 export function BlogBrowser({ articles }: { articles: Article[] }) {
   const { t } = useLanguage();
   const [category, setCategory] = useState<ArticleCategory | "All">("All");
+  const [query, setQuery] = useState("");
 
   const visible = useMemo(() => {
-    const list =
+    const needle = query.trim().toLowerCase();
+    const list = (
       category === "All"
         ? articles
-        : articles.filter((article) => article.category === category);
+        : articles.filter((article) => article.category === category)
+    ).filter(
+      (article) =>
+        !needle ||
+        article.title.toLowerCase().includes(needle) ||
+        article.excerpt.toLowerCase().includes(needle) ||
+        article.tags.some((tag) => tag.toLowerCase().includes(needle)),
+    );
     return [...list].sort((a, b) => b.date.localeCompare(a.date));
-  }, [articles, category]);
+  }, [articles, category, query]);
 
   const [featured, ...rest] = visible;
 
   return (
     <div className="space-y-10">
-      {/* Category pills */}
-      <div className="flex flex-wrap gap-2">
-        <CategoryPill
-          active={category === "All"}
-          onClick={() => setCategory("All")}
-        >
-          {t("blog.allArticles")}
-        </CategoryPill>
-        {ARTICLE_CATEGORIES.map((option) => (
+      {/* Category pills + search */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap gap-2">
           <CategoryPill
-            key={option}
-            active={category === option}
-            onClick={() => setCategory(option)}
+            active={category === "All"}
+            onClick={() => setCategory("All")}
           >
-            {option}
+            {t("blog.allArticles")}
           </CategoryPill>
-        ))}
+          {ARTICLE_CATEGORIES.map((option) => (
+            <CategoryPill
+              key={option}
+              active={category === option}
+              onClick={() => setCategory(option)}
+            >
+              {option}
+            </CategoryPill>
+          ))}
+        </div>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search articles, topics, tags…"
+            className="h-11 w-full rounded-xl border border-slate-700 bg-slate-900/60 pl-10 pr-4 text-sm text-slate-200 placeholder:text-slate-500 focus:border-emerald-400/40 focus:outline-none"
+          />
+        </div>
       </div>
 
       {featured && <FeaturedCard article={featured} />}

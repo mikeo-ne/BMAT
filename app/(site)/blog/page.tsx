@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ARTICLES } from "@/lib/site-content";
 import { BlogBrowser } from "@/components/blog-browser";
+import { PlatformMetricWidget } from "@/components/platform-metric-widget";
 
 export const metadata: Metadata = {
   title: "Insights",
@@ -22,6 +23,9 @@ export default function BlogPage() {
           Field notes from the panel: chart mechanics, UPRS compliance, music
           tech and ad auditing across East Africa.
         </p>
+      </div>
+      <div className="mt-8">
+        <PlatformMetricWidget />
       </div>
       <div className="mt-10">
         <BlogBrowser articles={ARTICLES} />
