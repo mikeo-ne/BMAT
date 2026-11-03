@@ -101,7 +101,7 @@ describe("account transition fencing before navigation", () => {
     });
     expect(screen.getByText("Transition finished")).toBeTruthy();
   });
-  it("does not navigate away from logout while old private snapshots are still being deleted", async () => {
+  it("does not navigate away from logout while old private snapshots are still being deleted, then returns to the public site", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => Response.json({ ok: true })),
@@ -114,7 +114,7 @@ describe("account transition fencing before navigation", () => {
     await act(async () => {
       finishEviction[0]();
     });
-    expect(state.replace).toHaveBeenCalledExactlyOnceWith("/dashboard/charts");
+    expect(state.replace).toHaveBeenCalledExactlyOnceWith("/");
   });
   it("ignores a delayed old-cookie refresh after a newer authenticated transition", async () => {
     let respond: ((response: Response) => void) | undefined;

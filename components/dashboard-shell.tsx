@@ -413,6 +413,15 @@ export function DashboardShell({
               >
                 {workspace.badge}
               </span>
+              <Link
+                href="/"
+                aria-label="Public site"
+                title="Back to the public site"
+                className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-background/60 px-2.5 text-[10px] font-semibold text-muted transition-colors hover:border-brand/40 hover:text-foreground"
+              >
+                <Globe2 size={13} />
+                <span className="hidden sm:inline">Public site</span>
+              </Link>
               {!publicView && (
                 <>
                   <span className="hidden sm:block">

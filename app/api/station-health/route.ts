@@ -38,9 +38,15 @@ interface HealthSummary {
   byCountry: Record<string, CountrySummary>;
   byMedium: Record<"FM" | "TV", CountrySummary>;
   feeds: FeedHealth[];
+  stale: boolean;
+  notice: string | null;
 }
 
-function summarize(feeds: FeedHealth[]): HealthSummary {
+function summarize(
+  feeds: FeedHealth[],
+  stale: boolean,
+  lastError = "",
+): HealthSummary {
   const byCountry: Record<string, CountrySummary> = {};
   const byMedium: Record<"FM" | "TV", CountrySummary> = {
     FM: { total: 0, reachable: 0 },
@@ -77,6 +83,12 @@ function summarize(feeds: FeedHealth[]): HealthSummary {
     byCountry,
     byMedium,
     feeds,
+    stale,
+    notice: stale
+      ? lastError
+        ? `Live probes are unavailable right now (${lastError}). Showing the last known state.`
+        : "Live probes are unavailable right now. Showing the last known state."
+      : null,
   };
 }
 
@@ -90,12 +102,20 @@ function summarize(feeds: FeedHealth[]): HealthSummary {
  */
 export async function GET() {
   let health = await readStationHealth();
-  if (!isStationHealthFresh() && health.size === 0) {
-    // Cold instance with no persisted history: probe now so the public
-    // monitor never reports phantom health.
-    const results = await probeFeeds(allProbedFeeds(), { concurrency: 8 });
-    await recordStationHealth(results);
-    health = new Map(results);
+  let stale = false;
+  let lastError = "";
+  try {
+    if (!isStationHealthFresh() && health.size === 0) {
+      // Cold instance with no persisted history: probe now so the public
+      // monitor never reports phantom health.
+      const results = await probeFeeds(allProbedFeeds(), { concurrency: 8 });
+      await recordStationHealth(results);
+      health = new Map(results);
+    }
+  } catch (error) {
+    // Probing must never break the endpoint: serve the last known state.
+    stale = true;
+    lastError = error instanceof Error ? error.message : String(error);
   }
 
   const feeds: FeedHealth[] = [...MONITORED_FEEDS, ...REFERENCE_FEEDS]
@@ -110,7 +130,7 @@ export async function GET() {
         a.country.localeCompare(b.country) || a.name.localeCompare(b.name),
     );
 
-  const summary = summarize(feeds);
+  const summary = summarize(feeds, stale, lastError);
   return Response.json(summary, {
     headers: { "cache-control": "no-store" },
   });
