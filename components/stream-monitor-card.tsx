@@ -6,6 +6,44 @@ import { FEED_PING_SEED, type FeedPing } from "@/lib/site-content";
 import { playSnippet, type SnippetHandle } from "@/lib/snippet-audio";
 import { useLanguage } from "@/components/language-provider";
 
+interface RealStationHealth {
+  ok: boolean;
+  status: number | null;
+  latencyMs: number;
+  streamKind: "hls" | "audio" | "unknown";
+  checkedAt: string;
+  error: string | null;
+}
+
+interface RealFeedHealth {
+  id: string;
+  name: string;
+  country: string;
+  city: string;
+  medium: "FM" | "TV";
+  reference: boolean;
+  health: RealStationHealth | null;
+}
+
+interface RealHealthSummary {
+  updatedAt: string | null;
+  total: number;
+  reachable: number;
+  avgLatencyMs: number | null;
+  feeds: RealFeedHealth[];
+}
+
+/** Kampala-relevant feeds shown in the monitor's real-health row. */
+const KAMPALA_FEED_IDS = [
+  "ntv-uganda",
+  "bukedde-tv-1",
+  "bbs-tv",
+  "kstv",
+  "radio-maria-ug",
+  "next-radio",
+  "bbc-world-service",
+];
+
 interface LivePing extends FeedPing {
   at: number;
 }
@@ -38,6 +76,32 @@ export function StreamMonitorCard() {
   const [now, setNow] = useState(MOUNT_TIME);
   const [playingKey, setPlayingKey] = useState<string | null>(null);
   const [handle, setHandle] = useState<SnippetHandle | null>(null);
+  const [realHealth, setRealHealth] = useState<RealHealthSummary | null>(
+    null,
+  );
+
+  // Real broadcast feed health from the public health API.
+  useEffect(() => {
+    let closed = false;
+    const loadRealHealth = () =>
+      fetch("/api/station-health", { cache: "no-store" })
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return (await response.json()) as RealHealthSummary;
+        })
+        .then((body) => {
+          if (!closed) setRealHealth(body);
+        })
+        .catch(() => {
+          /* keep the previous health view on transient failure */
+        });
+    void loadRealHealth();
+    const timer = setInterval(loadRealHealth, 90_000);
+    return () => {
+      closed = true;
+      clearInterval(timer);
+    };
+  }, []);
 
   const toggleEvidence = (ping: LivePing) => {
     const key = `${ping.track}-${ping.artist}`;
@@ -102,6 +166,63 @@ export function StreamMonitorCard() {
             {t("monitor.stations", { count: 32 })}
           </span>
         </header>
+
+        {/* Real broadcast feed health */}
+        <div className="mt-4 rounded-xl border border-slate-800/70 bg-slate-950/40 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-300">
+              {t("monitor.realFeeds")}
+            </p>
+            <p className="text-[10px] text-slate-500">
+              {t("monitor.realFeedsHint")}
+            </p>
+          </div>
+          {realHealth ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {KAMPALA_FEED_IDS.map((id) => {
+                const feed = realHealth.feeds.find((item) => item.id === id);
+                if (!feed) return null;
+                const health = feed.health;
+                const ok = health?.ok ?? null;
+                return (
+                  <div
+                    key={id}
+                    className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${
+                      ok
+                        ? "border-emerald-500/30 bg-emerald-500/5"
+                        : ok === false
+                          ? "border-red-500/20 bg-red-500/5"
+                          : "border-dashed border-slate-700/50 bg-slate-900/40"
+                    }`}
+                  >
+                    <span
+                      className={`h-2 w-2 shrink-0 rounded-full ${
+                        ok ? "bg-emerald-400" : ok === false ? "bg-red-400" : "bg-slate-600"
+                      }`}
+                    />
+                    <span className="truncate text-xs font-semibold text-white">
+                      {feed.name}
+                    </span>
+                    {health?.ok && (
+                      <span className="shrink-0 text-[10px] font-bold text-slate-400">
+                        {health.latencyMs}ms
+                      </span>
+                    )}
+                    {!health?.ok && health && (
+                      <span className="shrink-0 text-[9px] text-red-400/70">
+                        off
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-2 text-[11px] text-slate-500">
+              {t("monitor.probing")}
+            </p>
+          )}
+        </div>
 
         <div className="mt-4 min-h-[26rem] space-y-2">
           {pings.map((ping, index) => {
