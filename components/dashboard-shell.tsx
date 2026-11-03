@@ -27,6 +27,7 @@ import {
   Menu,
   Radio,
   ScanLine,
+  ScrollText,
   ShieldCheck,
   Upload,
   Users,
@@ -68,7 +69,21 @@ const ICONS: Record<ModuleId, LucideIcon> = {
   royalties: Wallet,
   regional: MapPinned,
   "mix-parser": ScanLine,
+  reportal: ScrollText,
 };
+
+/** BMAT operating-system suite taxonomy shown above the concrete use cases. */
+const SOLUTIONS: ReadonlyArray<{
+  id: string;
+  label: string;
+  href: string;
+}> = [
+  { id: "vericast", label: "Vericast", href: "/dashboard/monitoring" },
+  { id: "reportal", label: "Reportal", href: "/dashboard/reportal" },
+  { id: "resol", label: "ReSol", href: "/dashboard/splits" },
+  { id: "ad-control", label: "AD Control", href: "/dashboard/advertisers" },
+  { id: "music-charts", label: "Music Charts", href: "/dashboard/charts" },
+];
 export function DashboardShell({
   children,
   deploymentNotice,
@@ -257,7 +272,29 @@ export function DashboardShell({
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-6">
             <p className="mb-3 px-3 text-[9px] font-semibold uppercase tracking-[0.2em] text-muted">
-              {publicView ? "Public modules" : "Your modules"}
+              Solutions · BMAT operating system
+            </p>
+            {session.user && (
+              <nav
+                aria-label="Solutions"
+                className="solutions-grid mb-5 grid grid-cols-2 gap-1.5 px-1"
+              >
+                {SOLUTIONS.filter((item) => roleMayOpen(role, item.href)).map(
+                  (item) => (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      onClick={(event) => navigate(event, item.href)}
+                      className="solution-pill group flex items-center gap-1.5 rounded-lg border border-line bg-surface-2/40 px-2.5 py-2 text-[10px] font-semibold leading-4 text-muted transition-colors hover:border-brand/40 hover:bg-surface-2 hover:text-foreground"
+                    >
+                      {item.label}
+                    </Link>
+                  ),
+                )}
+              </nav>
+            )}
+            <p className="mb-3 px-3 text-[9px] font-semibold uppercase tracking-[0.2em] text-muted">
+              {publicView ? "Public charts" : "Use cases"}
             </p>
             <nav aria-label="Dashboard" className="space-y-1">
               {modules.map((item) => {

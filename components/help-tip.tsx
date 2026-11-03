@@ -39,6 +39,10 @@ export const GLOSSARY = {
     term: "Time-of-day weighting",
     text: "An illustrative multiplier applied to a base per-play rate. Prime, standard and night bands use East Africa Time. These rates and multipliers are demo policy, not the published UPRS tariff.",
   },
+  reportal: {
+    term: "UPRS cue sheets",
+    text: "A broadcast cue sheet lists every captured play for a station and reporting period with its EAT timestamp and daypart. Reportal generates XLSX and PDF exports from authenticated playout records; unmatched audio keeps a blank ISRC.",
+  },
 } as const;
 
 export function HelpTip({ topic }: { topic: keyof typeof GLOSSARY }) {

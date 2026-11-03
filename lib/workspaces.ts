@@ -20,7 +20,8 @@ export type ModuleId =
   | "rights"
   | "royalties"
   | "regional"
-  | "mix-parser";
+  | "mix-parser"
+  | "reportal";
 
 interface Workspace {
   id: WorkspaceId;
@@ -84,10 +85,11 @@ export const WORKSPACES: readonly Workspace[] = [
     initials: "BR",
     accent: "#fbbf24",
     href: "/dashboard/playout",
-    description: "Capture-backed playout and evidence",
+    description: "Capture-backed playout, evidence and cue sheets",
     modules: [
       "station-logs",
       "station-overview",
+      "reportal",
       "charts",
       "ad-audit",
       "regional",
@@ -199,6 +201,13 @@ export const WORKSPACE_MODULES: readonly WorkspaceModule[] = [
     href: "/dashboard/playout",
     label: "Station playout logs",
     title: "Broadcaster Playout Log",
+    owner: "broadcaster",
+  },
+  {
+    id: "reportal",
+    href: "/dashboard/reportal",
+    label: "Reportal · UPRS cue sheets",
+    title: "UPRS Broadcast Cue Sheets",
     owner: "broadcaster",
   },
   {

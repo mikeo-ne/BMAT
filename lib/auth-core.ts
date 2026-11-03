@@ -212,10 +212,36 @@ export async function sessionForToken(
 export async function requestSession(request: Request) {
   return sessionForToken(cookieToken(request.headers.get("cookie")));
 }
+
+/**
+ * The origin this request was actually addressed at.
+ *
+ * Next.js builds `request.url` from the interface the server is bound to
+ * (e.g. `http://0.0.0.0:3000` when started with `--hostname 0.0.0.0`), which
+ * never equals the origin a browser sends in its `Origin` header. The Host
+ * header (and the forwarded variants a reverse proxy sets from it) carry the
+ * address the client used, so origin and cookie-security decisions must be
+ * made from those headers instead. Browsers control both headers, so the
+ * CSRF comparison stays sound: a malicious site sends its own Origin with the
+ * victim site's Host, and the two no longer match.
+ */
+export function requestOrigin(request: Request): string {
+  const configured = process.env.EAST_SOUND_APP_ORIGIN;
+  if (configured) return configured;
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = forwardedHost ?? request.headers.get("host");
+  if (!host) return new URL(request.url).origin;
+  const forwardedProto = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    .trim();
+  const protocol = forwardedProto ?? new URL(request.url).protocol.replace(":", "");
+  return new URL(`${protocol}://${host}`).origin;
+}
+
 export function assertSameOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  const expected =
-    process.env.EAST_SOUND_APP_ORIGIN ?? new URL(request.url).origin;
+  const expected = requestOrigin(request);
   if (
     (origin && origin !== expected) ||
     request.headers.get("sec-fetch-site") === "cross-site"
@@ -228,8 +254,7 @@ export function cookieHeader(
   expiresAt: string,
   clear = false,
 ) {
-  const configured = process.env.EAST_SOUND_APP_ORIGIN;
-  const address = new URL(configured ?? request.url);
+  const address = new URL(requestOrigin(request));
   const local = ["127.0.0.1", "localhost", "[::1]"].includes(address.hostname);
   const secure =
     address.protocol === "https:" ||
