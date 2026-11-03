@@ -8,7 +8,7 @@
 
 /* ------------------------------------------------------------------ tiers */
 
-export type TierId = "guest" | "artist" | "broadcaster" | "cmo";
+export type TierId = "label" | "artist" | "broadcaster" | "cmo" | "venue";
 
 export interface TierCard {
   id: TierId;
@@ -25,36 +25,36 @@ export interface TierCard {
 
 export const TIERS: TierCard[] = [
   {
-    id: "guest",
-    role: "public",
-    label: "Public Guest",
-    icon: "Eye",
-    headline: "Browse the charts, no sign-up",
+    id: "label",
+    role: "artist",
+    label: "Record Label Roster",
+    icon: "Disc3",
+    headline: "One delivery pipeline for every artist",
     blurb:
-      "Follow Uganda's national airplay Top 100, station health and macro market stats straight from the connected FM panel.",
+      "Multi-artist roster management, batch master uploads with spectral fingerprints and label-level revenue split across every confirmed spin.",
     features: [
-      "National Top 100 with 10-second evidence snippets",
-      "Live station registry health badges",
-      "Regional velocity heatmaps (Central · Eastern · Western · Northern)",
-      "Weekly macro stats: spins, reach, daypart share",
+      "Multi-artist roster with per-artist delivery status",
+      "Batch master uploads with Web Audio fingerprints + ISRCs",
+      "Label revenue dashboard across all roster releases",
+      "ReSol split-sheet agreements signed before release",
     ],
     accent: "from-emerald-500/20 to-emerald-500/5",
-    cta: "Open the charts",
-    href: "/charts",
+    cta: "Open label workspace",
+    href: "/dashboard/artist",
   },
   {
     id: "artist",
     role: "artist",
-    label: "Artist / Label Manager",
-    icon: "Disc3",
-    headline: "Deliver masters, get paid on real spins",
+    label: "Single Artist",
+    icon: "Mic",
+    headline: "Your discography, your spin velocity",
     blurb:
-      "Upload masters with client-side spectral fingerprints, generate ISRC codes, sign digital split-sheet agreements and watch velocity across regions.",
+      "Individual artist focus: upload masters, watch regional velocity heatmaps and toggle WhatsApp alerts for every confirmed spin.",
     features: [
-      "Web Audio spectral-energy master dropzone + ISRC (UG-ESD-26-XXXXX)",
+      "Client-side spectral-energy master dropzone + ISRC",
+      "Spin velocity heatmaps across Central · Eastern · Western · Northern",
+      "WhatsApp / email alert toggles per station and hour",
       "ReSol split-sheet agreements before release",
-      "WhatsApp / email alerts on every confirmed spin",
-      "Regional velocity heatmaps for your catalogue",
     ],
     accent: "from-sky-500/20 to-sky-500/5",
     cta: "Open artist workspace",
@@ -95,6 +95,24 @@ export const TIERS: TierCard[] = [
     accent: "from-violet-500/20 to-violet-500/5",
     cta: "Open auditor workspace",
     href: "/dashboard/cmo",
+  },
+  {
+    id: "venue",
+    role: "venue",
+    label: "Venue Operator",
+    icon: "Martini",
+    headline: "Ambient listening, compliant by design",
+    blurb:
+      "Bars, clubs and restaurants run ambient listener nodes: every play is logged, UPRS public-performance compliance is badged and resident DJ sets stay on record.",
+    features: [
+      "Ambient listener node logs with timestamped plays",
+      "UPRS Public Performance Compliance Badge 🟢",
+      "Resident DJ set logs with track-level detail",
+      "Automated compliance reporting to collecting societies",
+    ],
+    accent: "from-rose-500/20 to-rose-500/5",
+    cta: "Open venue workspace",
+    href: "/dashboard/venue",
   },
 ];
 
@@ -353,6 +371,151 @@ export const FEED_PING_SEED: FeedPing[] = [
   },
 ];
 
+/* ----------------------------------------------------------------- venues */
+
+export interface VenuePing {
+  venue: string;
+  type: "Lounge" | "Bar" | "Club" | "Restaurant";
+  location: string;
+  track: string;
+  artist: string;
+  minutesAgo: number;
+  compliance: "compliant" | "pending";
+}
+
+/** Illustrative ambient playout from registered Kampala venues. */
+export const VENUE_PINGS: VenuePing[] = [
+  {
+    venue: "Cayenne Lounge",
+    type: "Lounge",
+    location: "Kololo",
+    track: "Jennifer",
+    artist: "Smooth Vibes",
+    minutesAgo: 3,
+    compliance: "compliant",
+  },
+  {
+    venue: "Bikya Bar",
+    type: "Bar",
+    location: "Kampala Road",
+    track: "Mulongo",
+    artist: "Ariah K",
+    minutesAgo: 8,
+    compliance: "compliant",
+  },
+  {
+    venue: "Dawn Suites Club",
+    type: "Club",
+    location: "Bugolobi",
+    track: "Ononya",
+    artist: "Apass",
+    minutesAgo: 14,
+    compliance: "compliant",
+  },
+  {
+    venue: "The Upstairs Lounge",
+    type: "Lounge",
+    location: "Ntinda",
+    track: "Sukita",
+    artist: "Lydia Jazmine",
+    minutesAgo: 21,
+    compliance: "pending",
+  },
+  {
+    venue: "Katogo Restaurant",
+    type: "Restaurant",
+    location: "Kabalagala",
+    track: "Sembera",
+    artist: "Naira Ali",
+    minutesAgo: 30,
+    compliance: "compliant",
+  },
+  {
+    venue: "Nightshift Club",
+    type: "Club",
+    location: "Kawempe",
+    track: "Kwata Dance",
+    artist: "Mr. Leo",
+    minutesAgo: 42,
+    compliance: "compliant",
+  },
+];
+
+export interface VenueNode {
+  id: string;
+  name: string;
+  type: VenuePing["type"];
+  location: string;
+  nodeId: string;
+  compliance: VenuePing["compliance"];
+  pings24h: number;
+  active: boolean;
+}
+
+/** Registered ambient listener nodes across Kampala. */
+export const VENUE_NODES: VenueNode[] = [
+  {
+    id: "cayenne",
+    name: "Cayenne Lounge",
+    type: "Lounge",
+    location: "Kololo",
+    nodeId: "UG-VEN-001",
+    compliance: "compliant",
+    pings24h: 184,
+    active: true,
+  },
+  {
+    id: "bikya",
+    name: "Bikya Bar",
+    type: "Bar",
+    location: "Kampala Road",
+    nodeId: "UG-VEN-002",
+    compliance: "compliant",
+    pings24h: 142,
+    active: true,
+  },
+  {
+    id: "dawn",
+    name: "Dawn Suites Club",
+    type: "Club",
+    location: "Bugolobi",
+    nodeId: "UG-VEN-003",
+    compliance: "compliant",
+    pings24h: 312,
+    active: true,
+  },
+  {
+    id: "upstairs",
+    name: "The Upstairs Lounge",
+    type: "Lounge",
+    location: "Ntinda",
+    nodeId: "UG-VEN-004",
+    compliance: "pending",
+    pings24h: 96,
+    active: true,
+  },
+  {
+    id: "katogo",
+    name: "Katogo Restaurant",
+    type: "Restaurant",
+    location: "Kabalagala",
+    nodeId: "UG-VEN-005",
+    compliance: "compliant",
+    pings24h: 78,
+    active: false,
+  },
+  {
+    id: "nightshift",
+    name: "Nightshift Club",
+    type: "Club",
+    location: "Kawempe",
+    nodeId: "UG-VEN-006",
+    compliance: "compliant",
+    pings24h: 241,
+    active: true,
+  },
+];
+
 /* ------------------------------------------------------------- demo chart */
 
 export type DemoRegion = "Central" | "Eastern" | "Western" | "Northern";
@@ -533,13 +696,15 @@ export type ArticleCategory =
   | "Airplay Charts"
   | "UPRS & Rights"
   | "Music Tech"
-  | "Ad Auditing";
+  | "Ad Auditing"
+  | "Platform Updates";
 
 export const ARTICLE_CATEGORIES: ArticleCategory[] = [
   "Airplay Charts",
   "UPRS & Rights",
   "Music Tech",
   "Ad Auditing",
+  "Platform Updates",
 ];
 
 export type ArticleBlock =
@@ -797,6 +962,48 @@ export const ARTICLES: Article[] = [
           "Webhooks signed with HMAC secrets for agency pipelines",
           "The simulator in the artist workspace shows exactly what leaves",
         ],
+      },
+    ],
+  },
+  {
+    slug: "venue-ambient-monitoring-rollout",
+    title: "Venue ambient monitoring: bars, clubs and restaurants join the panel",
+    category: "Platform Updates",
+    excerpt:
+      "Ambient listener nodes now log every play in registered Kampala venues — with the UPRS Public Performance Compliance Badge making compliance visible at the door.",
+    author: "Tom Awino",
+    authorRole: "Co-founder · Systems",
+    date: "2026-11-01",
+    readMinutes: 4,
+    cover: "from-rose-500/30 via-rose-500/10 to-slate-950",
+    tags: ["Venues", "UPRS", "Ambient"],
+    body: [
+      {
+        type: "paragraph",
+        text: "Public performance royalties do not stop at the radio studio. From this month, registered Kampala lounges, bars, restaurants and clubs can run an East Sound ambient listener node: the venue's house sound feeds a small capture client, every track is timestamped, and plays settle to UPRS through the same evidence pipeline the FM panel uses.",
+      },
+      { type: "heading", text: "The compliance badge" },
+      {
+        type: "paragraph",
+        text: "Each venue node carries a Public Performance Compliance Badge: green when every logged play in the reporting window is matched and reported, amber when plays are pending verification. The badge is designed to be shown — at the door, on a receipt, on a venue's social profile.",
+      },
+      {
+        type: "list",
+        items: [
+          "Ambient node logs plays with timestamp, track and fingerprint",
+          "Resident DJ sets are captured track-by-track, not as one block",
+          "Badge state recalculates nightly against the UPRS reporting window",
+          "Venues with a green badge settle faster — fewer dispute calls",
+        ],
+      },
+      {
+        type: "callout",
+        text: "Compliance is a badge you can wear, not a letter you file.",
+      },
+      { type: "heading", text: "What venues get" },
+      {
+        type: "paragraph",
+        text: "A venue workspace shows the ambient ping feed, resident DJ set logs, nightly compliance status and a one-click settlement export for the collecting society. The monitoring view is public: visitors can watch pings land from Cayenne Lounge to Dawn Suites Club in real time.",
       },
     ],
   },

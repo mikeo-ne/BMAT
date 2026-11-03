@@ -12,9 +12,9 @@ import { TRANSLATIONS, translate } from "@/lib/site-i18n";
 import { snippetScale } from "@/lib/snippet-audio";
 
 describe("site tiers", () => {
-  it("defines four distinct tiers covering every role", () => {
+  it("defines five distinct tiers covering every role", () => {
     expect(TIERS.map((tier) => tier.id).sort()).toEqual(
-      ["artist", "broadcaster", "cmo", "guest"].sort(),
+      ["artist", "broadcaster", "cmo", "label", "venue"].sort(),
     );
     for (const tier of TIERS) {
       expect(tier.label.length).toBeGreaterThan(0);

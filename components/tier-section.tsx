@@ -1,25 +1,27 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import {
   Check,
+  Martini,
   Disc3,
-  Eye,
+  Mic,
   Radio,
   ShieldCheck,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
-import { Dialog } from "@/components/dialog";
+import { AuthModal } from "@/components/auth-modal";
 import { TIERS, type TierCard } from "@/lib/site-content";
 import { useLanguage } from "@/components/language-provider";
 
 const ICONS: Record<string, LucideIcon> = {
-  Eye,
+  Eye: Sparkles,
   Disc3,
+  Mic,
   Radio,
   ShieldCheck,
+  Martini,
 };
 
 export function TierSection() {
@@ -40,7 +42,7 @@ export function TierSection() {
         </p>
       </div>
 
-      <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-4">
+      <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-3">
         {TIERS.map((tier) => {
           const Icon = ICONS[tier.icon] ?? Sparkles;
           return (
@@ -90,73 +92,19 @@ export function TierSection() {
       </div>
 
       {activeTier && (
-        <TierOnboardingModal tier={activeTier} onClose={() => setActiveTier(null)} />
+        <AuthModal
+          role={{
+            id: activeTier.id,
+            label: activeTier.label,
+            headline: activeTier.headline,
+            blurb: activeTier.blurb,
+            features: activeTier.features,
+          }}
+          onClose={() => setActiveTier(null)}
+        />
       )}
     </section>
   );
 }
 
-function TierOnboardingModal({
-  tier,
-  onClose,
-}: {
-  tier: TierCard;
-  onClose: () => void;
-}) {
-  const { t } = useLanguage();
-  const Icon = ICONS[tier.icon] ?? Sparkles;
-
-  return (
-    <Dialog title={tier.label} onClose={onClose} wide>
-      <div className="space-y-5 p-2">
-        <div className="flex items-center gap-3">
-          <span
-            className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${tier.accent} text-white ring-1 ring-white/10`}
-          >
-            <Icon className="h-6 w-6" />
-          </span>
-          <div>
-            <h3 className="text-lg font-bold text-white">{tier.headline}</h3>
-            <p className="text-sm text-slate-400">{tier.role}</p>
-          </div>
-        </div>
-
-        <p className="text-sm leading-relaxed text-slate-300">{tier.blurb}</p>
-
-        <ul className="space-y-2.5">
-          {tier.features.map((feature) => (
-            <li key={feature} className="flex items-start gap-2.5">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-              <span className="text-sm leading-snug text-slate-300">
-                {feature}
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        <div className="flex flex-col gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-slate-500">
-            {tier.id === "guest"
-              ? "No account needed — start browsing instantly."
-              : "Create a role account in under two minutes. No card required."}
-          </p>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-12 rounded-xl px-4 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800/70"
-            >
-              {t("nav.closeMenu")}
-            </button>
-            <Link
-              href={tier.href}
-              className="flex h-12 items-center rounded-xl bg-emerald-400 px-6 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-300"
-            >
-              {tier.cta}
-            </Link>
-          </div>
-        </div>
-      </div>
-    </Dialog>
-  );
-}
+export { Sparkles as TierGuestIcon };
