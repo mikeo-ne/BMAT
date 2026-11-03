@@ -89,7 +89,9 @@ export async function readStationHealth(): Promise<
 /**
  * Persist a fresh probe batch. Writes are serialized behind a promise chain
  * (same pattern as the other runtime stores) so concurrent probe runs cannot
- * interleave partial files.
+ * interleave partial files. Persistence is best-effort telemetry: the
+ * memory cache still serves reads, so a read-only or ephemeral filesystem
+ * must never break the health endpoint.
  */
 export async function recordStationHealth(
   results: Map<string, ProbeResult>,
@@ -101,8 +103,12 @@ export async function recordStationHealth(
     results: Object.fromEntries(results),
   };
   const write = async () => {
-    await mkdir(directory(), { recursive: true });
-    await writeFile(filename(), JSON.stringify(record, null, 2), "utf8");
+    try {
+      await mkdir(directory(), { recursive: true });
+      await writeFile(filename(), JSON.stringify(record, null, 2), "utf8");
+    } catch {
+      // Health is telemetry, not master data — serve from cache on failure.
+    }
   };
   mutations = mutations.then(write, write);
   await mutations;

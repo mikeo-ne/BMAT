@@ -142,7 +142,8 @@ export function AuthProvider({
     if (!response.ok && response.status !== 401)
       throw new Error("Sign-out could not be confirmed. Retry.");
     await update(EMPTY);
-    router.replace("/dashboard/charts");
+    // Signing out returns visitors to the public site, not the dashboard.
+    router.replace("/");
     router.refresh();
   }
   return (
