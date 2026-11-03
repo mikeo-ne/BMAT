@@ -5,6 +5,15 @@ import { AuthModal } from "@/components/auth-modal";
 import { VenueMonitor } from "@/components/venue-monitor";
 import { TIERS, VENUE_NODES, VENUE_PINGS } from "@/lib/site-content";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    push: vi.fn(),
+  }),
+  usePathname: () => "/",
+}));
+
 vi.mock("@/components/auth-provider", () => ({
   useAuth: () => ({ update: vi.fn() }),
 }));
