@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 export const dynamic = "force-dynamic";
 export default async function PlayoutPage() {
-  const data = await readPageWorkspace(["broadcaster"], "/dashboard/playout");
+  const data = await readPageWorkspace(["broadcaster", "cmo"], "/dashboard/playout");
   return (
     <PlayoutLog
       catalogue={data.catalogue}

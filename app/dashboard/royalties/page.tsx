@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RoyaltiesPage() {
-  const data = await readPageWorkspace(["cmo"], "/dashboard/royalties");
+  const data = await readPageWorkspace(["cmo", "artist", "label"], "/dashboard/royalties");
   const now = new Date();
   const model = buildCapturedRoyaltiesModel(
     data.catalogue,

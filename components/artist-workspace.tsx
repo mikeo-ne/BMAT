@@ -15,7 +15,7 @@ export async function ArtistWorkspace({
   initialView?: ArtistView;
 }) {
   const data = await readPageWorkspace(
-    ["artist"],
+    ["artist", "label", "cmo"],
     {
       overview: "/dashboard/artist",
       music: "/dashboard/artists",

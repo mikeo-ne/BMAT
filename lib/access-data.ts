@@ -76,6 +76,15 @@ export function isolateWorkspace(
       history: selected,
     };
   }
+  if (user.role === "venue") {
+    // Venue operators only ever see their own ambient node activity. Station
+    // playout and the wider catalogue never cross into a venue workspace.
+    const assigned = new Set(user.stationIds);
+    return {
+      tracks: [],
+      history: history.filter((e) => assigned.has(e.stationId)),
+    };
+  }
   return {
     tracks: tracks.map(clientTrack),
     history,
