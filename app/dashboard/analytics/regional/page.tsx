@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RegionalAnalyticsPage() {
   const data = await readPageWorkspace(
-    ["artist"],
+    ["artist", "broadcaster", "label", "cmo"],
     "/dashboard/analytics/regional",
   );
   return (

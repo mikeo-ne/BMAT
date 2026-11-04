@@ -126,24 +126,29 @@ export interface TaxonomyItem {
 
 export const USE_CASES: TaxonomyItem[] = [
   {
-    label: "CMOS",
+    label: "CMOS / Auditors",
     blurb: "UPRS · MCSK · COSOTA royalty settlement on captured evidence",
-    href: "/about#cmo",
+    href: "/dashboard/cmo",
   },
   {
     label: "Record Labels",
     blurb: "One delivery pipeline for every master in the region",
-    href: "/#tier-artist",
+    href: "/dashboard/artists",
   },
   {
     label: "Broadcasters",
     blurb: "Radio & TV playout logs that settle themselves",
-    href: "/#tier-broadcaster",
+    href: "/dashboard/playout",
   },
   {
     label: "Independent Artists",
     blurb: "Fingerprint your master, get alerts the moment it spins",
-    href: "/#tier-artist",
+    href: "/dashboard/artist",
+  },
+  {
+    label: "Venue Operators",
+    blurb: "Ambient monitoring, UPRS compliance and venue playouts",
+    href: "/dashboard/monitoring",
   },
   {
     label: "Media Agencies",

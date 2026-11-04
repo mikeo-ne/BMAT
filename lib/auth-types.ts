@@ -27,10 +27,11 @@ export const ROLE_HOME: Record<SecurityRole, string> = {
   broadcaster: "/dashboard/playout",
   cmo: "/dashboard/cmo",
   label: "/dashboard/artists",
-  venue: "/dashboard/monitoring",
+  venue: "/dashboard/venue",
 };
-const PUBLIC = ["/dashboard/charts", "/dashboard/stats"];
-const PRIVATE: Record<AccountRole, string[]> = {
+export const PUBLIC_DASHBOARD_ROUTES = ["/dashboard/charts", "/dashboard/stats"];
+const PUBLIC = PUBLIC_DASHBOARD_ROUTES;
+export const PRIVATE_ROUTES: Record<AccountRole, string[]> = {
   artist: [
     "/dashboard/artist",
     "/dashboard/artists",
@@ -39,33 +40,52 @@ const PRIVATE: Record<AccountRole, string[]> = {
     "/dashboard/alerts",
     "/dashboard/analytics/regional",
     "/dashboard/splits",
+    "/dashboard/royalties",
   ],
   broadcaster: [
     "/dashboard/playout",
+    "/dashboard/broadcaster",
     "/dashboard/monitoring",
     "/dashboard/reportal",
     "/dashboard/advertisers",
+    "/dashboard/analytics/regional",
   ],
   cmo: [
+    // The CMO auditor holds universal system visibility across every use case.
     "/dashboard/cmo",
     "/dashboard/cmo/master",
     "/dashboard/east-sound",
     "/dashboard/royalties",
     "/dashboard/splits",
     "/dashboard/mix-parser",
+    "/dashboard/artist",
+    "/dashboard/artists",
+    "/dashboard/artist/catalogue",
+    "/dashboard/artist/delivery",
+    "/dashboard/playout",
+    "/dashboard/broadcaster",
+    "/dashboard/monitoring",
+    "/dashboard/venue",
+    "/dashboard/label",
+    "/dashboard/reportal",
+    "/dashboard/advertisers",
+    "/dashboard/alerts",
+    "/dashboard/analytics/regional",
   ],
   label: [
     "/dashboard/artists",
+    "/dashboard/label",
     "/dashboard/artist",
     "/dashboard/artist/catalogue",
     "/dashboard/artist/delivery",
     "/dashboard/splits",
+    "/dashboard/royalties",
+    "/dashboard/analytics/regional",
+    "/dashboard/alerts",
   ],
-  venue: [
-    "/dashboard/monitoring",
-    "/dashboard/playout",
-  ],
+  venue: ["/dashboard/venue"],
 };
+const PRIVATE = PRIVATE_ROUTES;
 export function roleMayOpen(role: SecurityRole, pathname: string): boolean {
   const raw = pathname.split(/[?#]/)[0].replace(/\/+$/, "");
   const index = raw.indexOf("/dashboard");

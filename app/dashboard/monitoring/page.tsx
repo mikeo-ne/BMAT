@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LiveStationMonitorPage() {
   const data = await readPageWorkspace(
-    ["broadcaster"],
+    ["broadcaster", "cmo"],
     "/dashboard/monitoring",
   );
   return (

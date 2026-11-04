@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AlertsPage() {
-  const data = await readPageWorkspace(["artist"], "/dashboard/alerts");
+  const data = await readPageWorkspace(["artist", "label", "cmo"], "/dashboard/alerts");
   return (
     <AlertsView
       catalogue={data.catalogue.filter((t) => t.ownerId === data.actor.id)}

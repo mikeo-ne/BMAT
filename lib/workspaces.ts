@@ -17,6 +17,7 @@ export type ModuleId =
   | "stats"
   | "station-overview"
   | "station-logs"
+  | "venue-node"
   | "ad-audit"
   | "audit"
   | "rights"
@@ -95,10 +96,6 @@ export const WORKSPACES: readonly Workspace[] = [
       "charts",
       "ad-audit",
       "regional",
-      "mix-parser",
-      "audit",
-      "music",
-      "alerts",
     ],
   },
   {
@@ -148,16 +145,9 @@ export const WORKSPACES: readonly Workspace[] = [
     badge: "Venue Monitor",
     initials: "VN",
     accent: "#f472b6",
-    href: "/dashboard/monitoring",
+    href: "/dashboard/venue",
     description: "Ambient listener nodes, UPRS compliance and venue playouts",
-    modules: [
-      "station-overview",
-      "station-logs",
-      "reportal",
-      "charts",
-      "regional",
-      "music",
-    ],
+    modules: ["venue-node", "charts"],
   },
   {
     id: "advertiser",
@@ -235,6 +225,13 @@ export const WORKSPACE_MODULES: readonly WorkspaceModule[] = [
     label: "Station overview & sources",
     title: "Live Station Monitor",
     owner: "broadcaster",
+  },
+  {
+    id: "venue-node",
+    href: "/dashboard/venue",
+    label: "Venue node & ambient logs",
+    title: "Venue Operator Dashboard",
+    owner: "venue",
   },
   {
     id: "station-logs",

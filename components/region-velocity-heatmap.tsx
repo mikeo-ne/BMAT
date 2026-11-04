@@ -84,7 +84,8 @@ export function RegionVelocityHeatmap() {
         </div>
       </div>
 
-      <div className="mt-4 flex gap-3">
+      <div className="mt-4 overflow-x-auto">
+        <div className="flex min-w-max gap-3">
         {orderedRegions.map((region) => {
           const regionCells = cells.filter((cell) => cell.region === region);
           const missing = maxHeight - regionCells.length;
@@ -127,6 +128,7 @@ export function RegionVelocityHeatmap() {
             </div>
           );
         })}
+      </div>
       </div>
     </section>
   );
