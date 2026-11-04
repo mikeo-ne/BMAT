@@ -6,6 +6,7 @@
   python -m eastsound_ingest scan recording.mp3 --station capital-fm-91-3   # whole file, faster than real time
   python -m eastsound_ingest run --stations stations.csv    # monitor live streams 24/7
   python -m eastsound_ingest resolve "Capital FM"           # look up a current stream URL
+  python -m eastsound_ingest --stations stations.csv doctor # is this worker wired correctly?
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ import threading
 import time
 from pathlib import Path
 
-from . import radiobrowser
+from . import doctor, radiobrowser
 from .audio import decode_file
 from .config import Station, load_settings, slugify
 from .fingerprint import SAMPLE_RATE, landmarks
@@ -125,11 +126,14 @@ def main() -> None:
     sc = sub.add_parser("scan"); sc.add_argument("file"); sc.add_argument("--station", default="file")
     sc.add_argument("--started-at", help="ISO time the recording began, e.g. 2026-11-04T08:00:00+03:00")
     sub.add_parser("run")
+    sub.add_parser("doctor")
     r = sub.add_parser("resolve"); r.add_argument("name")
     a = p.parse_args()
     logging.basicConfig(level=logging.DEBUG if a.verbose else logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     s = load_settings(a.stations)
     Path(s.index_path).parent.mkdir(parents=True, exist_ok=True)
+    if a.cmd == "doctor":
+        sys.exit(doctor.main(s))
     {"enroll": cmd_enroll, "enroll-dir": cmd_enroll_dir, "identify": cmd_identify, "scan": cmd_scan,
      "run": cmd_run, "resolve": cmd_resolve}[a.cmd](a, s)
 

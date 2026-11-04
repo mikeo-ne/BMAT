@@ -51,7 +51,18 @@ export function AirplayChart() {
           </div>
         ))}
         {!state.loading && rows.length === 0 && (
-          <p className="px-5 py-10 text-center text-sm text-slate-500">{state.error ? "The chart is unavailable right now." : "No plays detected in this region yet this week."}</p>
+          <div className="px-5 py-10 text-center text-sm text-slate-500">
+            {state.error ? (
+              <p>The chart is unavailable right now. Try again in a moment.</p>
+            ) : live ? (
+              <div className="space-y-1">
+                <p className="font-medium text-slate-300">Monitoring is on — the chart is warming up.</p>
+                <p>Our stations are being fingerprinted around the clock. Each verified play appears here within seconds of airplay.</p>
+              </div>
+            ) : (
+              <p>No plays detected in this region yet this week.</p>
+            )}
+          </div>
         )}
       </div>
       <p className="mt-3 text-xs text-slate-500">

@@ -53,6 +53,7 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m tests.test_broadcast
       - run: python -m tests.test_panel
+      - run: python -m tests.test_doctor
 
   worker-image:
     name: Ingest worker — Docker build
