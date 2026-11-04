@@ -19,7 +19,8 @@ cd workers/ingest
 pip install -r requirements.txt
 
 # 1. Build the reference catalogue (filenames "Artist - Title.mp3")
-python -m eastsound_ingest enroll-dir ~/masters/
+python -m eastsound_ingest enroll-dir ~/masters/          # a folder on this machine
+python -m eastsound_ingest enroll-list masters.txt       # URLs or paths, one per line — no file transfer
 #    or one file, linked to its Supabase recordings.id:
 python -m eastsound_ingest enroll master.wav --title "Kampala Nights" --artist "Nalu Akello" \
        --recording-id 0b9f...-uuid --isrc UG-PSR-26-00011

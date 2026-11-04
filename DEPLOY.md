@@ -113,6 +113,15 @@ docker compose logs -f          # watch detections arrive
 
 `enroll-dir` prints one line per master and the final count. It is safe to re-run: the same recording is skipped instead of duplicated.
 
+**No shell access, or the audio is somewhere else?** Put the masters in any bucket you can make reachable by URL (for example a temporary public bucket in Supabase → Storage), write the links to `masters.txt` — one per line, optional `Artist - Title` after a tab — and run `enroll-list`:
+
+```bash
+python -m eastsound_ingest enroll-list masters.txt
+#   ✓ Jovan — Kampala Nights
+#   ✗ https://…/missing.mp3: …        (a dead link never stops the batch)
+# 7 enrolled · 7 recordings in index
+```
+
 Edit `stations.csv` to add or pause stations, then restart the worker. Leave the two Supabase variables empty for a **dry run**: detections are written to the `ingest-data` volume instead of the database.
 
 Confirm it end-to-end: `/setup` should flip **Ingest worker reporting** to green within a few minutes of the first detection, and the broadcaster playout timeline starts filling.
