@@ -47,11 +47,30 @@ The service-role key stays on this server only; never put it in the website.
 
 ## Stations
 
-`stations.csv` lists what to monitor. Leave `stream_url` empty and the worker
-looks up the current link in the open Radio Browser directory at start-up, and
-again whenever a stream keeps failing (links change). Set `enabled=false` to
-pause a station. The seven Kampala stations whose streams were confirmed working
-are enabled; the rest are listed but off until checked.
+`stations.csv` is a byte-identical copy of the panel of record,
+`supabase/seed/uganda_stream_stations.csv` — the same 14 stations the platform
+publishes. **Edit the seed, then copy it here** (or CI will fail the panel
+drift check):
+
+```bash
+cp supabase/seed/uganda_stream_stations.csv workers/ingest/stations.csv
+```
+
+The loader understands that panel's schema directly:
+
+| Column | Meaning |
+|---|---|
+| `stream_host` | A URL, or host+path without a scheme (`dc4.serverse.com/proxy/pearlfm/stream`) → used as the stream URL. A bare host is ignored and resolved through Radio Browser instead of guessing a path. |
+| `directory_status` | `OK` / `OK (stale)` → station is monitored. `listed …` → known station, no captured stream yet, so it stays idle. An explicit `enabled` column, if present, overrides this. |
+| `region` | Parenthetical notes collapse to the reporting region (`Central (Masaka)` → `Central`). |
+
+Seven stations are monitored today; the other seven are listed but idle until
+their stream is captured. A legacy `stations.csv` with `stream_url` and
+`enabled` columns still loads, so existing deployments keep working.
+
+```bash
+python -m tests.test_panel     # drift, parse, enable rules, URLs, regions
+```
 
 ## What it records
 
