@@ -224,6 +224,7 @@ export function AuthModal({
                 name: form.get("name"),
                 email: form.get("email"),
                 password: form.get("password"),
+                role: role.id,
               });
             }}
           >
@@ -274,8 +275,8 @@ export function AuthModal({
               <ArrowRight size={14} />
             </button>
             <p className="text-[10px] leading-relaxed text-muted">
-              Your account is created as {role.label}. Station-manager and CMO
-              roles are provisioned by the platform operator.
+              Your account is created as {role.label}. Broadcaster and CMO
+              accounts require operator-assigned stations or provisioning.
             </p>
           </form>
         )}

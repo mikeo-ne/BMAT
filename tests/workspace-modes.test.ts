@@ -14,12 +14,14 @@ import {
 } from "@/lib/workspaces";
 
 describe("role-scoped navigation is a view preference, not authorization", () => {
-  it("adds Public Guest without removing the four existing specialist views", () => {
+  it("adds Public Guest and the five master-schema specialist views", () => {
     expect(WORKSPACES.map((row) => row.id)).toEqual([
       "public",
       "artist",
       "broadcaster",
       "cmo",
+      "label",
+      "venue",
       "advertiser",
     ]);
     expect(isWorkspace("public")).toBe(true);

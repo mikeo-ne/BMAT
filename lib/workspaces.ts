@@ -3,6 +3,8 @@ export type WorkspaceId =
   | "artist"
   | "broadcaster"
   | "cmo"
+  | "label"
+  | "venue"
   | "advertiser";
 export type ArtistView = "overview" | "music" | "catalogue" | "delivery";
 export type ModuleId =
@@ -116,6 +118,44 @@ export const WORKSPACES: readonly Workspace[] = [
       "regional",
       "station-overview",
       "mix-parser",
+      "music",
+    ],
+  },
+  {
+    id: "label",
+    label: "Record Label Roster",
+    short: "Record label",
+    badge: "Label Portal",
+    initials: "RL",
+    accent: "#34d399",
+    href: "/dashboard/artists",
+    description: "Roster catalogue, delivery pipeline and splits",
+    modules: [
+      "music",
+      "catalogue",
+      "delivery",
+      "rights",
+      "royalties",
+      "charts",
+      "regional",
+      "alerts",
+    ],
+  },
+  {
+    id: "venue",
+    label: "Venue Operator",
+    short: "Venue",
+    badge: "Venue Monitor",
+    initials: "VN",
+    accent: "#f472b6",
+    href: "/dashboard/monitoring",
+    description: "Ambient listener nodes, UPRS compliance and venue playouts",
+    modules: [
+      "station-overview",
+      "station-logs",
+      "reportal",
+      "charts",
+      "regional",
       "music",
     ],
   },
