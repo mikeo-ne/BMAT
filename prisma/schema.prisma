@@ -1,7 +1,8 @@
-// Historical, unwired Prisma design (validated for reference only).
-// Active optional PostgreSQL persistence uses db/migrations and lib/postgres,
-// with a dedicated east_sound schema. Do NOT prisma db push this draft over it.
-// See docs/postgres-and-worker.md for migration/seed/worker commands and boundaries.
+// Master entity schema (7H Music Group Ltd).
+// Canonical Supabase-style entity structure, adapted to the project's
+// east_sound PostgreSQL schema. Active persistence uses db/migrations and
+// lib/postgres with a dedicated east_sound schema. Do NOT prisma db push
+// this draft over it. See docs/postgres-and-worker.md for boundaries.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,276 +14,207 @@ datasource db {
 }
 
 enum UserRole {
-  ARTIST
+  CMO
   LABEL
-  CMO_ADMIN
-  ADVERTISER
-  A_AND_R
+  ARTIST
+  BROADCASTER
+  VENUE
 }
 
-enum TrackStatus {
-  PROCESSING
-  LIVE
+enum BroadcastType {
+  RADIO_FM
+  TV_DIGITAL
+  WEB_RADIO
+  WEB_TV
+}
+
+enum StreamProtocol {
+  ICECAST
+  HLS
+  SHOUTCAST
+  HTTP_MP3
+  RTSP
+}
+
+enum VenueCategory {
+  BAR_LOUNGE
+  NIGHTCLUB
+  RESTAURANT
+  HOTEL
+  EVENT_SPACE
+}
+
+enum DisputeStatus {
+  PENDING
+  UNDER_REVIEW
+  RESOLVED
   REJECTED
 }
 
-enum StationMedium {
-  FM
-  TV
+model Profile {
+  id              String     @id @default(cuid())
+  email           String
+  fullName        String?
+  role            UserRole   @default(ARTIST)
+  organizationName String?
+  phoneNumber     String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  labels         Label[]
+  artists        Artist[]
+  broadcastStations BroadcastStation[]
+  venues         Venue[]
+  disputes       Dispute[] @relation("DisputeFiledBy")
+
+  @@map("profiles")
 }
 
-enum SlotOutcome {
-  FULFILLED
-  UNVERIFIED
-  OFF_WINDOW
-  MISSED
+model Label {
+  id        String   @id @default(cuid())
+  profileId String
+  labelName String
+  country   String   @default("Uganda")
+  createdAt DateTime @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id])
+  artists Artist[]
+  tracks  Track[]
+
+  @@map("labels")
 }
 
-enum PayoutStatus {
-  DRAFT
-  APPROVED
-  PAID
-  BLOCKED
-}
+model Artist {
+  id         String   @id @default(cuid())
+  profileId  String?
+  labelId    String?
+  stageName  String
+  realName   String?
+  isrcPrefix String   @default("UG-ESD")
+  createdAt  DateTime @default(now())
 
-enum SplitRole {
-  PRIMARY_ARTIST
-  FEATURED_ARTIST
-  PRODUCER
-  SONGWRITER
-  PUBLISHER
-}
+  profile Profile? @relation(fields: [profileId], references: [id])
+  label   Label?    @relation(fields: [labelId], references: [id])
+  tracks  Track[]
 
-model User {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  displayName String
-  role        UserRole @default(ARTIST)
-  // UPRS member ids the account can act for.
-  memberIds   String[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  tracks         Track[]
-  campaigns      AdCampaign[]
-  reports        RoyaltyReport[]
-  splitSignOffs  SplitParty[]
-  payoutBatches  PayoutBatch[]
+  @@map("artists")
 }
 
 model Track {
-  id              String      @id @default(cuid())
-  title           String
-  primaryArtist   String
-  featuredArtists String[]
-  genre           String?
-  releaseDate     DateTime
-  isrc            String      @unique
-  audioFileName   String
-  audioFormat     String
-  audioMimeType   String
-  audioSizeBytes  Int
-  audioDurationSec Int?
-  status          TrackStatus @default(PROCESSING)
-  uploadedAt      DateTime    @default(now())
+  id           String   @id @default(cuid())
+  artistId     String
+  labelId      String?
+  title        String
+  isrc         String   @unique
+  upc          String?
+  audioFileUrl String
+  fingerprintHash String?
+  genre        String   @default("Afro-fusion")
+  releaseDate  DateTime?
+  createdAt    DateTime @default(now())
 
-  ownerId String?
-  owner   User?   @relation(fields: [ownerId], references: [id])
+  artist Artist @relation(fields: [artistId], references: [id])
+  label  Label? @relation(fields: [labelId], references: [id])
 
-  matches     AirplayMatch[]
-  royaltyLines RoyaltyLine[]
-  splitSheet  SplitSheet?
-  clips       UnidentifiedClip[]
+  splits    TrackSplit[]
+  disputes  Dispute[]
+  stationLogs StationPlayoutLog[]
+  venueLogs   VenuePlayoutLog[]
 
-  @@index([primaryArtist])
-  @@index([status])
+  @@map("tracks")
 }
 
-model RadioStation {
-  id        String        @id
-  name      String
-  region    String
-  location  String
-  frequency String
-  reach     Int
-  medium    StationMedium @default(FM)
-  monitored Boolean       @default(false)
+model TrackSplit {
+  id               String  @id @default(cuid())
+  trackId          String
+  contributorName  String
+  role             String  // Producer | Composer | Writer | Publisher
+  sharePercentage  Float
+  createdAt        DateTime @default(now())
 
-  matches   AirplayMatch[]
-  campaigns AdCampaign[]
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@map("track_splits")
 }
 
-// A fingerprinted playout: the join between the catalogue and the panel that
-// every royalty figure downstream is built from.
-model AirplayMatch {
-  id         String   @id @default(cuid())
-  detectedAt DateTime
-  hour       Int?
-  confidence Float
-  verified   Boolean  @default(false)
-  plays      Int      @default(1)
+model BroadcastStation {
+  id             String        @id @default(cuid())
+  profileId      String?
+  stationName    String
+  broadcastType  BroadcastType @default(RADIO_FM)
+  frequencyFm    String?
+  region         String        @default("Central")
+  streamUrl      String
+  protocol       StreamProtocol @default(ICECAST)
+  isActive       Boolean       @default(true)
+  lastPingAt     DateTime      @default(now())
+  createdAt      DateTime      @default(now())
 
-  trackId   String
-  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
-  stationId String
-  station   RadioStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  profile Profile? @relation(fields: [profileId], references: [id])
+  logs    StationPlayoutLog[]
 
-  @@index([trackId, detectedAt])
-  @@index([stationId, detectedAt])
+  @@map("broadcast_stations")
 }
 
-model RoyaltyReport {
-  id          String   @id @default(cuid())
-  period      String
-  generatedAt DateTime @default(now())
-  totalPlays  Int
-  poolUgx     Int
-  poolUsd     Float
-  status      String   @default("DRAFT")
+model Venue {
+  id             String        @id @default(cuid())
+  profileId      String?
+  venueName      String
+  category       VenueCategory @default(BAR_LOUNGE)
+  district       String        @default("Kampala")
+  address        String?
+  uprsLicenseNo  String?
+  isCompliant    Boolean       @default(true)
+  createdAt      DateTime      @default(now())
 
-  generatedById String
-  generatedBy   User   @relation(fields: [generatedById], references: [id])
+  profile Profile? @relation(fields: [profileId], references: [id])
+  logs    VenuePlayoutLog[]
 
-  lines      RoyaltyLine[]
-  statements RoyaltyStatement[]
+  @@map("venues")
 }
 
-model RoyaltyLine {
-  id        String @id @default(cuid())
-  memberId  String
-  artist    String
-  isrc      String
-  stationId String
-  plays     Int
-  allocationUgx Int
+model StationPlayoutLog {
+  id              String   @id @default(cuid())
+  stationId       String
+  trackId         String?
+  matchedTitle    String
+  matchedArtist   String
+  confidenceScore Float    @default(99.0)
+  playoutType     String   @default("music")
+  playedAt        DateTime @default(now())
 
-  reportId String
-  report   RoyaltyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  trackId  String?
-  track    Track?        @relation(fields: [trackId], references: [id])
+  station BroadcastStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  track   Track?           @relation(fields: [trackId], references: [id])
+
+  @@map("station_playout_logs")
 }
 
-// A member's accrued entitlement for one reporting period, sliced out of a
-// RoyaltyReport. This is what member services approves and pays.
-model RoyaltyStatement {
-  id           String      @id @default(cuid())
-  memberId     String
-  artist       String
-  period       String
-  plays        Int
-  stations     Int
-  works        Int
-  allocationUgx Int
-  allocationUsd Float
-  shareOfPool  Float
-  status       PayoutStatus @default(DRAFT)
-  approvedAt   DateTime?
-  paidAt       DateTime?
-  paymentReference String?
+model VenuePlayoutLog {
+  id              String   @id @default(cuid())
+  venueId         String
+  trackId         String?
+  matchedTitle    String
+  matchedArtist   String
+  confidenceScore Float    @default(98.5)
+  playedAt        DateTime @default(now())
 
-  reportId String
-  report   RoyaltyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  batchId  String?
-  batch    PayoutBatch?  @relation(fields: [batchId], references: [id])
+  venue  Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  track  Track? @relation(fields: [trackId], references: [id])
 
-  @@index([reportId])
-  @@index([memberId, period])
-  @@unique([reportId, memberId, period])
+  @@map("venue_playout_logs")
 }
 
-// The group of statements released to payment for one reporting period.
-model PayoutBatch {
-  id           String      @id @default(cuid())
-  period       String      @unique
-  status       PayoutStatus @default(DRAFT)
-  allocationUgx Int
-  allocationUsd Float
-  members      Int
-  plays        Int
-  paidAt       DateTime?
-  createdById  String
-  createdBy    User        @relation(fields: [createdById], references: [id])
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+model Dispute {
+  id               String        @id @default(cuid())
+  trackId          String
+  filedByProfileId String
+  disputeReason    String
+  status           DisputeStatus @default(PENDING)
+  resolutionNotes  String?
+  createdAt        DateTime      @default(now())
 
-  statements RoyaltyStatement[]
-}
+  track   Track   @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  filedBy Profile @relation("DisputeFiledBy", fields: [filedByProfileId], references: [id])
 
-model AdCampaign {
-  id            String @id @default(cuid())
-  brand         String
-  product       String
-  agency        String
-  jingleFile    String
-  jingleBytes   Int
-  jingleSec     Int
-  playsPerDay   Int
-  windowStartHour Int
-  windowEndHour Int
-  days          Int
-  startsOn      DateTime
-
-  ownerId String?
-  owner   User?   @relation(fields: [ownerId], references: [id])
-  stationId String
-  station   RadioStation @relation(fields: [stationId], references: [id])
-
-  slots AdSlot[]
-}
-
-model AdSlot {
-  id        String      @id @default(cuid())
-  day       DateTime
-  slotIndex Int
-  outcome   SlotOutcome
-  airedAt   DateTime?
-  airedHour Int?
-
-  campaignId String
-  campaign   AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-
-  @@index([campaignId, day])
-}
-
-model SplitSheet {
-  id       String @id @default(cuid())
-  isrc     String @unique
-  title    String
-  raisedAt DateTime @default(now())
-
-  // One split sheet per recording.
-  trackId String @unique
-  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
-
-  parties SplitParty[]
-}
-
-model SplitParty {
-  id       String    @id @default(cuid())
-  name     String
-  role     SplitRole
-  sharePct Int
-  memberId String?
-  signedAt DateTime?
-  channel  String?
-
-  sheetId String
-  sheet   SplitSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
-
-  // The user account that digitally signed, when it is one of ours.
-  signOffById String?
-  signOffBy   User?   @relation(fields: [signOffById], references: [id])
-}
-
-// Unresolved mix-parser segments awaiting an A&R link.
-model UnidentifiedClip {
-  id          String   @id @default(cuid())
-  startSec    Int
-  endSec      Int
-  confidence  Float
-  linkedTitle String?
-  linkedAt    DateTime?
-
-  trackId String?
-  track   Track?  @relation(fields: [trackId], references: [id])
+  @@map("disputes")
 }

@@ -1,4 +1,4 @@
-export type SecurityRole = "public" | "artist" | "broadcaster" | "cmo";
+export type SecurityRole = "public" | "artist" | "broadcaster" | "cmo" | "label" | "venue";
 export type AccountRole = Exclude<SecurityRole, "public">;
 export interface SessionUser {
   id: string;
@@ -18,12 +18,16 @@ export const ROLE_LABELS: Record<SecurityRole, string> = {
   artist: "Artist / Label Manager",
   broadcaster: "Broadcaster / Station Manager",
   cmo: "CMO Auditor",
+  label: "Record Label",
+  venue: "Venue Operator",
 };
 export const ROLE_HOME: Record<SecurityRole, string> = {
   public: "/dashboard/charts",
   artist: "/dashboard/artist",
   broadcaster: "/dashboard/playout",
   cmo: "/dashboard/cmo",
+  label: "/dashboard/artists",
+  venue: "/dashboard/monitoring",
 };
 const PUBLIC = ["/dashboard/charts", "/dashboard/stats"];
 const PRIVATE: Record<AccountRole, string[]> = {
@@ -49,6 +53,17 @@ const PRIVATE: Record<AccountRole, string[]> = {
     "/dashboard/royalties",
     "/dashboard/splits",
     "/dashboard/mix-parser",
+  ],
+  label: [
+    "/dashboard/artists",
+    "/dashboard/artist",
+    "/dashboard/artist/catalogue",
+    "/dashboard/artist/delivery",
+    "/dashboard/splits",
+  ],
+  venue: [
+    "/dashboard/monitoring",
+    "/dashboard/playout",
   ],
 };
 export function roleMayOpen(role: SecurityRole, pathname: string): boolean {

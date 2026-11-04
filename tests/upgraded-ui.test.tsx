@@ -93,8 +93,8 @@ describe("metadata onboarding", () => {
     fireEvent.click(screen.getByRole("button"));
     expect(screen.getByRole("tooltip")).toBeTruthy();
   });
-  it("adds a public view while retaining four specialized workspaces", () => {
-    expect(WORKSPACES).toHaveLength(5);
+  it("adds a public view while retaining all specialized workspaces", () => {
+    expect(WORKSPACES).toHaveLength(7);
     expect(isWorkspace("public")).toBe(true);
     expect(workspaceForPath("/dashboard/charts")).toBe("public");
     expect(
@@ -105,6 +105,8 @@ describe("metadata onboarding", () => {
     expect(workspaceForPath("/dashboard/cmo")).toBe("cmo");
     expect(workspaceForPath("/dashboard/playout")).toBe("broadcaster");
     expect(isWorkspace("advertiser")).toBe(true);
+    expect(isWorkspace("label")).toBe(true);
+    expect(isWorkspace("venue")).toBe(true);
     expect(isWorkspace("admin-root")).toBe(false);
   });
 });

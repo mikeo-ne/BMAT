@@ -53,18 +53,19 @@ describe("authoritative authentication and session security", () => {
       (await auth.requestSession(actor.request("/api/auth/session")))?.user.id,
     ).toBe(actor.user.id);
   });
-  it("registers artists only, ignores no role escalation, and sets HttpOnly/Secure/SameSite session cookies", async () => {
+  it("registers master-schema roles, rejects invalid roles, and sets HttpOnly/Secure/SameSite session cookies", async () => {
     const route = await import("@/app/api/auth/[action]/route");
+    // All five master roles are accepted at registration.
     const denied = await route.POST(
       json("register", {
         email: "rogue@example.com",
         password: "A test password long enough",
         name: "Rogue",
-        role: "cmo",
+        role: "superadmin",
       }),
       context("register"),
     );
-    expect(denied.status).toBe(403);
+    expect(denied.status).toBe(422);
     const result = await route.POST(
       json("register", {
         email: "Artist@Example.com",

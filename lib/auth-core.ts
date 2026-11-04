@@ -111,7 +111,7 @@ export async function createAccount(
       "Enter a valid email and a name of 2–120 characters.",
     );
   const role = provisioned ? (input.role ?? "artist") : "artist";
-  if (!["artist", "broadcaster", "cmo"].includes(role))
+  if (!["artist", "broadcaster", "cmo", "label", "venue"].includes(role))
     throw new HttpError(422, "Unsupported account role.");
   const stationIds = provisioned ? [...new Set(input.stationIds ?? [])] : [];
   if (

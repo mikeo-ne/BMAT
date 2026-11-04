@@ -15,6 +15,7 @@ import {
   userDto,
 } from "@/lib/auth-core";
 import { takeRateLimit } from "@/lib/security-store";
+import type { AccountRole } from "@/lib/auth-types";
 import { readBoundedJson } from "@/lib/integration-auth";
 import { safeReturnPath } from "@/lib/auth-types";
 export const runtime = "nodejs";
@@ -50,7 +51,7 @@ export async function POST(
     assertSameOrigin(request);
     const { action } = await context.params;
     if (action === "logout") {
-      await requireApiRole(request, ["artist", "broadcaster", "cmo"], true);
+      await requireApiRole(request, ["artist", "broadcaster", "cmo", "label", "venue"], true);
       await logout(request);
       return Response.json(
         { ok: true },
@@ -94,11 +95,12 @@ export async function POST(
       if (typeof body.email !== "string" || typeof body.password !== "string")
         throw new HttpError(422, "Enter your email and password.");
       if (action === "register") {
-        if (body.role !== undefined && body.role !== "artist")
-          throw new HttpError(
-            403,
-            "Privileged roles are operator-provisioned, never selected during registration.",
-          );
+        const masterRoles = ["cmo", "label", "artist", "broadcaster", "venue"];
+        if (
+          body.role !== undefined &&
+          !masterRoles.includes(String(body.role))
+        )
+          throw new HttpError(422, "Unsupported account role.");
         if (
           !(await takeRateLimit(
             tokenHash(
@@ -109,11 +111,15 @@ export async function POST(
           ))
         )
           throw new HttpError(429, "Registration is temporarily rate limited.");
-        user = await createAccount({
-          email: body.email,
-          password: body.password,
-          name: String(body.name ?? ""),
-        });
+        user = await createAccount(
+          {
+            email: body.email,
+            password: body.password,
+            name: String(body.name ?? ""),
+            role: body.role as AccountRole | undefined,
+          },
+          true,
+        );
       } else user = await loginAccount(body.email, body.password);
     }
     // Rotate any existing browser session; a supplied localStorage role is never consulted.
