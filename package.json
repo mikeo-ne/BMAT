@@ -2,7 +2,7 @@
   "name": "east-sound-technologies",
   "version": "0.1.0",
   "private": true,
-  "description": "East Sound Technologies \u2014 music copyright & airplay tracking SaaS (7H Music Group Ltd)",
+  "description": "East Sound Technologies — music copyright & airplay tracking SaaS (7H Music Group Ltd)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -24,6 +24,9 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/node": "^22.0.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
