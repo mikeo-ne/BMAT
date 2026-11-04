@@ -1,0 +1,92 @@
+"use client";
+
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { safeStorage } from "./safe";
+
+export const LANGS = [
+  { code: "en", label: "EN", name: "English" },
+  { code: "lg", label: "LG", name: "Luganda" },
+  { code: "sw", label: "SW", name: "Kiswahili" },
+] as const;
+export type Lang = (typeof LANGS)[number]["code"];
+
+// NOTE: Luganda & Kiswahili strings are first drafts — have a native speaker review before launch.
+const DICT = {
+  en: {
+    solutions: "Solutions",
+    useCases: "Use Cases",
+    blog: "Blog",
+    signIn: "Sign in",
+    dashboard: "My dashboard",
+    live: "32 Streams & 150+ Venues Active",
+    liveTpl: "{s} Streams & {v} Venues Active",
+    heroTitle: "Every spin. Every venue. Every shilling accounted for.",
+    heroSub:
+      "East Sound monitors Ugandan radio, TV and venues around the clock, matches what plays to who owns it, and turns airplay into evidence-backed royalties.",
+    ctaCharts: "Explore Live Charts",
+    ctaUseCase: "Choose Use Case",
+    chartTitle: "National Top 10 Airplay",
+    allRegions: "All Uganda",
+  },
+  lg: {
+    solutions: "Eby'okugonjoola",
+    useCases: "Abakozesa",
+    blog: "Amawulire",
+    signIn: "Yingira",
+    dashboard: "Dashibodi yange",
+    live: "Emikutu 32 n'ebifo 150+ biri ku mpewo",
+    liveTpl: "Emikutu {s} n'ebifo {v} biri ku mpewo",
+    heroTitle: "Buli luyimba, buli kifo, buli shilingi kibalibwa.",
+    heroSub:
+      "East Sound ewuliriza leediyo, TV n'ebifo by'okusanyukiramu mu Uganda essaawa zonna, n'ekakasa nnannyini nnyimba okusasulwa.",
+    ctaCharts: "Laba Ebipimo",
+    ctaUseCase: "Londa Ekikozesebwa",
+    chartTitle: "Ennyimba 10 Ezisinga ku Leediyo",
+    allRegions: "Uganda Yonna",
+  },
+  sw: {
+    solutions: "Suluhisho",
+    useCases: "Matumizi",
+    blog: "Blogu",
+    signIn: "Ingia",
+    dashboard: "Dashibodi yangu",
+    live: "Vituo 32 na Kumbi 150+ Hai",
+    liveTpl: "Vituo {s} na Kumbi {v} Hai",
+    heroTitle: "Kila wimbo. Kila ukumbi. Kila shilingi inahesabiwa.",
+    heroSub:
+      "East Sound hufuatilia redio, TV na kumbi za Uganda saa zote, na kugeuza kila uchezaji kuwa mrabaha wenye ushahidi.",
+    ctaCharts: "Tazama Chati Hai",
+    ctaUseCase: "Chagua Matumizi",
+    chartTitle: "Nyimbo 10 Bora Redioni",
+    allRegions: "Uganda Yote",
+  },
+} as const;
+
+export type DictKey = keyof (typeof DICT)["en"];
+
+type I18n = { lang: Lang; setLang: (l: Lang) => void; t: (k: DictKey) => string };
+const Ctx = createContext<I18n>({ lang: "en", setLang: () => undefined, t: (k) => DICT.en[k] });
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  // Always render "en" on the server and first client paint, then apply the saved choice.
+  const [lang, setLangState] = useState<Lang>("en");
+
+  useEffect(() => {
+    const saved = safeStorage.get<string>("est_lang", "en");
+    if (saved === "en" || saved === "lg" || saved === "sw") setLangState(saved);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = lang === "lg" ? "lg" : lang;
+  }, [lang]);
+
+  const setLang = (l: Lang) => {
+    setLangState(l);
+    safeStorage.set("est_lang", l);
+  };
+
+  const t = (k: DictKey) => DICT[lang]?.[k] ?? DICT.en[k];
+  return <Ctx.Provider value={{ lang, setLang, t }}>{children}</Ctx.Provider>;
+}
+
+export const useI18n = () => useContext(Ctx);

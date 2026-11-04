@@ -1,0 +1,4 @@
+# The ingest worker runs on its own server, not on Vercel.
+workers/
+supabase/
+.github/

@@ -1,39 +1,20 @@
-import { AuthProvider } from "@/components/auth-provider";
-import { serverSession, userDto } from "@/lib/auth";
-import { authenticationAvailable } from "@/lib/security-store";
-import type { Metadata } from "next";
-import { GeistMono } from "geist/font/mono";
-import { GeistSans } from "geist/font/sans";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { Providers } from "@/components/Providers";
 
 export const metadata: Metadata = {
-  referrer: "no-referrer",
-  title: {
-    default: "East Sound",
-    template: "%s · East Sound",
-  },
+  title: { default: "East Sound Technologies — Airplay & Copyright Intelligence", template: "%s · East Sound" },
   description:
-    "East Sound measures music airplay across Uganda's FM panel and gives artists, labels and stations one shared source of truth for spins.",
+    "Broadcast monitoring, airplay charts and royalty evidence for Uganda's music industry. A 7H Music Group Ltd company.",
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const auth = await serverSession();
-  const initial = auth
-    ? {
-        user: userDto(auth.user),
-        csrfToken: auth.session.csrfToken,
-        expiresAt: auth.session.expiresAt,
-      }
-    : { user: null, csrfToken: null, expiresAt: null };
+export const viewport: Viewport = { themeColor: "#020617", width: "device-width", initialScale: 1 };
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
-        <AuthProvider initial={initial} available={authenticationAvailable()}>
-          {children}
-        </AuthProvider>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body className="min-h-screen font-sans">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

@@ -1,0 +1,15 @@
+# Run on the always-on server:  docker compose up -d --build
+services:
+  ingest:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ingest-data:/app/data          # fingerprint index + logs survive restarts
+      - ./stations.csv:/app/stations.csv:ro
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+volumes:
+  ingest-data:

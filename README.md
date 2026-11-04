@@ -1,97 +1,81 @@
-# East Sound
+# East Sound Technologies
 
-An East Africa airplay workspace built with **Next.js 16, React 19, TypeScript and Tailwind CSS 4**, with authenticated Node APIs, scoped persistent storage and an opt-in PostgreSQL capture/outbox backend.
+Music copyright & airplay tracking SaaS — a 7H Music Group Ltd product.
+Next.js 15 (App Router) · Tailwind CSS · Supabase · Web Audio API.
 
-## Start locally
+**Deploying?** See [DEPLOY.md](DEPLOY.md) for GitHub → Vercel → Supabase → ingest server, step by step.
 
-```sh
-npm ci
-# Optional: cp .env.example .env, then set your browser-visible origin.
-npm run dev -- --hostname 0.0.0.0
+## Run it
+
+```bash
+npm install
+cp .env.example .env.local   # leave empty for DEMO MODE
+npm run dev                  # http://localhost:3000
 ```
 
-Open `/dashboard/charts` as Public Guest, or `/login` to create an Artist / Label Manager account. Set `EAST_SOUND_APP_ORIGIN` to the browser-visible origin when running behind a proxy. `.data/` contains private local accounts, catalogue, uploads and outbox state; keep it on a private durable volume and out of Git. Use Node 22.
+**Demo mode** (no Supabase keys): any email + 6-character password signs you into the role you pick, with sample data. Changes you make last for the session. Nothing is sent anywhere.
 
-**[Fullstack setup, account provisioning, security boundaries and launch checklist →](docs/fullstack-operations.md)**
+**Live mode** (Supabase connected): every dashboard reads and writes the real database, limited by role at the database level.
 
-## Implemented workflows
+**Setting up live mode**: create a Supabase project, run the three files in `supabase/migrations/` in order in the SQL editor, add the URL + anon key to `.env.local`, and add `<site>/auth/callback` and `<site>/auth/reset` to Auth → URL Configuration → Redirect URLs.
 
-- **Authoritative authentication/RBAC:** email/password, salted scrypt, opaque HttpOnly sessions, CSRF/origin checks, persistent guessing limits and server-side account/station filtering. localStorage is display-only, not a role selector or bearer-token authority. Development mock Google/Microsoft OAuth is visibly simulated and disabled in production.
-- **Four security roles:** Public Guest sees national charts/statistics; Artist / Label Manager sees owned masters/analytics/preferences; Broadcaster / Station Manager sees only assigned station logs/sources/ad planning; CMO Auditor sees global allocation/audit ledgers and rights reviews. Privileged accounts are created by the operator CLI, never self-selected during sign-up.
-- **Actual MP3/WAV processing:** up to **80 MiB per file**, browser `OfflineAudioContext` decoding, waveform RMS/FFT features in a worker, full-file and feature SHA-256, and persistent unique `UG-ESD-26-XXXXX` format tags. Tags are local allocations, not official registration; features are not a licensed production recognition service or proof of rights.
-- **Independent split sign-off:** immutable source/metadata/three-pool agreements, hashed private invitations, independent account approvals and owner-only master delivery/playback/range/withdrawal. Owners cannot approve a collaborator's allocation. Material edits need fresh approvals.
-- **Monitoring/evidence:** account-persisted authorized native/HLS sources, explicit HTML5 playback, captured-only station logs and ten-second evidence playback with optional bounded SHA-256/CORS verification. Licensed feeds and upstream capture/matching remain external integrations.
-- **Reportal UPRS cue sheets:** broadcaster station managers generate official broadcast cue sheets with one click from captured playout records. The generator lists each spin with its EAT timestamp and daypart band, applies the station's daypart weighting, and exports both a real `.xlsx` workbook and a PDF document — generated client-side, no server round-trip. Unmatched audio keeps a blank ISRC; the tariff is a labelled placeholder, and exports are internal compliance documents, not certified filings.
-- **Automatic notifications:** account-persisted consent/subscriptions, event-driven outbox enqueue, owned-recording watch scopes, encrypted write-only webhook secrets and server-only signed/provider adapters. Leases, bounded retries, deduplication and revocation checks are implemented. Queued/accepted does not mean delivered/read. Actual sends require explicit live/worker enable and configured, approved providers. Post-capture dispatch and authenticated daily retry/cleanup are implemented; prompt retries need a more frequent external scheduler or supervised worker.
-- **Persistence and responsive UI:** file or PostgreSQL authority, user-scoped IndexedDB/localStorage snapshots, account-change/logout eviction, blocked-storage fallbacks, four Uganda regions, filtered/re-ranked airplay views, accessible mobile navigation and real deep links.
-- **CMO review:** capture-backed ledgers, EAT dayparts, illustrative allocation/CSV/PDF exports and immutable, idempotent CMO split-review decisions with atomic audit records. Review does not silently rewrite signed contributor shares, impose statutory holds or transfer money.
+## Role isolation — three layers
 
-## Retained data and honest simulations
+| Layer | Where | What it stops |
+|---|---|---|
+| 1. Middleware | `middleware.ts` | Any request to `/dashboard/<x>` where `x` ≠ the caller's role is redirected to their own dashboard before HTML is served. Role is read from the verified Supabase user's `profiles` row. |
+| 2. RoleGuard | `components/dashboard/RoleGuard.tsx` | The dashboard tree (and therefore its data module) renders only when `session.role` matches the page. Each route imports only its own `components/dashboards/<role>` and `lib/data/<role>.ts`, so other roles' code isn't even in the bundle. |
+| 3. Postgres RLS | `supabase/migrations/0001_rbac_schema.sql` | Every table enforces role + organisation ownership, so a hand-crafted API call with a valid token still can't read another role's rows. |
 
-**Mukisa Collective, Ray Bwete, Capital FM, CBS FM and UPRS** remain in the clearly labeled demonstration studio. Hear a generated ten-second sample, open demo evidence and preview a WhatsApp phone conversation, including:
+Additional rules:
+- Role comes from sign-up metadata, is validated by a DB trigger, and **cannot be changed by the user** afterwards (`lock_profile_fields` trigger).
+- Signing in with a different role than the one registered is refused, not silently switched.
+- **CMO accounts start unapproved** (they have universal read access) and land on `/pending` until East Sound staff set `approved = true`.
+- Password recovery returns the same message whether or not the email exists (no account enumeration).
 
-> 🔥 Airplay Alert! 'Mulongo' just played on Capital FM (Kampala)
+## Routes
 
-These demo actions stay in memory: they do not invent live captures, royalties, provider sends, society membership or endorsements. The embedded sample is generated instrumental audio, not the named artists' music.
+| Route | Purpose |
+|---|---|
+| `/` | Landing: sticky nav, live badge, EN/LG/SW, Solutions & Use Cases dropdowns, hero visualizer, playout ticker, Top 10 with regional filters + 10s evidence player |
+| `/blog`, `/blog/[slug]` | Live metric feed, category pills, search |
+| `/dashboard` | Routes to the caller's own dashboard |
+| `/dashboard/cmo` | Registry, split calculator, Top 100, regional heatmap, dispute engine, unmatched queue |
+| `/dashboard/label` | Roster, batch fingerprint dropzone, ISRC/UPC tracker, revenue, WhatsApp alerts |
+| `/dashboard/artist` | Discography, spin velocity, split summary, WhatsApp alerts |
+| `/dashboard/broadcaster` | Playout timeline, UPRS cue sheet PDF/XLSX export, ad control auditor |
+| `/dashboard/venue` | UPRS compliance badge, listener nodes, DJ set logs |
+| `/auth/callback`, `/auth/reset`, `/pending` | Email confirmation, password recovery, CMO approval wait |
 
-The **12 sourced release references** for **BARANGA, MR FALLBACK, SOUNDLYKBB and TAI DAI** are preserved, with source links and unknown identifiers/rights kept unknown. [Artist research and edition matching](docs/artist-research.md). Public artist metadata and published ℗ credits do not establish ownership, licensing or airplay. No public artist recording is downloaded or rehosted. Optional Apple playback requires explicit consent and depends on the provider/account/region.
+## Defensive standards applied
 
-Public statistics expose only the permitted minimized public scope. Private deliveries are not published to national charts unless the owner explicitly opts in. Missing capture data is labeled missing—not replaced by fabricated observed activity. The Uganda outline uses public-domain Natural Earth geometry; the four regional divisions are schematic rather than official administrative boundaries.
+- `"use client"` on every interactive file; server components only for static shells.
+- `window` / `localStorage` / `document` touched only inside `useEffect` or event handlers (`lib/safe.ts → safeStorage`, `usePersistentState`).
+- `safeArray()` / `(x || []).map` on every list; `DataTable` renders an empty state for null rows.
+- `AudioContext` created only in click/drop handlers (`lib/audio.ts → getAudioContext`), resumed if suspended — works on iOS Safari.
+- Route-level `error.tsx` boundaries so a runtime error never white-screens.
+- Seeded PRNG for demo data → identical server/client render, no hydration mismatch.
+- Verified: production build clean; headless-Chrome run across all 5 roles, cross-role URL jumps, PDF/XLSX export, audio playback and mobile width with **zero console errors**.
 
-## Accounts and integrations
+## Tests
 
-Artist sign-up is self-service. Use a secure local password source with the trusted provisioning CLI for other roles:
+| Command | What it proves |
+|---|---|
+| `npm run build` | The site and all dashboards compile |
+| `python3 supabase/tests/test_rls.py` | On real PostgreSQL: every table × every role sees only its own rows; 20 forbidden writes are refused; evidence clips follow play visibility |
+| `node supabase/tests/data-layer.test.mjs` | The app's real data code, run against PostgREST (Supabase's API server) as each role: dashboards load the right data, saves persist, cross-role calls return nothing |
+| `cd workers/ingest && python -m tests.test_broadcast` | Song recognition on a degraded simulated broadcast |
 
-```sh
-<secure-password-source> | npm run account:create -- \
-  --role broadcaster --email manager@your-domain.example \
-  --name 'Station manager' --stations capital-kla,cbs-kla
+All four run in GitHub Actions on every push.
 
-<secure-password-source> | npm run account:create -- \
-  --role cmo --email auditor@your-domain.example --name 'Rights auditor'
-```
+## Still to do before launch
 
-Never put real passwords or provider tokens in command arguments, source, chat, browser storage or exported configs. The CLI also accepts the private process variable `EAST_SOUND_ACCOUNT_PASSWORD`. A login account is not proof of legal identity or mailbox ownership. Real OAuth, mailbox verification, recovery and MFA are not supplied by the mock flow.
+- **Evidence clips on the public chart**: kept private by design; rights holders hear them in their dashboards.
+- **WhatsApp sending**: settings are saved per account; actual delivery needs a WhatsApp Business API sender.
+- **Real-audio test**: record 1–2 hours of a real station with real masters enrolled.
+- **Translations**: Luganda and Kiswahili strings in `lib/i18n.tsx` are drafts — have a native speaker review them.
+- **Legal review**: monitoring third-party streams and storing 10-second excerpts.
 
-- [Private cloud master uploads and live-delivery setup](docs/cloud-masters-and-live-delivery.md)
-- [Authenticated fullstack operations and security model](docs/fullstack-operations.md)
-- [PostgreSQL migrations, capture transactions and workers](docs/postgres-and-worker.md)
-- [Capture API, notification providers, HMAC and evidence contracts](docs/notifications-and-capture.md)
+## Stream ingest worker
 
-The default Node store is suitable for a single durable web host. The security/outbox store is locked across its local worker/CLI processes; catalogue/capture/ISRC storage is not a distributed multi-writer database. Use the opt-in PostgreSQL backend for multi-process/host production workloads. Do not infer ownership of old public/unowned rows from an artist's display name; plan any legacy backfill explicitly.
-
-## Verification
-
-```sh
-npm run typecheck
-npm run lint
-npm test
-npm run test:postgres
-npm run build
-npm run build:static  # run builds serially
-npx playwright install chromium
-npm run test:browser
-```
-
-The authenticated browser suite starts an isolated local server on port **3010** by default, with its own ignored `.data/qa` directory. It tests real audio decoding/delivery, separate collaborator sessions, RBAC, private audio/evidence, persisted preferences, automatic test-capture jobs, cross-tab logout/cache isolation and mobile layouts. Synthetic test captures are confined to that isolated store; no external provider is sent a message. Do **not** point it at production. To use an already-running local QA server, set `EAST_SOUND_TEST_URL`, matching `EAST_SOUND_E2E_DATA_DIR` and `EAST_SOUND_E2E_INGEST_TOKEN`. PostgreSQL tests use a temporary embedded database and mocked transports, not a production database.
-
-The separate, non-mutating reference-deployment smoke suite is:
-
-```sh
-EAST_SOUND_TEST_URL=https://your-approved-project.vercel.app \
-EAST_SOUND_EXPECT_COMMIT=<expected-full-git-sha> npm run test:deployment
-```
-
-It checks public charts/statistics, capability/commit identity, unauthorized API rejection and private-page sign-in gates. It does not provision an identity, inject a capture, reserve a tag or contact a notification provider.
-
-Cloud-adapter and notification-execution checks are recorded in [the cloud delivery verification report](docs/cloud-delivery-verification.md). The earlier [fullstack verification report](docs/fullstack-verification.md) retains the historical baseline checks and launch boundaries.
-
-## Deployment boundaries
-
-A **persistent Node host** supports the full 80 MiB delivery workflow: configure a private durable master volume, origin/TLS, datastore and keys; explicitly migrate/seed PostgreSQL if selected; then build/start the app and supervise the worker. See the launch checklist before enabling real sends.
-
-**Vercel without PostgreSQL** remains a read-only reference deployment. **Vercel with PostgreSQL and an explicitly configured PRIVATE Blob store** supports authenticated direct multipart master delivery up to 80 MiB, server-side streamed checksum validation, atomic agreement/catalogue/audit completion, and owner-only range playback. Missing/unsafe storage still disables delivery. Raw masters never pass through a serverless upload request or `/tmp` success path. [Cloud setup, retention, consent and scheduler limits](docs/cloud-masters-and-live-delivery.md). `/api/health` reports actual storage/capabilities without secrets. Selecting a broken PostgreSQL connection fails closed rather than falling back to JSON/references.
-
-`npm run build:static` creates `.static-build/out/` with `/BMAT` by default. It excludes APIs, private pages, environment files and runtime data. Only public charts/statistics and an unavailable sign-in view are exported. Static hosting cannot authenticate, deliver masters, ingest captures, store private settings or dispatch notifications.
-
-No production migration, provider send, official ISRC registration, licensed capture/recognition connection, legal rights certification, BMAT certification, society affiliation or deployment is implied by a successful build. Real launch additionally needs identity hardening, licensed upstream data, provider callbacks, observability, tested backup/retention/purge procedures, abuse controls and operational/legal review. Payment/paid markers and the existing ad-campaign planning model remain explicitly illustrative, not real settlement or ad recognition.
+`workers/ingest/` monitors station streams, recognises songs from the enrolled catalogue and writes detections + 10-second evidence clips into Supabase. Run migration `0002_stream_ingest.sql` after `0001`. See `workers/ingest/README.md`.
