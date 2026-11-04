@@ -58,6 +58,10 @@ Additional rules:
 - Seeded PRNG for demo data → identical server/client render, no hydration mismatch.
 - Verified: production build clean; headless-Chrome run across all 5 roles, cross-role URL jumps, PDF/XLSX export, audio playback and mobile width with **zero console errors**.
 
+## Going live
+
+Follow **[RUNBOOK.md](RUNBOOK.md)** — the five steps that need your accounts (worker host, masters, merge, SMTP, alert credentials), each with its own checkpoint.
+
 ## Tests
 
 | Command | What it proves |
