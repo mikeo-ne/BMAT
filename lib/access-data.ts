@@ -4,7 +4,7 @@ import type { Track } from "@/lib/types";
 import type { BroadcastSpin } from "@/lib/playout";
 
 export function ownsTrack(user: SessionUser, track: Track): boolean {
-  return user.role === "artist" && track.ownerId === user.id;
+  return (user.role === "artist" || user.role === "label") && track.ownerId === user.id;
 }
 export function allowedArtistTracks(
   user: SessionUser,
@@ -56,14 +56,11 @@ export function isolateWorkspace(
         }),
     };
   }
-  if (user.role === "artist") {
+  if (user.role === "artist" || user.role === "label") {
     const owned = allowedArtistTracks(user, tracks),
       ids = new Set(owned.map((t) => t.id));
-    const references = tracks
-      .filter((t) => t.origin === "public-reference")
-      .map((t) => redactMaster(t));
     return {
-      tracks: [...owned.map(clientTrack), ...references],
+      tracks: owned.map(clientTrack),
       history: history.filter((e) => e.trackId !== null && ids.has(e.trackId)),
     };
   }
