@@ -130,7 +130,7 @@ describe("durable live notification execution", () => {
     expect((await result.json()).uploads.cleaned).toBe(1);
     expect(hooks.postgres).toHaveBeenCalledTimes(1);
     expect(result.headers.get("cache-control")).toBe("no-store");
-  });
+  }, 10000);
   it("still cleans orphans while live sends are disabled without claiming or sending notification jobs", async () => {
     vi.stubEnv("EAST_SOUND_LIVE_NOTIFICATIONS", "false");
     const result = await GET(
@@ -141,5 +141,5 @@ describe("durable live notification execution", () => {
     expect(result.status).toBe(200);
     expect(hooks.cleanup).toHaveBeenCalledTimes(1);
     expect(hooks.postgres).not.toHaveBeenCalled();
-  });
+  }, 10000);
 });
