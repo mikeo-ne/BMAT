@@ -1,0 +1,13 @@
+station,frequency,region,stream_url,radio_browser_uuid,enabled
+Capital FM,91.3,Central,,,true
+NRG Radio Uganda,106.5,Central,,,true
+Pearl FM,107.9,Central,https://dc4.serverse.com/proxy/pearlfm/stream,,true
+97 Radio City,97.0,Central,,,true
+Beat FM,96.3,Central,,,true
+Akaboozi FM,87.9,Central,,,true
+Sanyu FM,88.2,Central,,,true
+CBS FM,88.8,Central,,,false
+KIIS Uganda,100.9,Central,,,false
+Radio Maria Uganda,101.8,Central,,,false
+Christ FM,91.6,Central,,,false
+Radio Buddu,98.8,Central,,,false

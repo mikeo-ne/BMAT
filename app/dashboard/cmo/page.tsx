@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { CmoDashboard } from "@/components/dashboards/cmo/CmoDashboard";
 
-export const metadata: Metadata = {
-  title: "CMO & Regulatory Audit",
-  description:
-    "Captured-play allocations with station, region, period and local rights-holder filters, illustrative daypart estimates and logging-sheet exports for UPRS review.",
-};
+export const metadata: Metadata = { title: "CMO Auditor" };
 
-export const dynamic = "force-dynamic";
-
-export { CmoAuditWorkspace as default } from "@/components/cmo-audit-workspace";
+// Route-level code splitting: this bundle contains ONLY the cmo module and its data.
+export default function Page() {
+  return (
+    <DashboardShell role="cmo">
+      <CmoDashboard />
+    </DashboardShell>
+  );
+}

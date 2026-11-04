@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import { ArtistWorkspace } from "@/components/artist-workspace";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { ArtistDashboard } from "@/components/dashboards/artist/ArtistDashboard";
 
-export const metadata: Metadata = {
-  title: "Artist & Label Portal",
-  description:
-    "Deliver MP3/WAV masters with metadata and an ISRC, then track spins across the Uganda FM panel by region.",
-};
+export const metadata: Metadata = { title: "Artist Dashboard" };
 
-export const dynamic = "force-dynamic";
-
-export default function ArtistPage() {
-  return <ArtistWorkspace initialView="overview" />;
+// Route-level code splitting: this bundle contains ONLY the artist module and its data.
+export default function Page() {
+  return (
+    <DashboardShell role="artist">
+      <ArtistDashboard />
+    </DashboardShell>
+  );
 }

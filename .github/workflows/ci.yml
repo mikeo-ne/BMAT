@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Website — typecheck & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # Builds in demo mode: no Supabase secrets are needed (or exposed) in CI.
+      - run: npm run build
+
+  ingest:
+    name: Ingest worker — accuracy test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers/ingest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: workers/ingest/requirements.txt
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: pip install -r requirements.txt
+      - run: python -m tests.test_broadcast
+
+  worker-image:
+    name: Ingest worker — Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t eastsound-ingest workers/ingest
+
+  database:
+    name: Database — role isolation + live data layer
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      JWT_SECRET: ci-only-jwt-secret-that-is-at-least-32-characters
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Role-isolation suite (every table × every role, refused writes, evidence access)
+        run: python3 supabase/tests/test_rls.py
+      - name: Prepare a database for the data-layer test
+        run: |
+          createdb est_rls_test
+          psql -d est_rls_test -v ON_ERROR_STOP=1 -qf supabase/tests/supabase_shim.sql
+          for f in supabase/migrations/*.sql; do psql -d est_rls_test -v ON_ERROR_STOP=1 -qf "$f"; done
+          for r in cmo label artist broadcaster venue; do
+            psql -d est_rls_test -qc "insert into auth.users (email, raw_user_meta_data) values ('$r@demo.eastsound.ug', '{\"requested_role\": \"$r\"}')"
+          done
+          psql -d est_rls_test -qc "update profiles set approved = true"
+          psql -d est_rls_test -qc "create role authenticator login password 'ci' noinherit; grant anon, authenticated, service_role to authenticator;"
+      - name: App data layer against PostgREST (the API server Supabase uses), as each role
+        run: |
+          curl -sSfL -o /tmp/pgrst.tar.xz https://github.com/PostgREST/postgrest/releases/download/v12.2.12/postgrest-v12.2.12-linux-static-x86-64.tar.xz
+          tar -xJf /tmp/pgrst.tar.xz -C /tmp
+          PGRST_DB_URI="postgres://authenticator:ci@127.0.0.1:5432/est_rls_test" PGRST_DB_SCHEMAS=public PGRST_DB_ANON_ROLE=anon \
+            PGRST_JWT_SECRET="$JWT_SECRET" PGRST_SERVER_PORT=3300 /tmp/postgrest &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3300/ >/dev/null && break; sleep 1; done
+          # same step, so PostgREST is still running
+          PGRST_URL=http://127.0.0.1:3300 node supabase/tests/data-layer.test.mjs
