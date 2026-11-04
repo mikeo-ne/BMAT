@@ -1,4 +1,9 @@
 # The ingest worker runs on its own server, not on Vercel.
 workers/
-supabase/
+# Root-anchored: without the leading slash this also matched lib/supabase/,
+# which stripped runtime source files and broke the build with
+# "Module not found: Can't resolve '@/lib/supabase/config'".
+/supabase/
+# Belt and braces: app source is never ignorable, whatever the patterns above do.
+!/lib/supabase/
 .github/
