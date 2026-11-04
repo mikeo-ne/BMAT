@@ -16,6 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DB = os.environ.get("RLS_TEST_DB", "est_rls_suite")
+SETUP_DB = os.environ.get("RLS_SETUP_DB", "est_setup_suite")
 EMAILS = {
     "cmo": "cmo@demo.eastsound.ug",
     "label": "label@demo.eastsound.ug",
@@ -31,10 +32,34 @@ def psql(sql: str, db: str = DB, check: bool = True) -> subprocess.CompletedProc
                           capture_output=True, text=True, check=check)
 
 
-def psql_file(path: Path) -> None:
-    r = subprocess.run(["psql", "-d", DB, "-v", "ON_ERROR_STOP=1", "-qX", "-f", str(path)], capture_output=True, text=True)
+def psql_file(path: Path, db: str = DB) -> None:
+    r = subprocess.run(["psql", "-d", db, "-v", "ON_ERROR_STOP=1", "-qX", "-f", str(path)], capture_output=True, text=True)
     if r.returncode:
         sys.exit(f"{path.name} failed:\n{r.stderr}")
+
+
+def check_one_shot_setup() -> None:
+    """supabase/setup.sql is what an operator pastes into the SQL Editor.
+
+    Applied to its own database so we know the concatenation runs cleanly on a
+    blank project — not just that each numbered migration does in isolation.
+    """
+    subprocess.run(["dropdb", "--if-exists", SETUP_DB], capture_output=True)
+    subprocess.run(["createdb", SETUP_DB], check=True)
+    psql_file(ROOT / "supabase/tests/supabase_shim.sql", SETUP_DB)
+    psql_file(ROOT / "supabase/setup.sql", SETUP_DB)
+    print("one-shot setup: supabase/setup.sql applied cleanly")
+
+    def q(sql: str) -> str:
+        return psql(sql, db=SETUP_DB).stdout.strip()
+
+    expect("setup.sql creates profiles", q("select count(*) from public.profiles"), "0")
+    expect("setup.sql creates stations", q("select count(*) from public.stations"), "0")
+    expect("setup.sql creates the evidence bucket", q("select count(*) from storage.buckets where id = 'evidence'"), "1")
+    expect("setup.sql defines my_role()", q("select public.my_role() is null"), "t")
+    rows = int(q("select count(*) from pg_policies where schemaname = 'public'"))
+    expect(f"setup.sql installs RLS policies ({rows})", str(rows >= 20), "True")
+    subprocess.run(["dropdb", "--if-exists", SETUP_DB], capture_output=True)
 
 
 def as_user(uid: str | None, sql: str) -> tuple[str, str]:
@@ -62,6 +87,7 @@ def expect_refused(label: str, err: str, out: str = "") -> None:
 
 
 def main() -> int:
+    check_one_shot_setup()
     subprocess.run(["dropdb", "--if-exists", DB], capture_output=True)
     subprocess.run(["createdb", DB], check=True)
     psql_file(ROOT / "supabase/tests/supabase_shim.sql")

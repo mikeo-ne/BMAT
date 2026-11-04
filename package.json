@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "check": "tsc --noEmit && vitest run && next build",
     "test:db": "python3 supabase/tests/test_rls.py && node supabase/tests/data-layer.test.mjs",
-    "health": "node scripts/health.mjs"
+    "health": "node scripts/health.mjs",
+    "setup:sql": "node scripts/build-setup-sql.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

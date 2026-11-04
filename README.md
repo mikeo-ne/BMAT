@@ -3,7 +3,7 @@
 Music copyright & airplay tracking SaaS — a 7H Music Group Ltd product.
 Next.js 15 (App Router) · Tailwind CSS · Supabase · Web Audio API.
 
-**Deploying?** See [DEPLOY.md](DEPLOY.md) for GitHub → Vercel → Supabase → ingest server, step by step.
+**Deploying?** See [DEPLOY.md](DEPLOY.md) for GitHub → Vercel → Supabase → ingest server, step by step. Database setup is one paste: `supabase/setup.sql` (`npm run setup:sql` regenerates it). Afterwards, `npm run health <url>` tells you what is still missing.
 
 ## Run it
 

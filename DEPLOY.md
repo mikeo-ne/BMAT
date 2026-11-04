@@ -35,10 +35,9 @@ The `.vercelignore` keeps the worker and database files out of the website deplo
 ## 3. Turn on Supabase (live mode)
 
 1. supabase.com → **New project**. Pick the region closest to Uganda (e.g. Frankfurt or South Africa if offered).
-2. **SQL Editor** → run, in order:
-   - `supabase/migrations/0001_rbac_schema.sql`
-   - `supabase/migrations/0002_stream_ingest.sql`
-   - `supabase/migrations/0003_dashboards_live.sql`
+2. **SQL Editor → New query**, then paste the whole of **`supabase/setup.sql`** and press **Run**. It applies all three migrations in one transaction — if anything fails, nothing is left half-built and you can simply run it again.
+
+   Prefer to see the steps separately? Run these three files in this order: `0001_rbac_schema.sql` → `0002_stream_ingest.sql` → `0003_dashboards_live.sql`. They are what `setup.sql` is generated from (`npm run setup:sql`), and CI applies the generated file to a blank database on every push so the two can't drift.
 3. **Authentication → URL Configuration**:
    - Site URL: `https://<your-vercel-domain>`
    - Redirect URLs: `https://<your-vercel-domain>/auth/callback` and `https://<your-vercel-domain>/auth/reset`
