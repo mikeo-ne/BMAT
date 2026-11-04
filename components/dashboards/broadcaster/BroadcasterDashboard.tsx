@@ -3,6 +3,15 @@
 import { useMemo, useState } from "react";
 import { loadBroadcaster, type AdLine, type BroadcasterData, type Segment, type SegmentKind } from "@/lib/db/broadcaster";
 import { evidenceUrl, kampalaDate, useLoad } from "@/lib/db/core";
+import {
+  CUE_SHEET_HEADER,
+  cueSheetFilename,
+  cueSheetRows,
+  cueSheetSummary,
+  hhmm,
+  musicWorks,
+} from "@/lib/cue-sheet";
+import { adDelivery, adShortfallCount, playoutShare, playoutTotals } from "@/lib/playout";
 import { DEMO_MODE } from "@/lib/auth-context";
 import { cx, safeArray } from "@/lib/safe";
 import { Badge, DataTable, LoadGate, Section, StatGrid } from "@/components/dashboard/ui";
@@ -13,7 +22,6 @@ const KIND: Record<SegmentKind, { bar: string; label: string }> = {
   ad: { bar: "bg-amber-400", label: "Ads" },
   talk: { bar: "bg-sky-400/60", label: "Talk / other" },
 };
-const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
 function Timeline({ segments }: { segments: Segment[] }) {
   const [hover, setHover] = useState<Segment | null>(null);
@@ -54,12 +62,12 @@ function Timeline({ segments }: { segments: Segment[] }) {
 }
 
 function CueSheet({ data }: { data: BroadcasterData }) {
-  const music = safeArray(data.segments).filter((s) => s.kind === "music");
+  const music = musicWorks(data.segments);
   const [busy, setBusy] = useState<"pdf" | "xlsx" | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const stationName = data.station?.name ?? "Station";
-  const rows = music.map((s, i) => [String(i + 1), hhmm(s.start), `${s.end - s.start}:00`, s.label, s.composer ?? "", s.publisher ?? "", s.isrc ?? ""]);
-  const header = ["#", "Time (EAT)", "Duration", "Title — Artist", "Composer", "Publisher", "ISRC"];
+  const rows = cueSheetRows(data.segments);
+  const header = [...CUE_SHEET_HEADER];
 
   const download = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);
@@ -77,9 +85,9 @@ function CueSheet({ data }: { data: BroadcasterData }) {
       const [{ jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
       const doc = new jsPDF({ orientation: "landscape" });
       doc.setFontSize(14); doc.text("UPRS Broadcast Cue Sheet", 14, 16);
-      doc.setFontSize(9); doc.text(`${stationName} · ${data.date} · ${rows.length} music works`, 14, 22);
+      doc.setFontSize(9); doc.text(cueSheetSummary(stationName, data.date, rows.length), 14, 22);
       autoTable(doc, { head: [header], body: rows, startY: 27, styles: { fontSize: 7 }, headStyles: { fillColor: [5, 150, 105] } });
-      download(doc.output("blob"), `UPRS-cue-sheet-${data.date}.pdf`);
+      download(doc.output("blob"), cueSheetFilename(data.date, "pdf"));
     } catch (e) { setErr(e instanceof Error ? e.message : "PDF export failed"); } finally { setBusy(null); }
   };
   const exportXlsx = async () => {
@@ -94,7 +102,7 @@ function CueSheet({ data }: { data: BroadcasterData }) {
       ws.addRow(header).font = { bold: true };
       rows.forEach((r) => ws.addRow(r));
       [5, 10, 10, 44, 18, 26, 18].forEach((w, i) => (ws.getColumn(i + 1).width = w));
-      download(new Blob([await wb.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `UPRS-cue-sheet-${data.date}.xlsx`);
+      download(new Blob([await wb.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), cueSheetFilename(data.date, "xlsx"));
     } catch (e) { setErr(e instanceof Error ? e.message : "Excel export failed"); } finally { setBusy(null); }
   };
 
@@ -131,8 +139,9 @@ function AdControl({ ads }: { ads: AdLine[] }) {
           { key: "b", header: "Booked", render: (r) => <span className="font-mono">{r.booked}</span>, className: "text-right" },
           { key: "a", header: "Aired", render: (r) => <span className="font-mono">{r.aired}</span>, className: "text-right" },
           { key: "s", header: "Result", render: (r) => {
-            const d = r.aired - r.booked;
-            return d === 0 ? <Badge tone="ok">Delivered</Badge> : d < 0 ? <Badge tone="bad">{-d} short · make-good due</Badge> : <Badge tone="warn">{d} extra</Badge>;
+            const v = adDelivery(r);
+            const tone = v.status === "delivered" ? "ok" : v.status === "short" ? "bad" : "warn";
+            return <Badge tone={tone}>{v.label}</Badge>;
           } },
         ]} />
     </Section>
@@ -150,14 +159,8 @@ export function BroadcasterDashboard() {
 }
 
 function BroadcasterView({ d, date, setDate, loading }: { d: BroadcasterData; date: string; setDate: (s: string) => void; loading: boolean }) {
-  const totals = useMemo(() => {
-    const t = { music: 0, ad: 0, talk: 0 };
-    for (const s of safeArray(d.segments)) t[s.kind] += s.end - s.start;
-    return t;
-  }, [d.segments]);
-  const all = totals.music + totals.ad + totals.talk || 1;
-  const pct = (m: number) => `${Math.round((m / all) * 100)}%`;
-  const short = safeArray(d.ads).filter((a) => a.aired < a.booked).length;
+  const share = useMemo(() => playoutShare(playoutTotals(d.segments)), [d.segments]);
+  const short = useMemo(() => adShortfallCount(d.ads), [d.ads]);
 
   if (!d.station) {
     return <div className="glass p-6 text-sm text-slate-400">No station is linked to your account yet. Ask East Sound to connect your station.</div>;
@@ -177,9 +180,9 @@ function BroadcasterView({ d, date, setDate, loading }: { d: BroadcasterData; da
           </label>
         </div>
         <StatGrid items={[
-          { label: "Music", value: pct(totals.music) },
-          { label: "Ads", value: pct(totals.ad) },
-          { label: "Talk / other", value: pct(totals.talk) },
+          { label: "Music", value: `${share.music}%` },
+          { label: "Ads", value: `${share.ad}%` },
+          { label: "Talk / other", value: `${share.talk}%` },
           { label: "Ad shortfalls", value: String(short), tone: short ? "bad" : "ok" },
         ]} />
       </section>

@@ -58,7 +58,43 @@ def slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
+def _stream_url(row: dict) -> str | None:
+    """Explicit URL, else the panel's recorded stream_host when it carries a path."""
+    explicit = (row.get("stream_url") or "").strip()
+    if explicit:
+        return explicit
+    host = (row.get("stream_host") or "").strip()
+    if host.startswith(("http://", "https://")):
+        return host
+    if "/" in host:
+        # The panel records host+path without a scheme (e.g.
+        # "dc4.serverse.com/proxy/pearlfm/stream").
+        return f"https://{host}"
+    return None
+
+
+def _enabled(row: dict) -> bool:
+    """
+    Explicit `enabled` wins; otherwise fall back to the panel's directory
+    status. Only stations whose stream was actually captured ("OK",
+    "OK (stale)") are monitored — "listed" entries have no URL to play yet.
+    """
+    cell = row.get("enabled")
+    if cell is not None:
+        return cell.strip().lower() not in ("false", "0", "no")
+    status = (row.get("directory_status") or "").strip().lower()
+    if status:
+        return status.startswith("ok")
+    return True
+
+
 def load_stations(path: str | Path) -> list[Station]:
+    """
+    Reads either the platform panel (supabase/seed/uganda_stream_stations.csv)
+    or a legacy worker file. Both share `station`, `frequency`, `region`; the
+    platform panel adds stream_host/directory_status instead of
+    stream_url/enabled.
+    """
     p = Path(path)
     if p.suffix == ".json":
         return [Station(**s) for s in json.loads(p.read_text())]
@@ -73,9 +109,9 @@ def load_stations(path: str | Path) -> list[Station]:
                 name=name,
                 region=(row.get("region") or "").split(" ")[0],
                 frequency=row.get("frequency") or "",
-                stream_url=(row.get("stream_url") or "").strip() or None,
+                stream_url=_stream_url(row),
                 radio_browser_uuid=(row.get("radio_browser_uuid") or "").strip() or None,
-                enabled=(row.get("enabled", "true").strip().lower() not in ("false", "0", "no")),
+                enabled=_enabled(row),
             ))
     return out
 

@@ -1,13 +1,15 @@
-station,frequency,region,stream_url,radio_browser_uuid,enabled
-Capital FM,91.3,Central,,,true
-NRG Radio Uganda,106.5,Central,,,true
-Pearl FM,107.9,Central,https://dc4.serverse.com/proxy/pearlfm/stream,,true
-97 Radio City,97.0,Central,,,true
-Beat FM,96.3,Central,,,true
-Akaboozi FM,87.9,Central,,,true
-Sanyu FM,88.2,Central,,,true
-CBS FM,88.8,Central,,,false
-KIIS Uganda,100.9,Central,,,false
-Radio Maria Uganda,101.8,Central,,,false
-Christ FM,91.6,Central,,,false
-Radio Buddu,98.8,Central,,,false
+station,frequency,region,codec,bitrate_kbps,stream_host,homepage,directory_status,checked,source_page
+Capital FM,91.3,Central,MP3,128,capitalfm.cloudrad.io,http://capitalradio.co.ug/,OK,2026-11-04,https://radio.dubbeh.net/stations/capital-fm-913-fm-mp3-1617
+NRG Radio Uganda,106.5,Central,MP3,128,dc4.serverse.com,https://nrgug.radio,OK,2026-11-04,https://radio.dubbeh.net/stations/nrg-uganda-1065-2971
+Pearl FM,107.9,Central,MP3,64,https://dc4.serverse.com/proxy/pearlfm/stream,,OK,2026-11-04,https://radio.dubbeh.net/stations/107-9-pearl-fm-4470
+97 Radio City,97.0,Central,MP3,64,radioone.loftuganda.tech,https://radioone.loftuganda.tech,OK,2026-11-04,https://radio.dubbeh.net/stations/97-radio-city-9029
+Beat FM,96.3,Central,MP3,128,5230.cloudrad.io,https://www.facebook.com/BeatFama/,OK (stale),2026-10-11,https://radio.dubbeh.net/stations/beat-fm-96-3-1373
+Akaboozi FM,87.9,Central,MP3,64,162.244.80.52,https://www.akaboozi.com/,OK (stale),2026-10-11,https://radio.dubbeh.net/stations/akaboozi-fm-87-9-296
+Sanyu FM,88.2,Central,AAC,48,s44.myradiostream.com,http://sanyufm.com/,OK (stale),2026-10-12,https://radio.dubbeh.net/stations/sanyu-fm-3635
+CBS FM Buganda,88.8,Central,,,,http://cbsfm.ug,listed - stream URL not yet captured,,https://tunein.com/radio/CBS-888-FM-s7477
+KIIS Uganda,100.9,Central,MP3,,,,listed - not yet checked,,https://radio.dubbeh.net/stations/kiis-100-9-kampala-100-9-fm-553437
+Radio Maria Uganda,101.8,Central,MP3,,,,listed - not yet checked,,https://radio.dubbeh.net/stations/radio-maria-uganda-1058
+Christ FM,91.6,Central,MP3,,,,listed - not yet checked,,https://radio.dubbeh.net/stations/91-6-christ-fm-1613
+Radio Buddu,98.8,Central (Masaka),MP3,,,,listed - not yet checked,,https://radio.dubbeh.net/stations/98-8-radio-buddu-576501
+RX Radio,,Central,MP3,,,,listed - not yet checked,,https://radio.dubbeh.net/stations/rx-radio-5436
+Bugwere FM,,Eastern,,,,,listed - not yet checked,,https://radio.dubbeh.net/stations/bugwere-fm-48105
