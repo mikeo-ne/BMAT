@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { loadCmo, resolveDispute, resolveUnmatched, type CmoData, type Dispute, type DisputeStatus, type UnmatchedClip, type Work } from "@/lib/db/cmo";
-import { evidenceUrl, fmtTime, useLoad } from "@/lib/db/core";
+import { evidenceUrl, fmtTime } from "@/lib/db/core";
+import { Freshness, useLiveLoad } from "@/lib/db/live";
 import { cx, fmtInt, fmtUGX, safeArray } from "@/lib/safe";
 import { allocatePool, sanitizeShare, splitBalance, splitTotal, type SplitRow } from "@/lib/splits";
 import { Badge, DataTable, LoadGate, Section, StatGrid } from "@/components/dashboard/ui";
@@ -238,13 +239,17 @@ function UnmatchedQueue({ initial, works }: { initial: UnmatchedClip[]; works: C
 }
 
 export function CmoDashboard() {
-  const state = useLoad(loadCmo);
+  // New detections and disputes land in this ledger without a page reload.
+  const state = useLiveLoad(loadCmo, [], { tables: ["detections", "unmatched_clips", "disputes"] });
   return (
     <LoadGate state={state}>
       {(d) => (
         <>
           <section id="overview" className="scroll-mt-20">
-            <h1 className="mb-4 text-2xl font-bold text-white">National audit</h1>
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-bold text-white">National audit</h1>
+              <Freshness live={state.live} lastUpdated={state.lastUpdated} />
+            </div>
             <StatGrid items={[
               { label: "Plays · 24h", value: fmtInt(d.stats.detections24h) },
               { label: "Matched", value: `${d.stats.matchedRate}%` },

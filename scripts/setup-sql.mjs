@@ -13,6 +13,7 @@ export const MIGRATIONS = [
   ["0001_rbac_schema.sql", "Core schema: organisations, profiles, roles, RLS policies"],
   ["0002_stream_ingest.sql", "Stream ingest: stations, detections, evidence bucket"],
   ["0003_dashboards_live.sql", "Dashboards: aggregates, dispute queue, playout functions"],
+  ["0004_realtime.sql", "Realtime: publish detections, stations and unmatched clips"],
 ];
 
 const BANNER = (n, name, note) => [
