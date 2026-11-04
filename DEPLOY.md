@@ -65,12 +65,21 @@ The `.vercelignore` keeps the worker and database files out of the website deplo
 
 The worker must run on something **always-on** — it holds open the station streams and fingerprints them in real time. Vercel cannot host it.
 
+Both hosts mount volumes as **root**, so the image starts with a tiny entrypoint that takes ownership of the data directory and then drops to the unprivileged `ingest` user. You do not have to `chown` anything by hand.
+
 ### Option A — Railway (fewest clicks)
 
 1. railway.app → **New Project → Deploy from GitHub repo** → pick this repo.
 2. Set **Root Directory** to `workers/ingest`. `railway.json` supplies the Dockerfile and the start command.
-3. **Variables:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (Supabase → Project Settings → API). Add `EST_INDEX_PATH=/data/fingerprints.db`.
-4. Attach a **Volume** mounted at `/data` so the fingerprint index survives restarts.
+3. **Variables:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (Supabase → Project Settings → API). Add `EST_INDEX_PATH=/data/fingerprints.db` and `EST_OUT_DIR=/data/out`.
+4. Attach a **Volume** mounted at `/data` so the fingerprint index and any dry-run clips survive restarts.
+5. Run the pre-flight check before letting it loose on the streams:
+
+   ```bash
+   railway run python -m eastsound_ingest --stations stations.csv doctor
+   ```
+
+   Every line must be `✓` before `run` starts. `!` lines are non-blocking hints (an empty fingerprint index, for example). A `✗ ffmpeg not on PATH` means the image was not built from this Dockerfile.
 
 ### Option B — Fly.io
 
@@ -83,6 +92,12 @@ fly deploy
 fly logs
 ```
 
+Then run the pre-flight check inside the deployed machine:
+
+```bash
+fly ssh console -C "python -m eastsound_ingest --stations stations.csv doctor"
+```
+
 ### Option C — any VPS / your own server
 
 ```bash
@@ -90,10 +105,13 @@ git clone https://github.com/<your-account>/east-sound-technologies.git
 cd east-sound-technologies/workers/ingest
 cp .env.example .env
 #   fill in SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (Project Settings → API → service_role)
+docker compose run --rm ingest python -m eastsound_ingest --stations stations.csv doctor
 docker compose run --rm -v ~/masters:/masters ingest python -m eastsound_ingest enroll-dir /masters
 docker compose up -d --build
 docker compose logs -f          # watch detections arrive
 ```
+
+`enroll-dir` prints one line per master and the final count. It is safe to re-run: the same recording is skipped instead of duplicated.
 
 Edit `stations.csv` to add or pause stations, then restart the worker. Leave the two Supabase variables empty for a **dry run**: detections are written to the `ingest-data` volume instead of the database.
 
