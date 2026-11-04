@@ -134,6 +134,7 @@ def main() -> int:
         "venue_nodes": {"cmo": "2", "venue": "2"},
         "dj_sets": {"cmo": "2", "venue": "2"},
         "split_shares": {"cmo": "5", "label": "2", "artist": "3"},
+        "alert_outbox": {},
         "profiles": {"cmo": q("select count(*) from profiles"), "label": "1", "artist": "1", "broadcaster": "1", "venue": "1", "pending_cmo": "1"},
     }
 
@@ -187,6 +188,10 @@ def main() -> int:
     expect_refused("anonymous visitor adds an artist to a real label", err)
     out, err = as_user(users["broadcaster"], f"insert into artists (label_org_id, name) values ('{org['label']}', 'x')")
     expect_refused("broadcaster adds an artist to a label's roster", err)
+    out, err = as_user(users["label"], f"insert into alert_outbox (profile_id, kind, title, body, dedupe_key) values ('{uid['label']}', 'firstspin', 'x', 'y', 'forged')")
+    expect_refused("label forges an entry in its own alert queue", err)
+    out, err = as_user(None, "select public.enqueue_alerts(now() - interval '1 hour')")
+    expect_refused("anonymous visitor enqueues alerts", err)
 
     print("\nWRITES that must be allowed")
     out, err = as_user(users["cmo"], "with u as (update disputes set status = 'resolved_split', resolved_at = now() returning 1) select count(*) from u")
@@ -200,6 +205,14 @@ def main() -> int:
     expect("venue logs a DJ set at its own venue", out or err, "1")
     out, err = as_user(users["artist"], f"with i as (insert into alert_prefs (profile_id, whatsapp_e164, events) values ('{uid['artist']}', '+256772123456', '{{}}') returning 1) select count(*) from i")
     expect("artist saves their own WhatsApp alert settings", out or err, "1")
+    # The queue is written by the service role; a person only reads their own history.
+    psql(f"insert into alert_outbox (profile_id, kind, title, body, link, dedupe_key) values ('{uid['artist']}', 'firstspin', 'First spin on Capital FM', 'x', '/dashboard/artist', 'test-a'), ('{uid['label']}', 'firstspin', 'First spin for the label', 'x', '/dashboard/label', 'test-l')")
+    got, _ = as_user(users["artist"], "select string_agg(title, ',') from alert_outbox")
+    expect("artist reads only their own alert history", got, "First spin on Capital FM")
+    got, _ = as_user(users["label"], "select string_agg(title, ',') from alert_outbox")
+    expect("label reads only their own alert history", got, "First spin for the label")
+    got, _ = as_user(None, "select count(*) from alert_outbox")
+    expect("anonymous visitor reads no alert history", got, "0")
 
     print("\nEVIDENCE CLIPS follow detection visibility")
     home_det = q(f"select d.id from detections d join stations s on s.id = d.station_id where s.broadcaster_org_id = '{org['broadcaster']}' limit 1")
