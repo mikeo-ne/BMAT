@@ -1,8 +1,9 @@
 /**
- * Builds supabase/setup.sql — the three migrations concatenated into one
- * paste for the Supabase SQL Editor.
+ * Builds supabase/setup.sql — every migration concatenated into one paste for
+ * the Supabase SQL Editor.
  *
- * Order matters: 0002 and 0003 alter tables and policies created by 0001.
+ * Order matters: 0002–0005 alter tables, policies and functions created by
+ * 0001.
  * The whole thing runs in a single transaction, so a failure anywhere leaves
  * the project untouched instead of half-migrated.
  */
@@ -14,6 +15,7 @@ export const MIGRATIONS = [
   ["0002_stream_ingest.sql", "Stream ingest: stations, detections, evidence bucket"],
   ["0003_dashboards_live.sql", "Dashboards: aggregates, dispute queue, playout functions"],
   ["0004_realtime.sql", "Realtime: publish detections, stations and unmatched clips"],
+  ["0005_alerts.sql", "Alerts: outbox, per-person switches, first-spin/chart/dispute enqueue"],
 ];
 
 const BANNER = (n, name, note) => [

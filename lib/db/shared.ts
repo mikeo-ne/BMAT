@@ -35,6 +35,33 @@ export async function saveAlertPrefs(p: AlertPrefs): Promise<void> {
   must(await sb.from("alert_prefs").upsert({ profile_id: u.user.id, whatsapp_e164: phone, events: p.events }).select("profile_id"), "save alert settings");
 }
 
+export type AlertLogRow = {
+  id: string;
+  kind: string;
+  title: string;
+  created_at: string;
+  sent_at: string | null;
+  channel: string | null;
+  last_error: string | null;
+  attempts: number;
+};
+
+/** The last few alerts for this account — proof that messages really went out. */
+export async function loadAlertLog(limit = 5): Promise<AlertLogRow[] | null> {
+  const sb = db();
+  if (!sb) return null; // demo mode has no delivery, so there is nothing to log
+  const { data: u } = await sb.auth.getUser();
+  if (!u.user) return null;
+  const { data, error } = await sb
+    .from("alert_outbox")
+    .select("id, kind, title, created_at, sent_at, channel, last_error, attempts")
+    .eq("profile_id", u.user.id)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) return null;
+  return safeArray(data) as AlertLogRow[];
+}
+
 export type PublicChart = { rows: ChartRow[]; live: boolean };
 
 export async function loadPublicChart(region: "All" | Region): Promise<PublicChart> {

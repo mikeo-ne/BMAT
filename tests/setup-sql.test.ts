@@ -23,6 +23,7 @@ describe("supabase/setup.sql", () => {
       "0002_stream_ingest.sql",
       "0003_dashboards_live.sql",
       "0004_realtime.sql",
+      "0005_alerts.sql",
     ]);
     const positions = MIGRATIONS.map(([file]: [string, string]) => sql.indexOf(file));
     expect(positions.every((p: number) => p > -1)).toBe(true);

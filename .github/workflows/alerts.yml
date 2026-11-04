@@ -1,0 +1,43 @@
+# Pings the alert sender so detections become WhatsApp/email messages.
+#
+# Vercel Hobby can only run one cron per day, so this keeps the queue moving
+# every 15 minutes. It stays quiet until both secrets exist:
+#   CRON_URL     https://<your-domain>/api/cron/alerts
+#   CRON_SECRET  the same value you set in Vercel
+name: Alerts
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Is the alert sender configured?
+        id: cfg
+        env:
+          CRON_URL: ${{ secrets.CRON_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Alert sender not configured yet — skipping."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Drain the outbox
+        if: steps.cfg.outputs.ready == 'true'
+        env:
+          CRON_URL: ${{ secrets.CRON_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          # --retry keeps a cold Vercel function from losing the sweep.
+          curl -fsS --retry 3 --retry-delay 5 --max-time 60 \
+            -X POST "$CRON_URL" \
+            -H "Authorization: Bearer $CRON_SECRET"

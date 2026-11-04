@@ -117,9 +117,43 @@ Edit `stations.csv` to add or pause stations, then restart the worker. Leave the
 
 Confirm it end-to-end: `/setup` should flip **Ingest worker reporting** to green within a few minutes of the first detection, and the broadcaster playout timeline starts filling.
 
+## 5. Turn on WhatsApp and email alerts
+
+Clients should not have to sit in the dashboard waiting for a spin. The database already knows who should hear about what (`alert_outbox`, migration 0005); the website drains that queue at `/api/cron/alerts`.
+
+1. **Variables in Vercel** (Settings → Environment Variables, *server* scope):
+
+   | Variable | What it is |
+   | --- | --- |
+   | `CRON_SECRET` | Any long random string. Without it the endpoint refuses to run. |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Used only by this route to read the queue and look up emails. |
+   | `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TOKEN` | Meta → WhatsApp Cloud API. Token must be a *permanent* system-user token. |
+   | `RESEND_API_KEY`, `ALERT_FROM_EMAIL` | Email fallback, e.g. `alerts@eastsound.ug` (the domain must be verified in Resend). |
+
+   With no provider configured the route enqueues nothing and sends nothing — a half-set-up deployment stays silent instead of misbehaving.
+
+2. **Schedule it.** Vercel Hobby only allows one cron per day, so `vercel.json` runs the sweep at 06:00 UTC. For WhatsApp-speed alerts, add an Actions secret pair and the included workflow does it every 15 minutes:
+
+   - `CRON_URL` = `https://<your-domain>/api/cron/alerts`
+   - `CRON_SECRET` = the same string as in Vercel
+
+   `.github/workflows/alerts.yml` skips itself quietly while those secrets are absent.
+
+3. **Prove it** before announcing anything:
+
+   ```bash
+   curl -fsS "https://<your-domain>/api/cron/alerts?limit=1" -H "Authorization: Bearer $CRON_SECRET"
+   ```
+
+   A useful answer looks like `{"ok":true,"channels":["whatsapp"],"enqueued":1,"picked":1,"sent":1,...}`. `channels: []` means the provider variables are missing; `"skipped"` counts people who have not saved a phone number or email yet.
+
+4. **What actually gets sent.** `enqueue_alerts` writes one row per person per event — first spin on a new station, an ownership dispute on either side, a new royalty statement — and honours each person's switches in *Settings → Alerts*. `?weekly=1` also enqueues chart movement. Rows are unique per `(profile_id, dedupe_key)`, so running the sweep every 15 minutes can never send the same news twice.
+
 ## Checklist before real clients
 
 - [ ] Native-speaker review of Luganda and Kiswahili strings (`lib/i18n.tsx`)
 - [ ] Legal review: monitoring public streams and storing 10-second clips; station partnership terms
 - [ ] Real-audio test: record 1–2 hours of a station, enroll real masters, check misses / wrong matches
 - [ ] Custom domain in Vercel (Settings → Domains), then update the Supabase URLs in step 3
+- [ ] WhatsApp templates approved by Meta if you send outside the 24-hour window; test with a real handset first
+- [ ] Native-speaker review of the alert wording (`lib/alerts/compose.ts`) alongside the UI strings
