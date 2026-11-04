@@ -24,6 +24,18 @@ jobs:
       # Builds in demo mode: no Supabase secrets are needed (or exposed) in CI.
       - run: npm run build
 
+  unit:
+    name: Unit — helpers, role routing and audio guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
   ingest:
     name: Ingest worker — accuracy test
     runs-on: ubuntu-latest
