@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { loadCmo, resolveDispute, resolveUnmatched, type CmoData, type Dispute, type DisputeStatus, type UnmatchedClip, type Work } from "@/lib/db/cmo";
 import { evidenceUrl, fmtTime, useLoad } from "@/lib/db/core";
-import { cx, fmtInt, fmtUGX, safeArray, safeNumber } from "@/lib/safe";
+import { cx, fmtInt, fmtUGX, safeArray } from "@/lib/safe";
+import { allocatePool, sanitizeShare, splitBalance, splitTotal, type SplitRow } from "@/lib/splits";
 import { Badge, DataTable, LoadGate, Section, StatGrid } from "@/components/dashboard/ui";
 import { EvidencePlayer } from "@/components/site/EvidencePlayer";
 
@@ -42,8 +43,6 @@ function Registry({ rows }: { rows: Work[] }) {
   );
 }
 
-type SplitRow = { id: number; party: string; role: string; share: string };
-
 function SplitCalculator() {
   const [pool, setPool] = useState("5000000");
   const [rows, setRows] = useState<SplitRow[]>([
@@ -51,9 +50,10 @@ function SplitCalculator() {
     { id: 2, party: "Publisher", role: "Publisher", share: "30" },
     { id: 3, party: "Producer", role: "Producer", share: "20" },
   ]);
-  const total = safeArray(rows).reduce((s, r) => s + safeNumber(r.share), 0);
-  const balanced = Math.abs(total - 100) < 0.001;
-  const update = (id: number, patch: Partial<SplitRow>) => setRows((rs) => safeArray(rs).map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const total = splitTotal(rows);
+  const balance = splitBalance(total);
+  const amounts = new Map(allocatePool(pool, rows).map((a) => [a.id, a.amount]));
+  const update = (id: SplitRow["id"], patch: Partial<SplitRow>) => setRows((rs) => safeArray(rs).map((r) => (r.id === id ? { ...r, ...patch } : r)));
   return (
     <Section id="splits" title="Split Sheet Calculator">
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
@@ -65,10 +65,10 @@ function SplitCalculator() {
                 {["Writer", "Composer", "Publisher", "Producer", "Performer"].map((o) => <option key={o}>{o}</option>)}
               </select>
               <div className="relative">
-                <input className="input !py-2 pr-6 text-right font-mono" inputMode="decimal" value={r.share} onChange={(e) => update(r.id, { share: e.target.value.replace(/[^\d.]/g, "") })} aria-label="Share percent" />
+                <input className="input !py-2 pr-6 text-right font-mono" inputMode="decimal" value={r.share} onChange={(e) => update(r.id, { share: sanitizeShare(e.target.value) })} aria-label="Share percent" />
                 <span className="pointer-events-none absolute right-2 top-2 text-sm text-slate-500">%</span>
               </div>
-              <span className="text-right font-mono text-sm text-slate-300">{fmtInt((safeNumber(pool) * safeNumber(r.share)) / 100)}</span>
+              <span className="text-right font-mono text-sm text-slate-300">{fmtInt(amounts.get(r.id) ?? 0)}</span>
               <button type="button" aria-label="Remove party" onClick={() => setRows((rs) => safeArray(rs).filter((x) => x.id !== r.id))} className="text-slate-500 hover:text-rose-300">✕</button>
             </div>
           ))}
@@ -81,9 +81,9 @@ function SplitCalculator() {
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-slate-400">Total share</span>
-            <span className={cx("font-mono font-bold", balanced ? "text-emerald-300" : "text-rose-300")}>{total.toFixed(2)}%</span>
+            <span className={cx("font-mono font-bold", balance.balanced ? "text-emerald-300" : "text-rose-300")}>{total.toFixed(2)}%</span>
           </div>
-          <Badge tone={balanced ? "ok" : "bad"}>{balanced ? "Adds up to 100%" : total > 100 ? `Over by ${(total - 100).toFixed(2)}%` : `${(100 - total).toFixed(2)}% unassigned`}</Badge>
+          <Badge tone={balance.tone}>{balance.label}</Badge>
           <p className="text-xs text-slate-500">Total: {fmtUGX(pool)}</p>
         </div>
       </div>
