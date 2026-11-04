@@ -2,7 +2,7 @@
   "name": "east-sound-technologies",
   "version": "0.1.0",
   "private": true,
-  "description": "East Sound Technologies — music copyright & airplay tracking SaaS (7H Music Group Ltd)",
+  "description": "East Sound Technologies \u2014 music copyright & airplay tracking SaaS (7H Music Group Ltd)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "tsc --noEmit && vitest run && next build",
-    "test:db": "python3 supabase/tests/test_rls.py && node supabase/tests/data-layer.test.mjs"
+    "test:db": "python3 supabase/tests/test_rls.py && node supabase/tests/data-layer.test.mjs",
+    "health": "node scripts/health.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

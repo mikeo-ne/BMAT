@@ -1,0 +1,28 @@
+# fly launch --copy-config --name eastsound-ingest --region jnb
+# fly secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
+app = "eastsound-ingest"
+primary_region = "jnb"          # Johannesburg — closest Fly region to Uganda
+
+[build]
+  dockerfile = "Dockerfile"
+
+# One always-on machine does the monitoring. No inbound traffic: the worker
+# only writes to Supabase, so there are no [services] or [[http_service]] blocks.
+[processes]
+  ingest = "python -m eastsound_ingest --stations stations.csv run"
+
+[env]
+  EST_INDEX_PATH = "/data/fingerprints.db"
+  EST_OUT_DIR = "/data/out"
+  EST_EVIDENCE_BUCKET = "evidence"
+
+[[mounts]]
+  source = "est_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"                # ffmpeg decode + fingerprinting is memory hungry
+
+[restart]
+  policy = "always"

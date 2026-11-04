@@ -46,6 +46,7 @@ Additional rules:
 | `/dashboard/broadcaster` | Playout timeline, UPRS cue sheet PDF/XLSX export, ad control auditor |
 | `/dashboard/venue` | UPRS compliance badge, listener nodes, DJ set logs |
 | `/auth/callback`, `/auth/reset`, `/pending` | Email confirmation, password recovery, CMO approval wait |
+| `/setup`, `/api/health` | Live readiness console: which env var, migration or worker is still missing. JSON for uptime monitors |
 
 ## Defensive standards applied
 

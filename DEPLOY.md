@@ -52,6 +52,7 @@ The `.vercelignore` keeps the worker and database files out of the website deplo
    | `NEXT_PUBLIC_SITE_URL` | `https://<your-vercel-domain>` |
 
 6. **Redeploy** (Deployments → ⋯ → Redeploy). The demo banner disappears and sign-up is real.
+7. Open **`/setup`** on the deployment. It probes the project with the anon key and tells you, check by check, what is still missing — no more guessing whether the env vars took effect. The same report is machine-readable at **`/api/health`** (200 when every blocking check passes, 503 otherwise), which is what an uptime monitor should watch.
 
 **CMO accounts start unapproved.** To activate one: Supabase → Table Editor → `profiles` → set `approved = true`.
 
@@ -63,26 +64,41 @@ The `.vercelignore` keeps the worker and database files out of the website deplo
 
 ## 4. Run the stream-ingest worker
 
-On a Linux server with Docker installed:
+The worker must run on something **always-on** — it holds open the station streams and fingerprints them in real time. Vercel cannot host it.
+
+### Option A — Railway (fewest clicks)
+
+1. railway.app → **New Project → Deploy from GitHub repo** → pick this repo.
+2. Set **Root Directory** to `workers/ingest`. `railway.json` supplies the Dockerfile and the start command.
+3. **Variables:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (Supabase → Project Settings → API). Add `EST_INDEX_PATH=/data/fingerprints.db`.
+4. Attach a **Volume** mounted at `/data` so the fingerprint index survives restarts.
+
+### Option B — Fly.io
+
+```bash
+cd workers/ingest
+fly launch --copy-config --name eastsound-ingest --region jnb   # jnb = Johannesburg
+fly secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
+fly volumes create est_data --size 3
+fly deploy
+fly logs
+```
+
+### Option C — any VPS / your own server
 
 ```bash
 git clone https://github.com/<your-account>/east-sound-technologies.git
 cd east-sound-technologies/workers/ingest
 cp .env.example .env
 #   fill in SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (Project Settings → API → service_role)
-```
-
-Enroll the masters, then start monitoring:
-
-```bash
 docker compose run --rm -v ~/masters:/masters ingest python -m eastsound_ingest enroll-dir /masters
 docker compose up -d --build
 docker compose logs -f          # watch detections arrive
 ```
 
-Edit `stations.csv` to add or pause stations, then `docker compose restart`.
+Edit `stations.csv` to add or pause stations, then restart the worker. Leave the two Supabase variables empty for a **dry run**: detections are written to the `ingest-data` volume instead of the database.
 
-Leave the two Supabase variables empty for a **dry run**: detections are written to the `ingest-data` volume instead of the database.
+Confirm it end-to-end: `/setup` should flip **Ingest worker reporting** to green within a few minutes of the first detection, and the broadcaster playout timeline starts filling.
 
 ## Checklist before real clients
 
