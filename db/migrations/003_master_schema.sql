@@ -37,9 +37,12 @@ CREATE TABLE profiles (
 
 -- Auto-create profile on account creation (mirrors Supabase handle_new_user).
 CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = pg_catalog, east_sound, pg_temp
+AS $$
 BEGIN
-    INSERT INTO profiles (id, tenant_id, email, role, full_name, organization_name)
+    INSERT INTO east_sound.profiles (id, tenant_id, email, role, full_name, organization_name)
     VALUES (
         NEW.id,
         NEW.tenant_id,
@@ -51,7 +54,7 @@ BEGIN
     ON CONFLICT (tenant_id, id) DO NOTHING;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON east_sound.auth_users

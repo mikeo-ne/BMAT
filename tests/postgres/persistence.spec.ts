@@ -101,6 +101,7 @@ beforeAll(async () => {
   expect(await migratePostgres(pool)).toEqual([
     "001_capture_outbox.sql",
     "002_accounts_sessions.sql",
+    "003_master_schema.sql",
   ]);
 }, 120000);
 afterAll(async () => {
@@ -171,6 +172,13 @@ describe("real PostgreSQL migrations, capture transactions and multi-worker outb
       path.join(folder, "002_accounts_sessions.sql"),
       await readFile(
         path.join(process.cwd(), "db/migrations/002_accounts_sessions.sql"),
+        "utf8",
+      ),
+    );
+    await writeFile(
+      path.join(folder, "003_master_schema.sql"),
+      await readFile(
+        path.join(process.cwd(), "db/migrations/003_master_schema.sql"),
         "utf8",
       ),
     );
