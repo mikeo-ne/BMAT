@@ -64,6 +64,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t eastsound-ingest workers/ingest
+      # Oracle Cloud's free servers are ARM (Ampere): make sure the image builds there too.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build for ARM64 (Oracle Cloud Always Free)
+        run: docker buildx build --platform linux/arm64 -t eastsound-ingest:arm64 workers/ingest
+      - name: Setup script is valid shell
+        run: bash -n workers/ingest/deploy/oracle-setup.sh && shellcheck -S warning workers/ingest/deploy/oracle-setup.sh
 
   database:
     name: Database — role isolation + live data layer

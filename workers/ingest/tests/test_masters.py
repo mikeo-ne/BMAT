@@ -20,7 +20,7 @@ import numpy as np
 from eastsound_ingest.audio import decode_file
 from eastsound_ingest.fingerprint import SAMPLE_RATE, landmarks
 from eastsound_ingest.index import FingerprintIndex
-from eastsound_ingest.masters import MIN_SECONDS, Pending, enroll_pending
+from eastsound_ingest.masters import MIN_SECONDS, Pending, enroll_pending, relearn_missing
 
 from .synth import SR, degrade, song, write_audio
 
@@ -48,6 +48,9 @@ class FakeSource:
         if path not in self.files:
             raise RuntimeError("HTTP Error 404: Object not found")
         return str(self.files[path])
+
+    def learned(self, page: int = 500) -> list[Pending]:
+        return [r for r in self.rows if (self.marks.get(r.id) or {}).get("enrolled_at")]
 
     def mark(self, rec_id: str, *, enrolled_at=None, error=None, duration=None) -> None:
         if self.fail_mark:
@@ -119,6 +122,14 @@ def main() -> int:
             check(True, "a network failure while saving status doesn't crash the worker")
         except Exception as e:
             check(False, f"network failure crashed the pass: {e}")
+
+        print("\nNEW SERVER")
+        fresh = FingerprintIndex(tmp / "fresh.db")
+        ok2, failed2 = relearn_missing(src, fresh)
+        check(ok2 == 2 and failed2 == 0 and len(fresh.tracks) == 2, f"a fresh index re-learns the 2 learned songs ({ok2} ok, {failed2} failed)")
+        check(relearn_missing(src, fresh) == (0, 0), "running it again re-learns nothing")
+        m3 = fresh.match(landmarks(decode_file(str(clip))))
+        check(m3 is not None and m3.track.recording_id == rows[1].id, "the rebuilt index still recognises the broadcast clip")
 
     print(f"\n{'ALL MASTER CHECKS PASSED' if not FAILS else f'{len(FAILS)} FAILED'}")
     return 1 if FAILS else 0

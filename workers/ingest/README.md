@@ -42,6 +42,9 @@ docker build -t eastsound-ingest .
 docker run -d --restart unless-stopped --env-file .env -v ingest-data:/app/data eastsound-ingest
 ```
 
+**Free option:** Oracle Cloud's Always Free ARM server — see [`deploy/ORACLE.md`](deploy/ORACLE.md)
+(one-paste setup with `deploy/oracle-setup.sh`).
+
 Run it on any always-on Linux server (a $10–40/month VPS handles dozens of
 stations). **Not** Vercel — it's a long-running process, not a web request.
 The service-role key stays on this server only; never put it in the website.
