@@ -60,6 +60,19 @@ class MasterSource:
         rows = json.loads(self._req("GET", f"/rest/v1/recordings?{q}") or b"[]")
         return [Pending(r["id"], r["title"], r.get("artist_name") or "Unknown", r.get("isrc"), r["master_path"]) for r in rows]
 
+    def learned(self, page: int = 500) -> list[Pending]:
+        """Every song the database says is already learned (to rebuild a fresh index)."""
+        out: list[Pending] = []
+        offset = 0
+        while True:
+            q = ("select=id,title,artist_name,isrc,master_path&master_path=not.is.null&enrolled_at=not.is.null"
+                 f"&order=created_at.asc&limit={page}&offset={offset}")
+            rows = json.loads(self._req("GET", f"/rest/v1/recordings?{q}") or b"[]")
+            out += [Pending(r["id"], r["title"], r.get("artist_name") or "Unknown", r.get("isrc"), r["master_path"]) for r in rows]
+            if len(rows) < page:
+                return out
+            offset += page
+
     def signed_url(self, path: str, seconds: int = 600) -> str:
         raw = self._req("POST", f"/storage/v1/object/sign/{BUCKET}/{urllib.parse.quote(path)}", {"expiresIn": seconds})
         signed = json.loads(raw)["signedURL"]  # "/object/sign/masters/…?token=…"
@@ -113,6 +126,29 @@ def enroll_pending(src: MasterSource, idx: FingerprintIndex, now: Callable[[], s
     return ok, failed
 
 
+def relearn_missing(src: MasterSource, idx: FingerprintIndex, decode=decode_file) -> tuple[int, int]:
+    """Re-learn songs the database marks as learned but this worker's index lacks.
+
+    A new server (or a lost volume) starts with an empty index; without this,
+    songs learned on the old server would never be recognised again.
+    """
+    have = {t.recording_id for t in idx.tracks}
+    ok = failed = 0
+    for p in src.learned():
+        if p.id in have:
+            continue
+        try:
+            x = decode(src.signed_url(p.path))
+            idx.enroll(landmarks(x), title=p.title, artist=p.artist, duration_sec=x.size / SAMPLE_RATE, recording_id=p.id, isrc=p.isrc)
+            ok += 1
+        except Exception as e:  # keep going; the song stays marked learned on the old index
+            failed += 1
+            log.warning("could not re-learn %s (%s): %s", p.title, p.id, e)
+    if ok or failed:
+        log.info("rebuilt local index: %d songs re-learned, %d failed", ok, failed)
+    return ok, failed
+
+
 class MasterSync(threading.Thread):
     """Background loop inside `run`: checks for new uploads every `every` seconds."""
 
@@ -124,6 +160,10 @@ class MasterSync(threading.Thread):
         import datetime as dt
 
         now = lambda: dt.datetime.now(dt.timezone.utc).isoformat()  # noqa: E731
+        try:
+            relearn_missing(self.src, self.idx)
+        except Exception as e:
+            log.warning("could not check for songs to re-learn: %s", e)
         while not self.stop.is_set():
             try:
                 ok, failed = enroll_pending(self.src, self.idx, now)
