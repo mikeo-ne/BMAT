@@ -88,7 +88,7 @@ function ArtistView({ d, name, scope, reload }: { d: Awaited<ReturnType<typeof l
         </div>
       </Section>
 
-      <Section id="alerts" title="WhatsApp Alerts">
+      <Section id="alerts" title="Airplay Alerts">
         <WhatsAppAlerts scope={scope} />
       </Section>
     </>

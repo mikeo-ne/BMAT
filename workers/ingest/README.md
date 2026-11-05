@@ -63,6 +63,27 @@ the song. To learn pending uploads straight away:
 python -m eastsound_ingest sync-masters
 ```
 
+## Airplay alerts (email)
+
+With `BREVO_API_KEY` and `ALERT_FROM_EMAIL` set, the worker emails artists and
+labels about their songs through Brevo's HTTPS API (not SMTP, which Railway and
+DigitalOcean block):
+
+| Alert | Default | When |
+|---|---|---|
+| First play on a new station | on | within a minute of the play ending |
+| Daily summary | on | 8 am Kampala, yesterday's plays by song and station |
+| Every play | off | within a minute of each play ending |
+
+Each person changes these under **Airplay Alerts** in their dashboard, where
+every sent or failed alert is listed. The database decides who is told
+(`enqueue_alerts`, `enqueue_daily_alerts`; one row per person per event), so
+retries never double-send. Without both variables nothing is queued at all.
+Brevo's free plan sends 300 emails a day in total.
+
+`ALERT_FROM_EMAIL` must be a sender verified in Brevo. Optional:
+`ALERT_FROM_NAME` (default "East Sound"), `SITE_URL` (links in emails).
+
 ## Stations
 
 `stations.csv` is a byte-identical copy of the panel of record,

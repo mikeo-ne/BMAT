@@ -71,5 +71,13 @@ server from the uploaded reference copies.
 | Restart | `sudo docker restart eastsound-worker` |
 | Change the key | `sudo rm /etc/eastsound/worker.env` then run the setup line again |
 
+Turn on airplay alert emails: add these two lines to `/etc/eastsound/worker.env`
+(`sudo nano /etc/eastsound/worker.env`), then run the setup line again so the worker picks them up:
+
+```
+BREVO_API_KEY=xkeysib-…
+ALERT_FROM_EMAIL=7hmusicgroupug@gmail.com
+```
+
 Turn on brand mentions later: add `EST_MENTIONS=1` to `/etc/eastsound/worker.env`
 (`sudo nano /etc/eastsound/worker.env`), then run the setup line again.

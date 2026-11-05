@@ -103,7 +103,7 @@ export function LabelDashboard() {
               </>
             ) : <p className="text-sm text-slate-500">No royalty statements yet.</p>}
           </Section>
-          <Section id="alerts" title="WhatsApp Alerts">
+          <Section id="alerts" title="Airplay Alerts">
             <WhatsAppAlerts scope={`label_${session?.userId ?? "anon"}`} />
           </Section>
         </>

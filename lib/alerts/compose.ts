@@ -5,7 +5,7 @@
  * tested (and later reviewed by a native speaker) without a live project.
  */
 
-export type AlertKind = "firstspin" | "chart" | "dispute" | "payout";
+export type AlertKind = "firstspin" | "play" | "daily" | "chart" | "dispute" | "payout";
 
 export type Alert = {
   id: string;

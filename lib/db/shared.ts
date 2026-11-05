@@ -6,7 +6,7 @@ import { safeArray } from "@/lib/safe";
 import { db, must } from "./core";
 
 export type AlertPrefs = { phone: string; events: Record<string, boolean> };
-const DEFAULT_EVENTS = { firstSpin: true, chart: true, dispute: true, payout: false };
+const DEFAULT_EVENTS = { firstSpin: true, dailySummary: true, everyPlay: false, chart: true, dispute: true, payout: false };
 
 export async function loadAlertPrefs(): Promise<AlertPrefs | null> {
   const sb = db();
@@ -47,7 +47,7 @@ export type AlertLogRow = {
 };
 
 /** The last few alerts for this account — proof that messages really went out. */
-export async function loadAlertLog(limit = 5): Promise<AlertLogRow[] | null> {
+export async function loadAlertLog(limit = 10): Promise<AlertLogRow[] | null> {
   const sb = db();
   if (!sb) return null; // demo mode has no delivery, so there is nothing to log
   const { data: u } = await sb.auth.getUser();

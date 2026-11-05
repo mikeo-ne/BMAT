@@ -8,14 +8,16 @@ import { cx, safeStorage } from "@/lib/safe";
 import { SaveNote, Toggle } from "./ui";
 
 const EVENTS = [
-  { id: "firstSpin", label: "First spin on a new station", description: "A track of yours is detected somewhere for the first time." },
+  { id: "firstSpin", label: "First play on a new station", description: "An email the moment a song of yours is played somewhere for the first time." },
+  { id: "dailySummary", label: "Daily summary", description: "Every morning at 8: yesterday's plays, by song and station." },
+  { id: "everyPlay", label: "Every play", description: "An email each time a song of yours is played. A busy song can mean dozens a day." },
   { id: "chart", label: "Chart movement", description: "Weekly Top 100 entries and position changes." },
   { id: "dispute", label: "Ownership disputes", description: "Someone claims a share of your work." },
   { id: "payout", label: "Royalty statements", description: "A new statement is ready." },
 ] as const;
-const DEFAULTS: AlertPrefs = { phone: "", events: { firstSpin: true, chart: true, dispute: true, payout: false } };
+const DEFAULTS: AlertPrefs = { phone: "", events: { firstSpin: true, dailySummary: true, everyPlay: false, chart: true, dispute: true, payout: false } };
 
-/** WhatsApp alert settings. Live: saved to your account. Demo: kept in this browser. */
+/** Airplay alert settings (email now, WhatsApp later). Live: saved to your account. Demo: kept in this browser. */
 export function WhatsAppAlerts({ scope }: { scope: string }) {
   const key = `est_wa_${scope}`;
   const [prefs, setPrefs] = useState<AlertPrefs>(DEFAULTS);
@@ -58,10 +60,11 @@ export function WhatsAppAlerts({ scope }: { scope: string }) {
   return (
     <div className="grid gap-6 md:grid-cols-[1fr_1.4fr]">
       <div>
-        <label className="label" htmlFor={`wa-${scope}`}>WhatsApp number</label>
+        <p className="text-sm text-slate-300">Alerts are emailed to the address you sign in with.</p>
+        <label className="label mt-5" htmlFor={`wa-${scope}`}>WhatsApp number <span className="font-normal text-slate-500">(optional)</span></label>
         <input id={`wa-${scope}`} className="input" placeholder="+256 7XX XXX XXX" inputMode="tel"
           value={prefs.phone} onChange={(e) => change({ ...prefs, phone: e.target.value })} />
-        <p className="mt-1.5 text-xs text-slate-500">Your choices are saved now; messages start once WhatsApp delivery is switched on for East Sound.</p>
+        <p className="mt-1.5 text-xs text-slate-500">WhatsApp messages are coming later. Save your number now and they'll start automatically.</p>
         <div className="mt-4 flex items-center gap-3">
           <button type="button" className="btn-primary !py-2" onClick={onSave} disabled={!dirty || save.kind === "saving"}>Save alerts</button>
           <SaveNote state={save} />
@@ -78,7 +81,7 @@ export function WhatsAppAlerts({ scope }: { scope: string }) {
           <div className="mt-6">
             <p className="font-mono text-xs uppercase tracking-widest text-slate-500">Recent alerts</p>
             {log.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">Nothing yet. The first message arrives after your next played track.</p>
+              <p className="mt-2 text-sm text-slate-500">Nothing yet. Your first alert arrives after a song of yours is played.</p>
             ) : (
               <ul className="mt-2 divide-y divide-slate-800 text-sm">
                 {log.map((row) => {

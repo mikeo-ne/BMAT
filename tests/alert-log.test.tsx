@@ -54,11 +54,19 @@ describe("WhatsAppAlerts delivery log", () => {
 
   it("explains an empty log instead of showing nothing", async () => {
     render(<WhatsAppAlerts scope="artist" />);
-    expect(await screen.findByText(/Nothing yet\. The first message arrives/)).toBeTruthy();
+    expect(await screen.findByText(/Nothing yet\. Your first alert arrives/)).toBeTruthy();
+  });
+
+  it("offers email alerts for first plays, a daily summary and every play", async () => {
+    render(<WhatsAppAlerts scope="artist" />);
+    expect(await screen.findByText(/emailed to the address you sign in with/)).toBeTruthy();
+    expect(screen.getByText("First play on a new station")).toBeTruthy();
+    expect(screen.getByText("Daily summary")).toBeTruthy();
+    expect(screen.getByText("Every play")).toBeTruthy();
   });
 
   it("keeps the saved number in the field", async () => {
     render(<WhatsAppAlerts scope="artist" />);
-    await waitFor(() => expect((screen.getByLabelText("WhatsApp number") as HTMLInputElement).value).toBe("+256772123456"));
+    await waitFor(() => expect((screen.getByLabelText(/WhatsApp number/) as HTMLInputElement).value).toBe("+256772123456"));
   });
 });
