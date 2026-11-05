@@ -4,10 +4,16 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { POSTS, type BlogPost } from "@/lib/data/public";
 import { cx, fmtInt, safeArray } from "@/lib/safe";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const CATS = ["All", "Industry", "Product", "Charts", "Policy"] as const;
 
 function MetricFeed() {
+  if (isSupabaseConfigured) return null; // sample numbers: demo mode only, never on the live site
+  return <SampleMetrics />;
+}
+
+function SampleMetrics() {
   // Starts from fixed values on the server; ticks only after mount (no hydration mismatch).
   const [m, setM] = useState({ detections: 18432, matched: 17361, streams: 32, venues: 152 });
   useEffect(() => {
