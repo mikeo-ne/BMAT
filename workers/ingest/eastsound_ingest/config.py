@@ -25,9 +25,9 @@ class Settings:
     index_path: str = "data/fingerprints.db"
     window_sec: float = 10.0  # audio analysed per check
     step_sec: float = 4.0  # how often each station is checked
-    confirm_hits: int = 2  # consecutive matches before a detection is opened
+    confirm_hits: int = 4  # windows on the song's own timeline before a play counts
     end_gap_sec: float = 16.0  # no match for this long closes a detection
-    min_detection_sec: float = 12.0
+    min_detection_sec: float = 30.0  # confirmed air time; jingles/stings/coincidences are shorter
     unmatched_every_sec: float = 600.0  # at most one unmatched sample per station per 10 min
     supabase_url: str = ""
     supabase_service_key: str = ""
