@@ -158,6 +158,34 @@ const ven2 = await M.venue.loadVenue();
 check("logging a DJ set is saved and counts tracks in its window", ven2.sets.length === before + 1 && ven2.sets[0].dj === "DJ From Test", `${ven2.sets[0].tracks} tracks`);
 
 // ---------------------------------------------------------------- Public + cross-role
+console.log("\nBrand mentions (live)");
+as("cmo@demo.eastsound.ug");
+const men = await M.cmo.loadMentions(7);
+check("CMO sees every station's mentions", men.mentions.length === Number(sql("select count(*) from mentions where heard_at >= now() - interval '7 days'")), `${men.mentions.length}`);
+check("CMO sees the tracked-brand list", men.brands.length === Number(sql("select count(*) from tracked_keywords")) && men.brands.some((b) => b.brand === "MTN"));
+const toReview = men.mentions.find((x) => x.status === "unreviewed");
+const brandRow = men.brands.find((b) => b.brand === toReview.brand);
+await M.cmo.reviewMention(toReview.id, "confirmed", { brandId: brandRow.id, alias: "learned spelling", aliases: brandRow.aliases });
+check("confirming a mention is saved with the reviewer", sql(`select status || ':' || (reviewed_by is not null) from mentions where id = ${toReview.id}`) === "confirmed:true");
+check("confirming can teach a misheard spelling", sql(`select 'learned spelling' = any(aliases) from tracked_keywords where id = '${brandRow.id}'`) === "t");
+await M.cmo.addTrackedBrand("Test Brand", ["test brand"]);
+check("CMO adds a tracked brand", sql("select count(*) from tracked_keywords where brand = 'Test Brand'") === "1");
+let dup = false;
+try { await M.cmo.addTrackedBrand("test brand", ["x"]); } catch (e) { dup = /already tracked/.test(String(e.message)); }
+check("adding the same brand twice gives a clear message", dup);
+await M.cmo.setBrandActive(brandRow.id, false);
+check("pausing a brand is saved", sql(`select active from tracked_keywords where id = '${brandRow.id}'`) === "f");
+as("broadcaster@demo.eastsound.ug");
+const own = await M.broadcaster.loadStationMentions(7);
+check("broadcaster sees only its own station's mentions", own.length === Number(sql("select count(*) from mentions m join stations s on s.id = m.station_id where s.slug = 'demo-home-fm'")) && own.every((x) => x.station.startsWith("Home FM")), `${own.length}`);
+as("label@demo.eastsound.ug");
+let leakM = -1;
+try { leakM = (await M.broadcaster.loadStationMentions(7)).length; } catch { leakM = 0; }
+check("a label calling the broadcaster's mention loader gets nothing", leakM === 0);
+let leakK = -1;
+try { leakK = (await M.cmo.loadMentions(7)).brands.length; } catch { leakK = 0; }
+check("a label cannot read the tracked-brand list", leakK === 0);
+
 console.log("\nPublic site + cross-role checks (live)");
 globalThis.__EST_USER__ = { id: "00000000-0000-0000-0000-000000000000", jwt: jwt(undefined, "anon") };
 const pub = await M.shared.loadPublicChart("All");

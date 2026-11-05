@@ -8,6 +8,7 @@ import { cx, fmtInt, fmtUGX, safeArray } from "@/lib/safe";
 import { allocatePool, sanitizeShare, splitBalance, splitTotal, type SplitRow } from "@/lib/splits";
 import { Badge, DataTable, LoadGate, Section, StatGrid } from "@/components/dashboard/ui";
 import { EvidencePlayer } from "@/components/site/EvidencePlayer";
+import { BrandMentions } from "./BrandMentions";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const BLOCKS = ["00–04", "04–08", "08–12", "12–16", "16–20", "20–24"];
@@ -263,6 +264,7 @@ export function CmoDashboard() {
           <Heatmap regions={d.regions} data={d.heatmap} />
           <Disputes initial={d.disputes} />
           <UnmatchedQueue initial={d.unmatched} works={d.works} />
+          <BrandMentions />
         </>
       )}
     </LoadGate>

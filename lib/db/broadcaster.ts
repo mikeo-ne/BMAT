@@ -4,6 +4,7 @@
 import * as demo from "@/lib/data/broadcaster";
 import { safeArray } from "@/lib/safe";
 import { db, must, EAT } from "./core";
+import type { Mention, MentionStatus } from "@/lib/mentions";
 
 export type SegmentKind = "music" | "ad" | "talk";
 export type Segment = { start: number; end: number; kind: SegmentKind; label: string; composer?: string; publisher?: string; isrc?: string; evidencePath?: string | null };
@@ -78,4 +79,25 @@ export async function loadBroadcaster(date: string): Promise<BroadcasterData> {
     segments: withTalk([...music, ...adSegs]),
     ads: bRows.map((b, i) => ({ id: b.id, advertiser: b.advertiser, spot: b.spot, booked: b.booked, aired: aired[i].count ?? 0, daypart: b.daypart ?? "All day" })),
   };
+}
+
+// ── Brand mentions on this broadcaster's own stations (read-only) ───────────
+
+export async function loadStationMentions(days = 7): Promise<Mention[]> {
+  const sb = db();
+  if (!sb) {
+    return [
+      { id: "m1", station: "Your station", brand: "MTN", heard: "mtn", transcript: "This hour is brought to you by MTN Uganda, everywhere you go.", heardAt: new Date(Date.now() - 36e5).toISOString(), score: 100, status: "confirmed", evidencePath: null },
+      { id: "m2", station: "Your station", brand: "Stanbic Bank", heard: "stambic bank", transcript: "And remember, Stambic Bank, Uganda, it can be.", heardAt: new Date(Date.now() - 72e5).toISOString(), score: 86, status: "unreviewed", evidencePath: null },
+    ];
+  }
+  const since = new Date(Date.now() - days * 864e5).toISOString();
+  type Row = { id: number; brand: string; heard: string; transcript: string; heard_at: string; score: number | null; status: MentionStatus; evidence_path: string | null; stations: { name: string } | { name: string }[] | null };
+  const rows = must(await sb.from("mentions").select("id, brand, heard, transcript, heard_at, score, status, evidence_path, stations(name)")
+    .gte("heard_at", since).order("heard_at", { ascending: false }).limit(500), "brand mentions") as Row[];
+  return safeArray(rows).map((m) => ({
+    id: String(m.id), station: (Array.isArray(m.stations) ? m.stations[0]?.name : m.stations?.name) ?? "—",
+    brand: m.brand, heard: m.heard, transcript: m.transcript, heardAt: m.heard_at, score: Number(m.score ?? 0),
+    status: m.status, evidencePath: m.evidence_path,
+  }));
 }

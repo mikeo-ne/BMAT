@@ -53,6 +53,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { id: "heatmap", label: "Regional Heatmap" },
     { id: "disputes", label: "Rights & Disputes" },
     { id: "unmatched", label: "Unmatched Audio Queue" },
+    { id: "mentions", label: "Brand Mentions" },
   ],
   label: [
     { id: "overview", label: "Overview" },
@@ -74,6 +75,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { id: "timeline", label: "Playout Timeline" },
     { id: "cuesheet", label: "UPRS Cue Sheet" },
     { id: "adcontrol", label: "Ad Control Auditor" },
+    { id: "mentions", label: "Brand Mentions" },
   ],
   venue: [
     { id: "overview", label: "Compliance" },

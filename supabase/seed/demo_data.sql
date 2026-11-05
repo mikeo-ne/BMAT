@@ -132,6 +132,18 @@ begin
     (v_home, 'DJ Wakiso', now() - interval '3 days 2 hours', now() - interval '2 days 22 hours'),
     (v_home, 'Selector Amani', now() - interval '1 day 3 hours', now() - interval '1 day');
 
+  -- brand mentions (spoken on air), only if migration 0007 is installed
+  if to_regclass('public.mentions') is not null then
+    delete from public.mentions where station_id in (select id from public.stations where slug like 'demo-%');
+    insert into public.mentions (station_id, keyword_id, brand, heard_at, heard, transcript, score, status)
+    select st, k.id, k.brand, now() - (n * interval '95 minutes'), lower(k.brand),
+           'This hour is brought to you by ' || k.brand || ', everywhere you go.', 100 - n,
+           case when n % 3 = 0 then 'confirmed' else 'unreviewed' end
+    from (values (st_home, 'MTN', 1), (st_home, 'Stanbic Bank', 2), (st_home, 'MTN', 3),
+                 (st_rival, 'Airtel', 4), (st_west, 'Nile Special', 5)) v(st, brand, n)
+    join public.tracked_keywords k on k.brand = v.brand;
+  end if;
+
   -- royalties
   for i in 0..5 loop
     insert into public.royalty_statements (org_id, period, amount_ugx, status)

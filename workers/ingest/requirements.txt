@@ -1,2 +1,6 @@
 numpy>=1.26
 scipy>=1.11
+# brand-mention scanning (EST_MENTIONS=1)
+rapidfuzz>=3.9,<4
+jellyfish>=1.0,<2
+sherpa-onnx==2.0.1

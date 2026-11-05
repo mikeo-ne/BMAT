@@ -61,6 +61,7 @@ class Detector:
         self.cur: _Open | None = None
         self.last_unmatched = -1e9
         self.now_playing: Track | None = None
+        self.matching = False  # did the latest window match a catalogue song?
 
     def _ts(self, base: dt.datetime, t: float) -> dt.datetime:
         return base + dt.timedelta(seconds=t)
@@ -70,6 +71,7 @@ class Detector:
         out: list[Detection | Unmatched] = []
         t_start = t_end - window.size / 11025.0
         m = self.index.match(landmarks(window))
+        self.matching = m is not None
 
         if m:
             c = self.cur

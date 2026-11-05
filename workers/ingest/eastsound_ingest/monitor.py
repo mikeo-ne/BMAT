@@ -15,6 +15,7 @@ from .config import Settings, Station
 from .detector import Detection, Detector, Unmatched
 from .fingerprint import SAMPLE_RATE, pcm16_to_float
 from .index import FingerprintIndex
+from .scanner import MentionScanner
 from .sinks import Sink
 
 log = logging.getLogger(__name__)
@@ -23,10 +24,11 @@ HEARTBEAT_SEC = 60
 
 class StationMonitor(threading.Thread):
     def __init__(self, station: Station, index: FingerprintIndex, sink: Sink, settings: Settings,
-                 stop: threading.Event, realtime: bool = True):
+                 stop: threading.Event, realtime: bool = True, scanner: MentionScanner | None = None):
         super().__init__(name=f"mon-{station.slug}", daemon=True)
         self.st, self.sink, self.s, self.stop_ev, self.realtime = station, sink, settings, stop, realtime
         self.det = Detector(station, index, settings)
+        self.scanner = scanner  # brand-mention scanning (optional, EST_MENTIONS=1)
         self.url: str | None = station.stream_url
         self.status = "starting"
         self.detections = 0
@@ -100,11 +102,15 @@ class StationMonitor(threading.Thread):
                 buf = np.concatenate([buf, chunk])[-window_n:]
                 if buf.size >= window_n:
                     self._emit(self.det.step(buf, samples / SAMPLE_RATE, base))
+                if self.scanner:
+                    self.scanner.feed(chunk, samples / SAMPLE_RATE, base, in_music=self.det.matching)
                 if time.monotonic() - last_beat > HEARTBEAT_SEC:
                     last_beat = time.monotonic()
                     self._beat()
         finally:
             self._emit(self.det.flush(base))
+            if self.scanner:
+                self.scanner.flush(base, samples / SAMPLE_RATE)
             proc.kill()
             err = (proc.stderr.read() if proc.stderr else b"").decode(errors="ignore").strip()
             proc.wait(timeout=5)

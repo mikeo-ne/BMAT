@@ -17,6 +17,7 @@ export const MIGRATIONS = [
   ["0004_realtime.sql", "Realtime: publish detections, stations and unmatched clips"],
   ["0005_alerts.sql", "Alerts: outbox, per-person switches, first-spin/chart/dispute enqueue"],
   ["0006_public_ingest_health.sql", "Public ingest health: station count and last detection for /setup"],
+  ["0007_brand_mentions.sql", "Brand mentions: tracked brands, spoken mentions, review"],
 ];
 
 const BANNER = (n, name, note) => [

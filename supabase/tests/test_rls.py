@@ -134,6 +134,9 @@ def main() -> int:
         "venue_nodes": {"cmo": "2", "venue": "2"},
         "dj_sets": {"cmo": "2", "venue": "2"},
         "split_shares": {"cmo": "5", "label": "2", "artist": "3"},
+        "mentions": {"cmo": q("select count(*) from mentions"),
+                     "broadcaster": q(f"select count(*) from mentions m join stations s on s.id = m.station_id where s.broadcaster_org_id = '{org['broadcaster']}'")},
+        "tracked_keywords": {"cmo": q("select count(*) from tracked_keywords")},
         "alert_outbox": {},
         "profiles": {"cmo": q("select count(*) from profiles"), "label": "1", "artist": "1", "broadcaster": "1", "venue": "1", "pending_cmo": "1"},
     }
@@ -199,6 +202,17 @@ def main() -> int:
     out, err = as_user(None, "select public.enqueue_alerts(now() - interval '1 hour')")
     expect_refused("anonymous visitor enqueues alerts", err)
 
+    out, err = as_user(users["broadcaster"], "with u as (update mentions set status = 'rejected' returning 1) select count(*) from u")
+    expect_refused("broadcaster reviews its own brand mentions", err, out)
+    out, err = as_user(users["broadcaster"], "insert into tracked_keywords (brand, terms) values ('X', '{x}')")
+    expect_refused("broadcaster adds a tracked brand", err)
+    any_station = q("select id from stations limit 1")
+    for who in ("label", "broadcaster", "cmo"):
+        out, err = as_user(users[who], f"insert into mentions (station_id, brand, heard_at, heard, transcript) values ('{any_station}', 'MTN', now(), 'mtn', 'x')")
+        expect_refused(f"{who} fabricates a brand mention", err)
+    out, err = as_user(users["cmo"], "update mentions set transcript = 'edited' where id = (select min(id) from mentions)")
+    expect_refused("CMO rewrites a mention's evidence", err)
+
     print("\nWRITES that must be allowed")
     out, err = as_user(users["cmo"], "with u as (update disputes set status = 'resolved_split', resolved_at = now() returning 1) select count(*) from u")
     expect("approved CMO resolves disputes", out or err, "2")
@@ -220,6 +234,13 @@ def main() -> int:
     got, _ = as_user(None, "select count(*) from alert_outbox")
     expect("anonymous visitor reads no alert history", got, "0")
 
+    out, err = as_user(users["cmo"], "with u as (update mentions set status = 'confirmed', reviewed_at = now() returning 1) select count(*) from u")
+    expect("approved CMO reviews brand mentions", out or err, q("select count(*) from mentions"))
+    out, err = as_user(users["cmo"], f"with i as (insert into tracked_keywords (brand, terms) values ('Test Brand', '{{test brand}}') returning 1) select count(*) from i")
+    expect("approved CMO adds a tracked brand", out or err, "1")
+    out, err = as_user(users["pending_cmo"], "with u as (update mentions set status = 'rejected' returning 1) select count(*) from u")
+    expect_refused("unapproved CMO reviews mentions", err, out)
+
     print("\nEVIDENCE CLIPS follow detection visibility")
     home_det = q(f"select d.id from detections d join stations s on s.id = d.station_id where s.broadcaster_org_id = '{org['broadcaster']}' limit 1")
     rival_det = q("select d.id from detections d join stations s on s.id = d.station_id where s.slug = 'demo-rival-fm' limit 1")
@@ -232,6 +253,15 @@ def main() -> int:
     expect("CMO can open every clip", got, "2")
     got, _ = as_user(None, "select count(*) from storage.objects")
     expect("anonymous visitor opens no clips", got, "0")
+    home_m = q(f"select m.id from mentions m join stations s on s.id = m.station_id where s.broadcaster_org_id = '{org['broadcaster']}' limit 1")
+    rival_m = q("select m.id from mentions m join stations s on s.id = m.station_id where s.slug = 'demo-rival-fm' limit 1")
+    psql(f"update mentions set evidence_path = 'mentions/home.mp3' where id = {home_m}")
+    psql(f"update mentions set evidence_path = 'mentions/rival.mp3' where id = {rival_m}")
+    psql("insert into storage.objects (bucket_id, name) values ('evidence', 'mentions/home.mp3'), ('evidence', 'mentions/rival.mp3')")
+    got, _ = as_user(users["broadcaster"], "select string_agg(name, ',' order by name) from storage.objects where name like 'mentions/%'")
+    expect("broadcaster hears only its own station's mention clips", got, "mentions/home.mp3")
+    got, _ = as_user(users["label"], "select count(*) from storage.objects where name like 'mentions/%'")
+    expect("a label hears no mention clips", got, "0")
 
     print(f"\n{'ALL CHECKS PASSED' if not FAILS else f'{len(FAILS)} FAILED: ' + '; '.join(FAILS)}")
     return 1 if FAILS else 0

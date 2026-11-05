@@ -99,6 +99,43 @@ These are synthetic signals. Before going live, test against real recordings of
 each station with real masters enrolled, and tune `MIN_ALIGNED` in `index.py`
 if you see misses (lower) or wrong matches (higher).
 
+## Brand mentions (spoken on air)
+
+Optional. Set `EST_MENTIONS=1` and the worker also listens to the **talk** on each
+station (never during a matched song) and reports when a tracked brand is said:
+live reads, presenter shout-outs, sponsor credits.
+
+- **Pre-recorded adverts are better caught by fingerprinting.** Enroll the ad file like
+  a song (`enroll ad.mp3 --title "Bell Lager 30s" --artist "Advert"`); every airing then
+  matches exactly. Speech recognition is for words a presenter says.
+- Talk is cut into 15 s pieces (2 s overlap) and transcribed with Whisper (`base.en` by
+  default; `small.en` is more accurate but needs ~4 CPU cores for 7 stations), downloaded once from the sherpa-onnx GitHub releases and checked against a
+  pinned SHA-256). Brand names are matched by spelling **and** sound, because
+  recognisers spell local names unpredictably ("Stanbic" → "Stambic", "Rwenzori" → "our wensory").
+- Brands come from the dashboard (**CMO → Brand Mentions**, table `tracked_keywords`,
+  refreshed every 10 min) or, without Supabase, from `keywords.csv`.
+- Each hit is saved to `mentions` with the transcript, the matched words and the 15 s
+  clip, as **To review**. The CMO confirms or rejects it; confirming a misheard spelling
+  adds it as a "heard as" alias for next time. Broadcasters see mentions on their own stations.
+- If the CPU can't keep up, the oldest waiting pieces are skipped and counted
+  (`speech: … skipped` in the status log) instead of falling further behind.
+
+**Calibrate before relying on it:** record an hour of a real station and run
+`python -m eastsound_ingest transcribe recording.mp3` to see exactly what the recogniser
+hears and which brands match.
+
+**How accurate is it?** Measured on 135 test clips — 20 ad reads and 25 everyday lines
+chosen to sound like brands, each read by 3 synthetic (Piper) voices, degraded like a
+64 kbps stream: `small.en` found **72%** of brand mentions; `base.en` found 64%. The only
+false alarm was "ring the bell later" heard as *Bell Lager* — a genuine near-homophone,
+which is why every mention goes through review. Synthetic voices are not Ugandan presenters,
+and these thresholds were tuned on the same clips: expect different numbers on real radio.
+
+**Luganda:** standard Whisper has no Luganda. Brand names usually still come through in
+English mode. For full Luganda transcription, Sunbird AI's
+`Sunbird/faster-whisper-51-african-languages` (Whisper large-v3 fine-tuned for 51 African
+languages) works with `EST_ASR_ENGINE=faster-whisper` but needs a GPU to keep up live.
+
 ## Limits to know
 
 - It only recognises songs you've **enrolled**. Unknown songs land in the unmatched queue.

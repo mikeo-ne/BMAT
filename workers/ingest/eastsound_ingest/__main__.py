@@ -130,20 +130,85 @@ def cmd_identify(a, s) -> None:
     print(f"{m.track.artist} — {m.track.title} | score {m.score} | confidence {m.confidence}% | at {m.track_offset_sec:.1f}s")
 
 
+def mentions_enabled(a=None) -> bool:
+    import os
+
+    return bool(getattr(a, "mentions", False)) or os.getenv("EST_MENTIONS", "").lower() in ("1", "true", "yes")
+
+
+def _keyword_loader(sink: Sink):
+    """Brands to listen for: the database list when on Supabase, else keywords.csv."""
+    import os
+
+    from .mentions import load_keywords_file
+
+    inner = getattr(sink, "inner", sink)
+    if isinstance(inner, SupabaseSink):
+        return inner.load_keywords
+    path = os.getenv("EST_KEYWORDS_FILE", str(Path(__file__).resolve().parent.parent / "keywords.csv"))
+    return lambda: load_keywords_file(path)
+
+
+def _mention_setup(sink: Sink):
+    """Shared speech pool + keyword source, or (None, None) when scanning is off."""
+    import os
+
+    from .scanner import KeywordSource, SpeechPool
+    from .speech import make_transcriber
+
+    tr = make_transcriber()
+    logging.info("brand-mention scanning on (%s)", tr.name)
+    pool = SpeechPool(tr, workers=int(os.getenv("EST_ASR_WORKERS", "1")), max_pending=int(os.getenv("EST_ASR_BACKLOG", "6")))
+    return pool, KeywordSource(_keyword_loader(sink))
+
+
+def _scanner(st: Station, pool, keywords, sink: Sink):
+    from .scanner import MentionScanner
+
+    return MentionScanner(st, pool, keywords, sink.mention) if pool else None
+
+
+def cmd_transcribe(a, s) -> None:
+    """Calibrate on a real recording: print what the recogniser hears and which brands match."""
+    from .mentions import find_mentions, load_keywords_file
+    from .speech import make_transcriber
+
+    tr = make_transcriber()
+    kws = load_keywords_file(a.keywords) if a.keywords else _keyword_loader(JsonlSink(s.out_dir))()
+    x = decode_file(a.file)
+    step = int(15 * SAMPLE_RATE)
+    for i in range(0, x.size, step):
+        text = tr.transcribe(x[i : i + step])
+        hits = find_mentions(text, kws)
+        mark = "  → " + ", ".join(f"{h.brand} ({h.heard!r}, {h.score})" for h in hits) if hits else ""
+        print(f"[{i // SAMPLE_RATE // 60:02d}:{i // SAMPLE_RATE % 60:02d}] {text}{mark}")
+
+
 def cmd_scan(a, s) -> None:
     """Run the full detector over a recorded file as if it were a live stream."""
     idx = FingerprintIndex(s.index_path)
     sink = _sink(s)
     st = Station(slug=a.station, name=a.station)
     st.stream_url = a.file
-    mon = StationMonitor(st, idx, sink, s, threading.Event(), realtime=False)
+    pool, keywords = _mention_setup(sink) if mentions_enabled(a) else (None, None)
+    mon = StationMonitor(st, idx, sink, s, threading.Event(), realtime=False, scanner=_scanner(st, pool, keywords, sink))
     if a.started_at:  # real wall-clock time the recording began (East Sound rejects future timestamps)
         import datetime as dt
 
         mon.base_override = dt.datetime.fromisoformat(a.started_at.replace("Z", "+00:00"))
     mon.run()
+    if pool:
+        _drain(pool)
+        logging.info(pool.summary())
     sink.close()
-    print(f"{mon.detections} detections")
+    print(f"{mon.detections} detections" + (f", {mon.scanner.mentions} brand mentions" if mon.scanner else ""))
+
+
+def _drain(pool, timeout: float = 600) -> None:
+    """Wait for queued speech chunks to finish (file scans only)."""
+    if not pool.wait_idle(timeout):
+        logging.warning("speech queue still busy after %ss; stopping", timeout)
+    pool.close()
 
 
 def cmd_run(a, s) -> None:
@@ -156,7 +221,8 @@ def cmd_run(a, s) -> None:
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     signal.signal(signal.SIGINT, lambda *_: stop.set())
-    mons = [StationMonitor(st, idx, sink, s, stop) for st in s.stations]
+    pool, keywords = _mention_setup(sink) if mentions_enabled() else (None, None)
+    mons = [StationMonitor(st, idx, sink, s, stop, scanner=_scanner(st, pool, keywords, sink)) for st in s.stations]
     for m in mons:
         m.start()
         time.sleep(0.5)  # stagger connections
@@ -164,6 +230,8 @@ def cmd_run(a, s) -> None:
     while not stop.is_set():
         stop.wait(300)
         logging.info("status: " + ", ".join(f"{m.st.slug}={m.status}/{m.detections}" for m in mons))
+        if pool:
+            logging.info(pool.summary())
     for m in mons:
         m.join(timeout=10)
     sink.close()
@@ -184,6 +252,9 @@ def main() -> None:
     el = sub.add_parser("enroll-list"); el.add_argument("manifest")
     i = sub.add_parser("identify"); i.add_argument("file")
     sc = sub.add_parser("scan"); sc.add_argument("file"); sc.add_argument("--station", default="file")
+    sc.add_argument("--mentions", action="store_true", help="also scan speech for tracked brands")
+    tc = sub.add_parser("transcribe", help="print transcript + brand hits for a recording (calibration)")
+    tc.add_argument("file"); tc.add_argument("--keywords", help="keywords.csv (default: database or bundled list)")
     sc.add_argument("--started-at", help="ISO time the recording began, e.g. 2026-11-04T08:00:00+03:00")
     sub.add_parser("run")
     sub.add_parser("doctor")
@@ -196,7 +267,7 @@ def main() -> None:
         sys.exit(doctor.main(s))
     {"enroll": cmd_enroll, "enroll-dir": cmd_enroll_dir, "enroll-list": cmd_enroll_list,
      "identify": cmd_identify, "scan": cmd_scan,
-     "run": cmd_run, "resolve": cmd_resolve}[a.cmd](a, s)
+     "run": cmd_run, "resolve": cmd_resolve, "transcribe": cmd_transcribe}[a.cmd](a, s)
 
 
 if __name__ == "__main__":
