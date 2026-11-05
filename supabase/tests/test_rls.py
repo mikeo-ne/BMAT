@@ -281,6 +281,11 @@ def main() -> int:
     expect("masters bucket is private", q("select public::text from storage.buckets where id = 'masters'"), "false")
 
     print("\nHARDENING")
+    got, _ = as_user(None, "select streams_online from public.public_platform_stats()")
+    want = q("select count(*) from stations where stream_status = 'online' and last_heartbeat > now() - interval '10 minutes'")
+    expect("homepage counts only stations that reported recently", got, want)
+    out, err = as_user(None, f"select public.owns_master('{own_rec}/x.wav')")
+    expect_refused("anonymous visitor calls owns_master()", err)
     out, err = as_user(None, f"select public.alert_wanted('{uid['artist']}', 'firstspin')")
     expect_refused("anonymous visitor calls alert_wanted()", err)
     out, err = as_user(users["label"], f"select public.alert_wanted('{uid['artist']}', 'firstspin')")

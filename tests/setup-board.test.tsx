@@ -72,7 +72,8 @@ describe("ReadinessBoard", () => {
     expect(headings[1]).toContain("Point the site at the project");
     expect(headings[2]).toContain("Allow the login round-trip");
     expect(headings[3]).toContain("Start the ingestor");
-    expect(screen.getByText(/0001_rbac_schema\.sql → 0002_stream_ingest\.sql → 0003_dashboards_live\.sql/)).toBeTruthy();
+    expect(screen.getByText("supabase/setup.sql")).toBeTruthy();
+    expect(screen.getByText(/installs every migration in order/)).toBeTruthy();
     expect(screen.getByText(/python -m eastsound_ingest --stations stations\.csv run/)).toBeTruthy();
   });
 

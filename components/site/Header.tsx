@@ -1,5 +1,6 @@
 "use client";
 
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -84,7 +85,11 @@ export function LiveBadge() {
   useEffect(() => {
     loadPublicStats().then(setStats).catch(() => setStats(null)); // live mode only; demo keeps the default copy
   }, []);
-  const text = stats ? t("liveTpl").replace("{s}", String(stats.streams)).replace("{v}", String(stats.venues)) : t("live");
+  // Live site: only real numbers (nothing until they load). Demo: the sample copy.
+  const text = stats
+    ? (stats.venues > 0 ? t("liveTpl").replace("{v}", String(stats.venues)) : t("liveStationsTpl")).replace("{s}", String(stats.streams))
+    : isSupabaseConfigured ? "" : t("live");
+  if (isSupabaseConfigured && !stats) return null;
   return (
     <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300">
       <span className="relative flex h-2 w-2">

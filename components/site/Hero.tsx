@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { PLAYOUT_TICKER } from "@/lib/data/public";
 import { safeArray } from "@/lib/safe";
 import { LiveBadge } from "./Header";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 function Visualizer() {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -101,13 +102,13 @@ function Visualizer() {
     <div className="glass relative overflow-hidden border-emerald-400/15 p-5 shadow-2xl shadow-emerald-950/30">
       <div className="mb-3 flex items-center justify-between text-xs">
         <span className="font-mono uppercase tracking-widest text-emerald-400/80">Vericast · live matcher</span>
-        <span className="font-mono text-slate-500">44.1 kHz · FFT 256</span>
+        <span className="font-mono text-slate-500">11 kHz · landmark fingerprints</span>
       </div>
       <canvas ref={canvas} className="h-40 w-full sm:h-48" aria-hidden />
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-white">{listening ? "Matching: Kampala Nights" : "Idle signal monitor"}</p>
-          <p className="text-xs text-slate-500">{listening ? "Confidence 98.6% · Capital FM 91.3" : "Tap to hear a 10s evidence sample"}</p>
+          <p className="truncate text-sm font-semibold text-white">{listening ? "Sample match: Kampala Nights" : "Idle signal monitor"}</p>
+          <p className="text-xs text-slate-500">{listening ? "Example of an evidence clip" : "Tap to hear a sample evidence clip"}</p>
         </div>
         <button type="button" onClick={toggle} className={listening ? "btn-ghost !py-2" : "btn-primary !py-2"}>
           {listening ? "Stop" : "▶ Listen"}
@@ -117,7 +118,9 @@ function Visualizer() {
   );
 }
 
+/** Sample plays for the demo site only — a live site never shows made-up airplay. */
 function Ticker() {
+  if (isSupabaseConfigured) return null;
   const items = safeArray(PLAYOUT_TICKER);
   const loop = [...items, ...items];
   return (

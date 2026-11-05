@@ -16,8 +16,8 @@ const TONE: Record<ReadinessCheck["state"], { label: string; dot: string; ring: 
 const STEPS = [
   {
     title: "Install the schema",
-    cmd: "supabase/migrations/0001_rbac_schema.sql → 0002_stream_ingest.sql → 0003_dashboards_live.sql",
-    note: "Supabase → SQL Editor, in that order. They create the tables, the evidence bucket and every RLS policy.",
+    cmd: "supabase/setup.sql",
+    note: "Supabase → SQL Editor → paste the whole file → Run. It installs every migration in order (tables, storage buckets, RLS policies). Already set up? Run only the migrations you haven't applied yet from supabase/migrations/.",
   },
   {
     title: "Point the site at the project",
