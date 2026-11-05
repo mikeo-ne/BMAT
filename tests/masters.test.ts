@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { encodeWav16 } from "@/lib/audio";
-import { detailProblems, emptyDetails, guessFromFilename, recognition } from "@/lib/db/masters";
+import { createSong, demoSeed, detailProblems, emptyDetails, guessFromFilename, recognition, upcConflict } from "@/lib/db/masters";
 import { ROLE_NAV } from "@/lib/roles";
 
 describe("song details", () => {
@@ -47,5 +47,17 @@ describe("upload navigation", () => {
   it("labels and artists both have a place to upload songs", () => {
     expect(ROLE_NAV.label.some((n) => n.id === "dropzone" && n.label === "Upload Songs")).toBe(true);
     expect(ROLE_NAV.artist.some((n) => n.id === "songs")).toBe(true);
+  });
+});
+
+describe("UPC clash warning", () => {
+  it("flags a UPC already used by a different main artist, never the same artist or the song itself", async () => {
+    demoSeed([]);
+    const id = await createSong({ kind: "artist", userId: null }, emptyDetails({ title: "Track 1", artistName: "Nalu Akello", upc: "012345678905" }));
+    expect(await upcConflict("012345678905", "Zawadi B")).toBe(true);
+    expect(await upcConflict("012345678905", " nalu akello ")).toBe(false); // same artist, another album track
+    expect(await upcConflict("012345678905", "Zawadi B", id)).toBe(false); // editing that very song
+    expect(await upcConflict("999999999999", "Zawadi B")).toBe(false);
+    expect(await upcConflict("123", "Zawadi B")).toBe(false); // not a UPC yet: no check
   });
 });

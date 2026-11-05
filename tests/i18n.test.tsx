@@ -100,7 +100,7 @@ describe("i18n", () => {
     );
     expect(read("live")).toBe("32 Streams & 150 Venues Active");
     await user.click(screen.getByRole("button", { name: "Kiswahili" }));
-    expect(read("live")).toBe("Vituo 32 na Kumbi 150 Hai");
+    expect(read("live")).toBe("Vituo 32 na Kumbi 150 Hewani");
   });
 
   it("restores a saved language on mount", async () => {

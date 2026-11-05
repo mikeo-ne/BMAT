@@ -157,6 +157,19 @@ export async function attachReference(id: string, ref: { wav: Blob; durationSec:
   );
 }
 
+/** True when this UPC is already on a song by a different main artist (any account).
+ *  A UPC is one release, so that usually means a typo or a copied code — unless
+ *  it's a compilation. Advisory only: never blocks a save. */
+export async function upcConflict(upc: string, artistName: string, excludeId?: string | null): Promise<boolean> {
+  if (!UPC_RE.test(upc) || !artistName.trim()) return false;
+  const sb = db();
+  const norm = (v: string) => v.trim().toLowerCase();
+  if (!sb) return demoSongs.some((x) => x.upc === upc && x.id !== excludeId && norm(x.artistName) !== norm(artistName));
+  const { data, error } = await sb.rpc("upc_used_by_other_artist", { p_upc: upc, p_artist: artistName.trim(), p_exclude: excludeId ?? null });
+  if (error) return false; // a failed check must not get in the way of saving
+  return data === true;
+}
+
 export async function deleteSong(song: Pick<Song, "id" | "masterPath">): Promise<void> {
   const sb = db();
   if (!sb) {

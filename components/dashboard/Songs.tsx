@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { getAudioContext, makeReference, type Reference } from "@/lib/audio";
 import {
-  GENRES, ISRC_RE, UPC_RE, attachReference, createSong, deleteSong, detailProblems, emptyDetails, guessFromFilename, recognition, updateSong,
+  GENRES, ISRC_RE, UPC_RE, attachReference, createSong, deleteSong, detailProblems, emptyDetails, guessFromFilename, recognition, upcConflict, updateSong,
   type Owner, type Song, type SongDetails,
 } from "@/lib/db/masters";
 import { cx, safeArray } from "@/lib/safe";
@@ -26,15 +26,35 @@ function Field({ label, hint, children, wide }: { label: string; hint?: string; 
   );
 }
 
-export function SongForm({ value, onChange, artists, lockArtist }: {
+/** Warns (never blocks) when the UPC is already used for a different main artist. */
+function useUpcWarning(upc: string, artistName: string, songId?: string | null): boolean {
+  const [clash, setClash] = useState(false);
+  useEffect(() => {
+    setClash(false);
+    if (!UPC_RE.test(upc) || !artistName.trim()) return;
+    let live = true;
+    const t = window.setTimeout(() => { upcConflict(upc, artistName, songId).then((c) => { if (live) setClash(c); }).catch(() => undefined); }, 500);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [upc, artistName, songId]);
+  return clash;
+}
+
+export const ISRC_HINT =
+  "Copy it from your distributor's dashboard (DistroKid, Ditto, TuneCore…) — don't type it from memory. Each version (remix, radio edit, clean, live) has its own ISRC. Leave blank if you don't have one yet.";
+export const UPC_HINT = "The release's barcode from your distributor, 12–13 digits. Every track on an album shares it. Optional.";
+
+export function SongForm({ value, onChange, artists, lockArtist, songId }: {
   value: SongDetails;
   onChange: (d: SongDetails) => void;
   /** Label roster: picking one links the song to that artist. */
   artists?: Artist[];
   /** Independent artists: the artist is the account holder. */
   lockArtist?: boolean;
+  /** When editing a saved song: leave it out of the UPC check. */
+  songId?: string | null;
 }) {
   const set = (p: Partial<SongDetails>) => onChange({ ...value, ...p });
+  const upcClash = useUpcWarning(value.upc, value.artistName, songId);
   const roster = safeArray(artists);
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -74,13 +94,18 @@ export function SongForm({ value, onChange, artists, lockArtist }: {
       <Field label="Release date">
         <input type="date" className="input !py-2" value={value.releaseDate} onChange={(e) => set({ releaseDate: e.target.value })} />
       </Field>
-      <Field label="ISRC" hint="12 characters, e.g. UG-ABC-26-00001 — leave blank if you don't have one yet">
+      <Field label="ISRC" hint={ISRC_HINT}>
         <input className={cx("input !py-2 font-mono", value.isrc && !ISRC_RE.test(value.isrc) && "!border-rose-500/60")} value={value.isrc}
           placeholder="UG-XXX-26-00000" onChange={(e) => set({ isrc: e.target.value.toUpperCase().trim() })} />
       </Field>
-      <Field label="UPC / barcode" hint="12–13 digits, for the release">
-        <input className={cx("input !py-2 font-mono", value.upc && !UPC_RE.test(value.upc) && "!border-rose-500/60")} value={value.upc}
+      <Field label="UPC / barcode" hint={UPC_HINT}>
+        <input className={cx("input !py-2 font-mono", value.upc && !UPC_RE.test(value.upc) && "!border-rose-500/60", upcClash && "!border-amber-400/60")} value={value.upc}
           inputMode="numeric" onChange={(e) => set({ upc: e.target.value.replace(/\D/g, "") })} />
+        {upcClash && (
+          <span role="status" className="mt-1 block text-[11px] font-medium text-amber-300">
+            This UPC is already used for a song by a different artist. Check it against your distributor — unless this release is a compilation, it's probably the wrong code.
+          </span>
+        )}
       </Field>
     </div>
   );
@@ -270,7 +295,7 @@ function SongEditor({ song, artists, lockArtist, onDone }: { song: Song; artists
 
   return (
     <div className="rounded-xl border border-emerald-400/20 bg-slate-950/70 p-4">
-      <SongForm value={d} onChange={setD} artists={artists} lockArtist={lockArtist} />
+      <SongForm value={d} onChange={setD} artists={artists} lockArtist={lockArtist} songId={song.id} />
       {err && <p role="alert" className="mt-3 text-sm text-rose-300">{err}</p>}
       {note && <p className="mt-3 text-sm text-emerald-300">{note}</p>}
       <div className="mt-4 flex flex-wrap items-center gap-2">
