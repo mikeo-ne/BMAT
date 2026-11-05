@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { loadBroadcaster, type AdLine, type BroadcasterData, type Segment, type SegmentKind } from "@/lib/db/broadcaster";
-import { evidenceUrl, kampalaDate, useLoad } from "@/lib/db/core";
+import { evidenceUrl, kampalaDate } from "@/lib/db/core";
+import { Freshness, useLiveLoad } from "@/lib/db/live";
 import {
   CUE_SHEET_HEADER,
   cueSheetFilename,
@@ -150,15 +151,24 @@ function AdControl({ ads }: { ads: AdLine[] }) {
 
 export function BroadcasterDashboard() {
   const [date, setDate] = useState(() => kampalaDate());
-  const state = useLoad(() => loadBroadcaster(date), [date]);
+  // A playout timeline is stale within seconds, so it tracks detections live.
+  const state = useLiveLoad(() => loadBroadcaster(date), [date], { tables: ["detections"] });
   return (
     <LoadGate state={state}>
-      {(d) => <BroadcasterView d={d} date={date} setDate={setDate} loading={state.loading} />}
+      {(d) => (
+        <BroadcasterView
+          d={d}
+          date={date}
+          setDate={setDate}
+          loading={state.loading}
+          freshness={<Freshness live={state.live} lastUpdated={state.lastUpdated} />}
+        />
+      )}
     </LoadGate>
   );
 }
 
-function BroadcasterView({ d, date, setDate, loading }: { d: BroadcasterData; date: string; setDate: (s: string) => void; loading: boolean }) {
+function BroadcasterView({ d, date, setDate, loading, freshness }: { d: BroadcasterData; date: string; setDate: (s: string) => void; loading: boolean; freshness?: ReactNode }) {
   const share = useMemo(() => playoutShare(playoutTotals(d.segments)), [d.segments]);
   const short = useMemo(() => adShortfallCount(d.ads), [d.ads]);
 
@@ -171,7 +181,9 @@ function BroadcasterView({ d, date, setDate, loading }: { d: BroadcasterData; da
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-white">{d.station.name}</h1>
-            <p className="text-sm text-slate-500">Kampala time</p>
+            <p className="flex items-center gap-2 text-sm text-slate-500">
+              Kampala time {freshness}
+            </p>
           </div>
           <label className="flex items-center gap-2 text-sm text-slate-400">
             Day

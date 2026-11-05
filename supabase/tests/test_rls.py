@@ -16,6 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DB = os.environ.get("RLS_TEST_DB", "est_rls_suite")
+SETUP_DB = os.environ.get("RLS_SETUP_DB", "est_setup_suite")
 EMAILS = {
     "cmo": "cmo@demo.eastsound.ug",
     "label": "label@demo.eastsound.ug",
@@ -31,10 +32,34 @@ def psql(sql: str, db: str = DB, check: bool = True) -> subprocess.CompletedProc
                           capture_output=True, text=True, check=check)
 
 
-def psql_file(path: Path) -> None:
-    r = subprocess.run(["psql", "-d", DB, "-v", "ON_ERROR_STOP=1", "-qX", "-f", str(path)], capture_output=True, text=True)
+def psql_file(path: Path, db: str = DB) -> None:
+    r = subprocess.run(["psql", "-d", db, "-v", "ON_ERROR_STOP=1", "-qX", "-f", str(path)], capture_output=True, text=True)
     if r.returncode:
         sys.exit(f"{path.name} failed:\n{r.stderr}")
+
+
+def check_one_shot_setup() -> None:
+    """supabase/setup.sql is what an operator pastes into the SQL Editor.
+
+    Applied to its own database so we know the concatenation runs cleanly on a
+    blank project — not just that each numbered migration does in isolation.
+    """
+    subprocess.run(["dropdb", "--if-exists", SETUP_DB], capture_output=True)
+    subprocess.run(["createdb", SETUP_DB], check=True)
+    psql_file(ROOT / "supabase/tests/supabase_shim.sql", SETUP_DB)
+    psql_file(ROOT / "supabase/setup.sql", SETUP_DB)
+    print("one-shot setup: supabase/setup.sql applied cleanly")
+
+    def q(sql: str) -> str:
+        return psql(sql, db=SETUP_DB).stdout.strip()
+
+    expect("setup.sql creates profiles", q("select count(*) from public.profiles"), "0")
+    expect("setup.sql creates stations", q("select count(*) from public.stations"), "0")
+    expect("setup.sql creates the evidence bucket", q("select count(*) from storage.buckets where id = 'evidence'"), "1")
+    expect("setup.sql defines my_role()", q("select public.my_role() is null"), "t")
+    rows = int(q("select count(*) from pg_policies where schemaname = 'public'"))
+    expect(f"setup.sql installs RLS policies ({rows})", str(rows >= 20), "True")
+    subprocess.run(["dropdb", "--if-exists", SETUP_DB], capture_output=True)
 
 
 def as_user(uid: str | None, sql: str) -> tuple[str, str]:
@@ -62,6 +87,7 @@ def expect_refused(label: str, err: str, out: str = "") -> None:
 
 
 def main() -> int:
+    check_one_shot_setup()
     subprocess.run(["dropdb", "--if-exists", DB], capture_output=True)
     subprocess.run(["createdb", DB], check=True)
     psql_file(ROOT / "supabase/tests/supabase_shim.sql")
@@ -108,6 +134,7 @@ def main() -> int:
         "venue_nodes": {"cmo": "2", "venue": "2"},
         "dj_sets": {"cmo": "2", "venue": "2"},
         "split_shares": {"cmo": "5", "label": "2", "artist": "3"},
+        "alert_outbox": {},
         "profiles": {"cmo": q("select count(*) from profiles"), "label": "1", "artist": "1", "broadcaster": "1", "venue": "1", "pending_cmo": "1"},
     }
 
@@ -133,6 +160,12 @@ def main() -> int:
     expect("public_top_chart() works for anonymous visitors", got, q("select count(distinct recording_id) from detections where recording_id is not null and detected_at >= now() - interval '7 days'"))
     got, err = as_user(None, "select count(*) from public.top_chart(7, null, 100)")
     expect("top_chart() as anon returns nothing", got, "0")
+    got, _ = as_user(None, "select (public.public_ingest_health() ->> 'stations')")
+    expect("public_ingest_health() counts the panel for anonymous visitors", got, q("select count(*) from stations"))
+    got, _ = as_user(None, "select count(*) from stations")
+    expect("anonymous visitor still reads no station rows", got, "0")
+    got, _ = as_user(None, "select string_agg(k, ',' order by k) from json_object_keys(public.public_ingest_health()) k")
+    expect("public_ingest_health() returns counts and timestamps only", got, "last_detection,last_heartbeat,monitored,stations")
 
     print("\nWRITES that must be refused")
     rival_rec = q("select id from recordings where title = 'Rival Anthem'")
@@ -161,6 +194,10 @@ def main() -> int:
     expect_refused("anonymous visitor adds an artist to a real label", err)
     out, err = as_user(users["broadcaster"], f"insert into artists (label_org_id, name) values ('{org['label']}', 'x')")
     expect_refused("broadcaster adds an artist to a label's roster", err)
+    out, err = as_user(users["label"], f"insert into alert_outbox (profile_id, kind, title, body, dedupe_key) values ('{uid['label']}', 'firstspin', 'x', 'y', 'forged')")
+    expect_refused("label forges an entry in its own alert queue", err)
+    out, err = as_user(None, "select public.enqueue_alerts(now() - interval '1 hour')")
+    expect_refused("anonymous visitor enqueues alerts", err)
 
     print("\nWRITES that must be allowed")
     out, err = as_user(users["cmo"], "with u as (update disputes set status = 'resolved_split', resolved_at = now() returning 1) select count(*) from u")
@@ -174,6 +211,14 @@ def main() -> int:
     expect("venue logs a DJ set at its own venue", out or err, "1")
     out, err = as_user(users["artist"], f"with i as (insert into alert_prefs (profile_id, whatsapp_e164, events) values ('{uid['artist']}', '+256772123456', '{{}}') returning 1) select count(*) from i")
     expect("artist saves their own WhatsApp alert settings", out or err, "1")
+    # The queue is written by the service role; a person only reads their own history.
+    psql(f"insert into alert_outbox (profile_id, kind, title, body, link, dedupe_key) values ('{uid['artist']}', 'firstspin', 'First spin on Capital FM', 'x', '/dashboard/artist', 'test-a'), ('{uid['label']}', 'firstspin', 'First spin for the label', 'x', '/dashboard/label', 'test-l')")
+    got, _ = as_user(users["artist"], "select string_agg(title, ',') from alert_outbox")
+    expect("artist reads only their own alert history", got, "First spin on Capital FM")
+    got, _ = as_user(users["label"], "select string_agg(title, ',') from alert_outbox")
+    expect("label reads only their own alert history", got, "First spin for the label")
+    got, _ = as_user(None, "select count(*) from alert_outbox")
+    expect("anonymous visitor reads no alert history", got, "0")
 
     print("\nEVIDENCE CLIPS follow detection visibility")
     home_det = q(f"select d.id from detections d join stations s on s.id = d.station_id where s.broadcaster_org_id = '{org['broadcaster']}' limit 1")

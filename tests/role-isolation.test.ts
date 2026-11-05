@@ -34,7 +34,8 @@ describe("role data isolation", () => {
       expect(imports.length, `${file} imports no role data module`).toBeGreaterThan(0);
       for (const imported of imports) {
         const [kind, name] = imported.split("/");
-        const shared = kind === "db" && (name === "core" || name === "shared");
+        // core/shared/live are role-agnostic plumbing, not tenant data.
+        const shared = kind === "db" && ["core", "shared", "live"].includes(name);
         expect(shared || name === role, `${file} must not import ${imported}`).toBe(true);
       }
     }
@@ -44,7 +45,7 @@ describe("role data isolation", () => {
     const source = readFileSync(join(ROOT, "lib", "db", `${role}.ts`), "utf8");
     for (const imported of roleLibImports(source)) {
       const name = imported.split("/")[1];
-      expect(["core", "shared", role], `lib/db/${role}.ts must not import ${imported}`).toContain(name);
+      expect(["core", "shared", "live", role], `lib/db/${role}.ts must not import ${imported}`).toContain(name);
     }
   });
 

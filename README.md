@@ -3,7 +3,7 @@
 Music copyright & airplay tracking SaaS — a 7H Music Group Ltd product.
 Next.js 15 (App Router) · Tailwind CSS · Supabase · Web Audio API.
 
-**Deploying?** See [DEPLOY.md](DEPLOY.md) for GitHub → Vercel → Supabase → ingest server, step by step.
+**Deploying?** See [DEPLOY.md](DEPLOY.md) for GitHub → Vercel → Supabase → ingest server, step by step. Database setup is one paste: `supabase/setup.sql` (`npm run setup:sql` regenerates it). Afterwards, `npm run health <url>` tells you what is still missing.
 
 ## Run it
 
@@ -41,11 +41,12 @@ Additional rules:
 | `/blog`, `/blog/[slug]` | Live metric feed, category pills, search |
 | `/dashboard` | Routes to the caller's own dashboard |
 | `/dashboard/cmo` | Registry, split calculator, Top 100, regional heatmap, dispute engine, unmatched queue |
-| `/dashboard/label` | Roster, batch fingerprint dropzone, ISRC/UPC tracker, revenue, WhatsApp alerts |
-| `/dashboard/artist` | Discography, spin velocity, split summary, WhatsApp alerts |
+| `/dashboard/label` | Roster, batch fingerprint dropzone, ISRC/UPC tracker, revenue, WhatsApp/email alerts with delivery history |
+| `/dashboard/artist` | Discography, spin velocity, split summary, WhatsApp/email alerts with delivery history |
 | `/dashboard/broadcaster` | Playout timeline, UPRS cue sheet PDF/XLSX export, ad control auditor |
 | `/dashboard/venue` | UPRS compliance badge, listener nodes, DJ set logs |
 | `/auth/callback`, `/auth/reset`, `/pending` | Email confirmation, password recovery, CMO approval wait |
+| `/setup`, `/api/health` | Live readiness console: which env var, migration or worker is still missing. JSON for uptime monitors |
 
 ## Defensive standards applied
 
@@ -57,6 +58,10 @@ Additional rules:
 - Seeded PRNG for demo data → identical server/client render, no hydration mismatch.
 - Verified: production build clean; headless-Chrome run across all 5 roles, cross-role URL jumps, PDF/XLSX export, audio playback and mobile width with **zero console errors**.
 
+## Going live
+
+Follow **[RUNBOOK.md](RUNBOOK.md)** — the five steps that need your accounts (worker host, masters, merge, SMTP, alert credentials), each with its own checkpoint.
+
 ## Tests
 
 | Command | What it proves |
@@ -65,13 +70,15 @@ Additional rules:
 | `python3 supabase/tests/test_rls.py` | On real PostgreSQL: every table × every role sees only its own rows; 20 forbidden writes are refused; evidence clips follow play visibility |
 | `node supabase/tests/data-layer.test.mjs` | The app's real data code, run against PostgREST (Supabase's API server) as each role: dashboards load the right data, saves persist, cross-role calls return nothing |
 | `cd workers/ingest && python -m tests.test_broadcast` | Song recognition on a degraded simulated broadcast |
+| `cd workers/ingest && python -m tests.test_doctor` | The worker's own pre-flight: ffmpeg, station panel, keys, database, bucket, index |
+| `npm test` → `tests/alerts.test.ts` | Alert wording, WhatsApp/Resend payloads, retries and the cron route's auth gate |
 
-All four run in GitHub Actions on every push.
+All of them run in GitHub Actions on every push.
 
 ## Still to do before launch
 
 - **Evidence clips on the public chart**: kept private by design; rights holders hear them in their dashboards.
-- **WhatsApp sending**: settings are saved per account; actual delivery needs a WhatsApp Business API sender.
+- **Alert sending**: the queue, wording, retries and delivery history are built and tested (`/api/cron/alerts`); it stays silent until you add a WhatsApp Cloud API token or a Resend key — see `DEPLOY.md` step 5.
 - **Real-audio test**: record 1–2 hours of a real station with real masters enrolled.
 - **Translations**: Luganda and Kiswahili strings in `lib/i18n.tsx` are drafts — have a native speaker review them.
 - **Legal review**: monitoring third-party streams and storing 10-second excerpts.
