@@ -82,20 +82,20 @@ def main() -> int:
     pkgs = ["eastsound_ingest"] + ([sys.argv[sys.argv.index("--old") + 1]] if "--old" in sys.argv else [])
     audio = load(rec)
     print(f"{len(audio)} stations, {sum(x.size for x in audio.values()) / SR / 3600:.1f} h of radio\n")
-    pieces = [(f"{k}@{i // SR}", x[i: i + PIECE * SR][::-1].copy()) for k, x in audio.items() for i in range(0, x.size - PIECE * SR, PIECE * SR)]
+    pieces = [(f"{k}@{i // SR}", x[i: i + PIECE * SR][::-1].copy()) for k, x in audio.items() for i in range(0, x.size - PIECE * SR, 2 * PIECE * SR)]
     fails = 0
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
         for pkg in pkgs:
-            print(f"=== {pkg}")
+            print(f"=== {pkg}", flush=True)
             ix = index(pkg, tmp / f"{pkg}-all.db", pieces)
             fp = [(k, *d) for k, x in audio.items() for d in run(pkg, ix, x, k)]
-            print(f"1. FALSE MATCHES vs {len(pieces)} backwards pieces: {len(fp)}")
+            print(f"1. FALSE MATCHES vs {len(pieces)} backwards pieces: {len(fp)}", flush=True)
             for f in fp[:15]:
                 print("     ", f)
             one = index(pkg, tmp / f"{pkg}-one.db", pieces[:1])
             fp1 = [(k, *d) for k, x in audio.items() for d in run(pkg, one, x, k)]
-            print(f"2. FALSE MATCHES with a one-song catalogue: {len(fp1)}")
+            print(f"2. FALSE MATCHES with a one-song catalogue: {len(fp1)}", flush=True)
             for f in fp1[:15]:
                 print("     ", f)
             if pkg == "eastsound_ingest":
