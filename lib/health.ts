@@ -228,81 +228,87 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
     );
   }
 
-  // 3. Station panel.
-  {
-    const { res, error } = await attempt(input.fetch, rest(url, "stations?select=slug&limit=200"), headers);
-    const failure = error ?? apiError(res?.body);
-    const rows = Array.isArray(res?.body) ? res.body.length : 0;
+  // 3 + 4. Station panel and ingest freshness.
+  //
+  // Row-level security hides every station and detection from the anon key,
+  // so reading the tables directly would always report an empty panel. The
+  // public_ingest_health() function (migration 0006) returns counts and
+  // timestamps only.
+  const { res: hRes, error: hError } = await attempt(input.fetch, rest(url, "rpc/public_ingest_health"), headers);
+  const hFailure = hError ?? apiError(hRes?.body);
+  const health = !hFailure && hRes?.body && typeof hRes.body === "object" && !Array.isArray(hRes.body)
+    ? (hRes.body as { stations?: number; monitored?: number; last_detection?: string | null })
+    : null;
+  const missingFn = !health && /PGRST202|42883|could not find the function|does not exist/i.test(hFailure ?? "");
+
+  if (!health) {
+    const fix = missingFn
+      ? "In Supabase → SQL Editor run supabase/migrations/0006_public_ingest_health.sql (or re-run supabase/setup.sql)."
+      : "Run the migrations in supabase/setup.sql, then reload this page.";
     checks.push(
-      failure
-        ? {
-            id: "stations",
-            label: "Station panel loaded",
-            state: "fail",
-            detail: `stations is not readable: ${failure}`,
-            fix: "Run migrations 0002 and 0003; they create and seed the station panel.",
-          }
-        : rows === 0
-          ? {
-              id: "stations",
-              label: "Station panel loaded",
-              state: "warn",
-              detail: "No stations in the panel yet — nothing will be monitored.",
-              fix: "Import supabase/seed/uganda_stream_stations.csv into the stations table (14 Ugandan stations, 7 ready to monitor).",
-            }
-          : {
-              id: "stations",
-              label: "Station panel loaded",
-              state: "ok",
-              detail: `${rows} station${rows === 1 ? "" : "s"} in the panel.`,
-            },
+      {
+        id: "stations",
+        label: "Station panel loaded",
+        state: "warn",
+        detail: missingFn ? "The health function is not installed yet, so the panel can't be counted." : `Health check failed: ${hFailure ?? "unexpected response"}`,
+        fix,
+      },
+      {
+        id: "ingest",
+        label: "Ingest worker reporting",
+        state: "warn",
+        detail: "Unknown until the health function answers.",
+        fix,
+      },
     );
+    return finish("live", url, now(), checks);
   }
 
-  // 4. Ingest freshness.
-  {
-    const { res, error } = await attempt(
-      input.fetch,
-      rest(url, "detections?select=detected_at&order=detected_at.desc&limit=1"),
-      headers,
-    );
-    const failure = error ?? apiError(res?.body);
-    const row = Array.isArray(res?.body) ? (res.body[0] as { detected_at?: string } | undefined) : undefined;
-    const at = row?.detected_at ? Date.parse(row.detected_at) : NaN;
-    const age = now().getTime() - at;
+  const rows = Number(health.stations) || 0;
+  const monitored = Number(health.monitored) || 0;
+  checks.push(
+    rows === 0
+      ? {
+          id: "stations",
+          label: "Station panel loaded",
+          state: "warn",
+          detail: "No stations in the panel yet — nothing will be monitored.",
+          fix: "Start the ingest worker: it registers every station in stations.csv on its first run.",
+        }
+      : {
+          id: "stations",
+          label: "Station panel loaded",
+          state: "ok",
+          detail: `${rows} station${rows === 1 ? "" : "s"} in the panel` + (monitored ? `, ${monitored} streaming.` : "."),
+        },
+  );
 
-    checks.push(
-      failure
+  const at = health.last_detection ? Date.parse(health.last_detection) : NaN;
+  const age = now().getTime() - at;
+  checks.push(
+    !Number.isFinite(at)
+      ? {
+          id: "ingest",
+          label: "Ingest worker reporting",
+          state: "warn",
+          detail: "No detections yet — the worker has not written anything.",
+          fix: "Start the ingest worker with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then enroll at least one master.",
+        }
+      : age <= staleAfter
         ? {
             id: "ingest",
             label: "Ingest worker reporting",
-            state: "warn",
-            detail: `detections is not readable with this key (${failure}). Sign in to a dashboard to inspect it.`,
+            state: "ok",
+            detail: `Last detection ${humanAge(age)}.`,
           }
-        : !row
-          ? {
-              id: "ingest",
-              label: "Ingest worker reporting",
-              state: "warn",
-              detail: "No detections yet — the worker has not written anything.",
-              fix: "Start the ingest worker with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then enroll at least one master.",
-            }
-          : age <= staleAfter
-            ? {
-                id: "ingest",
-                label: "Ingest worker reporting",
-                state: "ok",
-                detail: `Last detection ${humanAge(age)}.`,
-              }
-            : {
-                id: "ingest",
-                label: "Ingest worker reporting",
-                state: "warn",
-                detail: `Last detection ${humanAge(age)} — the worker looks stopped.`,
-                fix: "Check the worker host (Railway/Fly logs) and that stations.csv has enabled stations.",
-              },
-    );
-  }
+        : {
+            id: "ingest",
+            label: "Ingest worker reporting",
+            state: "warn",
+            detail: `Last detection ${humanAge(age)} — the worker looks stopped.`,
+            fix: "Check the worker host (Railway/Fly logs) and that stations.csv has enabled stations.",
+          },
+  );
 
   return finish("live", url, now(), checks);
 }

@@ -160,6 +160,12 @@ def main() -> int:
     expect("public_top_chart() works for anonymous visitors", got, q("select count(distinct recording_id) from detections where recording_id is not null and detected_at >= now() - interval '7 days'"))
     got, err = as_user(None, "select count(*) from public.top_chart(7, null, 100)")
     expect("top_chart() as anon returns nothing", got, "0")
+    got, _ = as_user(None, "select (public.public_ingest_health() ->> 'stations')")
+    expect("public_ingest_health() counts the panel for anonymous visitors", got, q("select count(*) from stations"))
+    got, _ = as_user(None, "select count(*) from stations")
+    expect("anonymous visitor still reads no station rows", got, "0")
+    got, _ = as_user(None, "select string_agg(k, ',' order by k) from json_object_keys(public.public_ingest_health()) k")
+    expect("public_ingest_health() returns counts and timestamps only", got, "last_detection,last_heartbeat,monitored,stations")
 
     print("\nWRITES that must be refused")
     rival_rec = q("select id from recordings where title = 'Rival Anthem'")

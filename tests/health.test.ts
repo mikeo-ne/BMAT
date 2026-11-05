@@ -29,8 +29,11 @@ const input = (routes: Route[], overrides: Partial<HealthInput> = {}): HealthInp
 const HEALTHY: Route[] = [
   { match: "/auth/v1/health", body: { name: "GoTrue", version: "2.1" } },
   { match: "profiles?select=id", body: [{ id: "u1" }] },
-  { match: "stations?select=slug", body: Array.from({ length: 14 }, (_, i) => ({ slug: `s${i}` })) },
-  { match: "detections?select=detected_at", body: [{ detected_at: "2026-11-04T11:58:00Z" }] },
+  { match: "rpc/public_ingest_health", body: { stations: 14, monitored: 7, last_heartbeat: "2026-11-04T11:59:00Z", last_detection: "2026-11-04T11:58:00Z" } },
+];
+const withDetection = (at: string | null): Route[] => [
+  ...HEALTHY.filter((r) => !r.match.includes("public_ingest_health")),
+  { match: "rpc/public_ingest_health", body: { stations: 14, monitored: 7, last_heartbeat: null, last_detection: at } },
 ];
 
 const byId = (r: Awaited<ReturnType<typeof buildReadiness>>, id: string) => r.checks.find((c) => c.id === id)!;
@@ -53,7 +56,7 @@ describe("buildReadiness", () => {
     expect(report.ready).toBe(true);
     expect(report.project).toBe("abcdefghijkl.supabase.co");
     expect(report.checks.filter((c) => c.state === "fail")).toHaveLength(0);
-    expect(byId(report, "stations").detail).toBe("14 stations in the panel.");
+    expect(byId(report, "stations").detail).toBe("14 stations in the panel, 7 streaming.");
     expect(byId(report, "ingest").detail).toMatch(/Last detection/);
   });
 
@@ -62,8 +65,7 @@ describe("buildReadiness", () => {
       input([
         { match: "/auth/v1/health", body: {} },
         { match: "profiles?select=id", status: 404, body: { message: "relation \"public.profiles\" does not exist", code: "42P01" } },
-        { match: "stations?select=slug", status: 404, body: { message: "relation does not exist", code: "42P01" } },
-        { match: "detections?select=detected_at", status: 404, body: { message: "relation does not exist", code: "42P01" } },
+        { match: "rpc/public_ingest_health", status: 404, body: { message: "Could not find the function public.public_ingest_health", code: "PGRST202" } },
       ]),
     );
     const schema = byId(report, "schema");
@@ -93,8 +95,7 @@ describe("buildReadiness", () => {
       input([
         { match: "/auth/v1/health", body: {} },
         { match: "profiles?select=id", body: [] },
-        { match: "stations?select=slug", body: [] },
-        { match: "detections?select=detected_at", body: [] },
+        { match: "rpc/public_ingest_health", body: { stations: 0, monitored: 0, last_heartbeat: null, last_detection: null } },
       ]),
     );
     expect(byId(report, "stations").state).toBe("warn");
@@ -104,17 +105,45 @@ describe("buildReadiness", () => {
 
   it("warns when detections stop arriving", async () => {
     const fresh = await buildReadiness(
-      input([...HEALTHY.filter((r) => !r.match.includes("detections")), { match: "detections", body: [{ detected_at: "2026-11-04T11:50:00Z" }] }]),
+      input(withDetection("2026-11-04T11:50:00Z")),
     );
     expect(byId(fresh, "ingest").state).toBe("ok");
     expect(byId(fresh, "ingest").detail).toBe("Last detection 10 minutes ago.");
 
     const stale = await buildReadiness(
-      input([...HEALTHY.filter((r) => !r.match.includes("detections")), { match: "detections", body: [{ detected_at: "2026-11-02T09:00:00Z" }] }]),
+      input(withDetection("2026-11-02T09:00:00Z")),
     );
     expect(byId(stale, "ingest").state).toBe("warn");
     expect(byId(stale, "ingest").detail).toContain("looks stopped");
     expect(stale.ready).toBe(true);
+  });
+
+  it("reads the panel through the health function, not the RLS-protected tables", async () => {
+    const seen: string[] = [];
+    const base = input(HEALTHY);
+    await buildReadiness({ ...base, fetch: (u, h) => { seen.push(u); return base.fetch(u, h); } });
+    expect(seen.some((u) => u.includes("rpc/public_ingest_health"))).toBe(true);
+    expect(seen.some((u) => /stations\?|detections\?/.test(u))).toBe(false);
+  });
+
+  it("tells the operator to install the health function when it is missing", async () => {
+    const report = await buildReadiness(
+      input([
+        ...HEALTHY.filter((r) => !r.match.includes("public_ingest_health")),
+        { match: "rpc/public_ingest_health", status: 404, body: { message: "Could not find the function public.public_ingest_health without parameters", code: "PGRST202" } },
+      ]),
+    );
+    for (const id of ["stations", "ingest"]) {
+      expect(byId(report, id).state).toBe("warn");
+      expect(byId(report, id).fix).toMatch(/0006_public_ingest_health\.sql/);
+    }
+    expect(report.ready).toBe(true);
+  });
+
+  it("warns, rather than claiming success, when no detection has ever arrived", async () => {
+    const report = await buildReadiness(input(withDetection(null)));
+    expect(byId(report, "ingest").state).toBe("warn");
+    expect(byId(report, "ingest").detail).toMatch(/No detections yet/);
   });
 
   it("flags a non-HTTPS project URL and a missing site URL", async () => {
@@ -158,7 +187,7 @@ describe("summarize", () => {
     expect(summarize(healthy)).toBe("Live and healthy.");
 
     const warn = await buildReadiness(
-      input([...HEALTHY.filter((r) => !r.match.includes("detections")), { match: "detections", body: [] }]),
+      input(withDetection(null)),
     );
     expect(summarize(warn)).toBe("Live, with 1 warning.");
 
