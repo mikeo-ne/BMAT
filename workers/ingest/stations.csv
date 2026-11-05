@@ -2,7 +2,7 @@ station,frequency,region,codec,bitrate_kbps,stream_host,homepage,directory_statu
 Capital FM,91.3,Central,MP3,128,capitalfm.cloudrad.io,http://capitalradio.co.ug/,OK,2026-11-04,https://radio.dubbeh.net/stations/capital-fm-913-fm-mp3-1617
 NRG Radio Uganda,106.5,Central,MP3,128,dc4.serverse.com,https://nrgug.radio,OK,2026-11-04,https://radio.dubbeh.net/stations/nrg-uganda-1065-2971
 Pearl FM,107.9,Central,MP3,64,https://dc4.serverse.com/proxy/pearlfm/stream,,OK,2026-11-04,https://radio.dubbeh.net/stations/107-9-pearl-fm-4470
-97 Radio City,97.0,Central,MP3,64,radioone.loftuganda.tech,https://radioone.loftuganda.tech,OK,2026-11-04,https://radio.dubbeh.net/stations/97-radio-city-9029
+97 Radio City,97.0,Central,MP3,128,https://cast1.asurahosting.com/proxy/richar16/stream,https://radiocity.ug,OK,2026-11-05,https://radio.dubbeh.net/stations/97-radio-city-9029
 Beat FM,96.3,Central,MP3,128,5230.cloudrad.io,https://www.facebook.com/BeatFama/,OK (stale),2026-10-11,https://radio.dubbeh.net/stations/beat-fm-96-3-1373
 Akaboozi FM,87.9,Central,MP3,64,162.244.80.52,https://www.akaboozi.com/,OK (stale),2026-10-11,https://radio.dubbeh.net/stations/akaboozi-fm-87-9-296
 Sanyu FM,88.2,Central,AAC,48,s44.myradiostream.com,http://sanyufm.com/,OK (stale),2026-10-12,https://radio.dubbeh.net/stations/sanyu-fm-3635
