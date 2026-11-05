@@ -85,4 +85,4 @@ All of them run in GitHub Actions on every push.
 
 ## Stream ingest worker
 
-`workers/ingest/` monitors station streams, recognises songs from the enrolled catalogue and writes detections + 10-second evidence clips into Supabase. Run migration `0002_stream_ingest.sql` after `0001`. See `workers/ingest/README.md`.
+`workers/ingest/` monitors station streams, recognises songs from the enrolled catalogue and writes detections + 10-second evidence clips into Supabase. With `EST_MENTIONS=1` it also transcribes on-air talk and reports tracked brands being mentioned (reviewed by the CMO). Run migration `0002_stream_ingest.sql` after `0001`. See `workers/ingest/README.md`.

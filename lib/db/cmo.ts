@@ -4,6 +4,7 @@
 import * as demo from "@/lib/data/cmo";
 import { safeArray } from "@/lib/safe";
 import { db, must } from "./core";
+import type { Mention, MentionStatus, TrackedBrand } from "@/lib/mentions";
 
 export type WorkStatus = "Registered" | "Pending" | "Conflict";
 export type Work = { id: string; title: string; artist: string; owner: string; isrc: string; status: WorkStatus };
@@ -134,4 +135,90 @@ export async function resolveUnmatched(id: string, recordingId: string | null): 
     resolved_by: u.user?.id ?? null,
     resolved_at: new Date().toISOString(),
   }).eq("id", Number(id)).select("id"), "update clip");
+}
+
+// ── Brand mentions (spoken on air) ──────────────────────────────────────────
+
+export type MentionsData = { mentions: Mention[]; brands: TrackedBrand[] };
+
+let demoBrands: TrackedBrand[] | null = null;
+let demoMentions: Mention[] | null = null;
+function demoMentionStore() {
+  demoBrands ??= [
+    { id: "b1", brand: "MTN", terms: ["mtn", "m t n"], aliases: ["mt and"], active: true },
+    { id: "b2", brand: "Airtel", terms: ["airtel", "air tel"], aliases: [], active: true },
+    { id: "b3", brand: "Stanbic Bank", terms: ["stanbic", "stanbic bank"], aliases: [], active: true },
+    { id: "b4", brand: "Nile Special", terms: ["nile special"], aliases: [], active: true },
+  ];
+  demoMentions ??= [
+    { id: "m1", station: "Capital FM", brand: "MTN", heard: "mtn", transcript: "This hour is brought to you by MTN Uganda, everywhere you go.", heardAt: new Date(Date.now() - 36e5).toISOString(), score: 100, status: "unreviewed", evidencePath: null },
+    { id: "m2", station: "CBS FM", brand: "Stanbic Bank", heard: "stambic bank", transcript: "And remember, Stambic Bank, Uganda, it can be.", heardAt: new Date(Date.now() - 72e5).toISOString(), score: 86, status: "unreviewed", evidencePath: null },
+    { id: "m3", station: "Capital FM", brand: "Airtel", heard: "airtel", transcript: "Airtel gives you more data this weekend.", heardAt: new Date(Date.now() - 108e5).toISOString(), score: 100, status: "confirmed", evidencePath: null },
+  ];
+  return { brands: demoBrands, mentions: demoMentions };
+}
+
+export async function loadMentions(days = 7): Promise<MentionsData> {
+  const sb = db();
+  if (!sb) {
+    const st = demoMentionStore();
+    return { brands: st.brands.map((b) => ({ ...b })), mentions: st.mentions.map((m) => ({ ...m })) };
+  }
+  const since = new Date(Date.now() - days * 864e5).toISOString();
+  const [ms, ks] = await Promise.all([
+    sb.from("mentions").select("id, brand, heard, transcript, heard_at, score, status, evidence_path, stations(name)")
+      .gte("heard_at", since).order("heard_at", { ascending: false }).limit(500),
+    sb.from("tracked_keywords").select("id, brand, terms, aliases, active").order("brand"),
+  ]);
+  type Row = { id: number; brand: string; heard: string; transcript: string; heard_at: string; score: number | null; status: MentionStatus; evidence_path: string | null; stations: { name: string } | { name: string }[] | null };
+  return {
+    mentions: safeArray(must(ms, "mentions") as Row[]).map((m) => ({
+      id: String(m.id), station: (Array.isArray(m.stations) ? m.stations[0]?.name : m.stations?.name) ?? "—",
+      brand: m.brand, heard: m.heard, transcript: m.transcript, heardAt: m.heard_at, score: Number(m.score ?? 0),
+      status: m.status, evidencePath: m.evidence_path,
+    })),
+    brands: safeArray(must(ks, "tracked brands") as TrackedBrand[]).map((b) => ({ ...b, terms: safeArray(b.terms), aliases: safeArray(b.aliases) })),
+  };
+}
+
+export async function reviewMention(id: string, status: MentionStatus, learn?: { brandId: string; alias: string; aliases: string[] }): Promise<void> {
+  const sb = db();
+  if (!sb) {
+    const st = demoMentionStore();
+    const m = st.mentions.find((x) => x.id === id);
+    if (m) m.status = status;
+    const b = learn && st.brands.find((x) => x.id === learn.brandId);
+    if (b && learn && !b.aliases.includes(learn.alias)) b.aliases.push(learn.alias);
+    return;
+  }
+  const { data: u } = await sb.auth.getUser();
+  must(await sb.from("mentions").update({ status, reviewed_by: u.user?.id ?? null, reviewed_at: new Date().toISOString() }).eq("id", Number(id)).select("id"), "review mention");
+  if (learn && !learn.aliases.includes(learn.alias)) {
+    must(await sb.from("tracked_keywords").update({ aliases: [...learn.aliases, learn.alias].slice(-50) }).eq("id", learn.brandId).select("id"), "learn alias");
+  }
+}
+
+export async function addTrackedBrand(brand: string, terms: string[]): Promise<void> {
+  const name = brand.trim();
+  if (!name || !terms.length) throw new Error("Give the brand a name and at least one way it is said.");
+  const sb = db();
+  if (!sb) {
+    const st = demoMentionStore();
+    if (st.brands.some((b) => b.brand.toLowerCase() === name.toLowerCase())) throw new Error(`${name} is already tracked.`);
+    st.brands.push({ id: `demo-${Date.now()}`, brand: name, terms, aliases: [], active: true });
+    return;
+  }
+  const res = await sb.from("tracked_keywords").insert({ brand: name, terms }).select("id");
+  if (res.error?.code === "23505") throw new Error(`${name} is already tracked.`);
+  must(res, "add brand");
+}
+
+export async function setBrandActive(id: string, active: boolean): Promise<void> {
+  const sb = db();
+  if (!sb) {
+    const b = demoMentionStore().brands.find((x) => x.id === id);
+    if (b) b.active = active;
+    return;
+  }
+  must(await sb.from("tracked_keywords").update({ active }).eq("id", id).select("id"), "update brand");
 }

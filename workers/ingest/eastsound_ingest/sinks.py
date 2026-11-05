@@ -20,9 +20,15 @@ from typing import Any
 from .audio import encode_mp3
 from .config import Settings, Station
 from .detector import Detection, Unmatched
+from .mentions import Keyword, KeywordSet
+from .scanner import Mention
 
 log = logging.getLogger(__name__)
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+
+
+def _slug(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:40] or "brand"
 
 
 def _iso(t: dt.datetime) -> str:
@@ -33,6 +39,7 @@ class Sink:
     def detection(self, d: Detection) -> None: ...
     def unmatched(self, u: Unmatched) -> None: ...
     def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None) -> None: ...
+    def mention(self, m: Mention) -> None: ...
     def close(self) -> None: ...
 
 
@@ -62,6 +69,14 @@ class JsonlSink(Sink):
         clip = self.dir / "evidence" / f"unmatched-{u.station.slug}-{u.heard_at:%Y%m%dT%H%M%S}.mp3"
         clip.write_bytes(encode_mp3(u.audio))
         self._write("unmatched.jsonl", {"station": u.station.slug, "heard_at": _iso(u.heard_at), "rms": round(u.rms, 3), "evidence": str(clip)})
+
+    def mention(self, m: Mention) -> None:
+        clip = self.dir / "evidence" / f"mention-{m.station.slug}-{m.heard_at:%Y%m%dT%H%M%S}-{_slug(m.brand)}.mp3"
+        clip.write_bytes(encode_mp3(m.audio))
+        self._write("mentions.jsonl", {
+            "station": m.station.slug, "heard_at": _iso(m.heard_at), "brand": m.brand, "heard": m.heard,
+            "score": m.score, "transcript": m.transcript, "evidence": str(clip),
+        })
 
     def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None) -> None:
         self._write("heartbeats.jsonl", {"station": st.slug, "at": _iso(dt.datetime.now(dt.timezone.utc)), "status": status, "now_playing": now_playing})
@@ -117,6 +132,23 @@ class SupabaseSink(Sink):
         sid = self._station_id(u.station)
         path = self._upload(f"unmatched/{u.station.slug}/{u.heard_at:%Y/%m/%d/%H%M%S}.mp3", encode_mp3(u.audio))
         self._rest("POST", "unmatched_clips", [{"station_id": sid, "heard_at": _iso(u.heard_at), "evidence_path": path, "rms": round(u.rms, 3)}])
+
+    def mention(self, m: Mention) -> None:
+        sid = self._station_id(m.station)
+        path = self._upload(f"mentions/{m.station.slug}/{m.heard_at:%Y/%m/%d/%H%M%S}-{_slug(m.brand)}.mp3", encode_mp3(m.audio))
+        self._rest("POST", "mentions", [{
+            "station_id": sid, "keyword_id": m.keyword_id if m.keyword_id and UUID_RE.match(m.keyword_id) else None,
+            "brand": m.brand, "heard_at": _iso(m.heard_at), "heard": m.heard[:200], "transcript": m.transcript[:1000],
+            "score": m.score, "evidence_path": path,
+        }])
+
+    def load_keywords(self) -> KeywordSet:
+        """Active brands from tracked_keywords (edited by the CMO in the dashboard)."""
+        raw = self._req("GET", "/rest/v1/tracked_keywords?select=id,brand,terms,aliases&active=eq.true", None,
+                        {"Accept": "application/json"})
+        rows = json.loads(raw or b"[]")
+        return KeywordSet([Keyword(r["brand"], tuple(r.get("terms") or [r["brand"]]), tuple(r.get("aliases") or []), r["id"])
+                           for r in rows if r.get("brand")])
 
     def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None) -> None:
         sid = self._station_id(st, stream_url)
@@ -248,6 +280,7 @@ class AsyncSink(Sink):
 
     def detection(self, d: Detection) -> None: self._put("detection", d)
     def unmatched(self, u: Unmatched) -> None: self._put("unmatched", u)
+    def mention(self, m: Mention) -> None: self._put("mention", m)
     def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None) -> None:
         self._put("heartbeat", st, status, now_playing, stream_url)
 

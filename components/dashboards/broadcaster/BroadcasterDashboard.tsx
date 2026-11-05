@@ -17,6 +17,7 @@ import { DEMO_MODE } from "@/lib/auth-context";
 import { cx, safeArray } from "@/lib/safe";
 import { Badge, DataTable, LoadGate, Section, StatGrid } from "@/components/dashboard/ui";
 import { EvidencePlayer } from "@/components/site/EvidencePlayer";
+import { StationMentions } from "./StationMentions";
 
 const KIND: Record<SegmentKind, { bar: string; label: string }> = {
   music: { bar: "bg-emerald-400", label: "Music" },
@@ -201,6 +202,7 @@ function BroadcasterView({ d, date, setDate, loading, freshness }: { d: Broadcas
       <Timeline segments={d.segments} />
       <CueSheet data={d} />
       <AdControl ads={d.ads} />
+      <StationMentions />
     </>
   );
 }
