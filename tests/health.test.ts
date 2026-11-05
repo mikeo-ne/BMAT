@@ -143,7 +143,14 @@ describe("buildReadiness", () => {
   it("warns, rather than claiming success, when no detection has ever arrived", async () => {
     const report = await buildReadiness(input(withDetection(null)));
     expect(byId(report, "ingest").state).toBe("warn");
-    expect(byId(report, "ingest").detail).toMatch(/No detections yet/);
+    expect(byId(report, "ingest").detail).toMatch(/listening to 7 stations; no plays recorded yet/);
+    expect(byId(report, "ingest").fix).toMatch(/Upload songs/);
+    const idle = await buildReadiness(input([
+      ...HEALTHY.filter((r) => !r.match.includes("public_ingest_health")),
+      { match: "rpc/public_ingest_health", body: { stations: 14, monitored: 0, last_heartbeat: null, last_detection: null } },
+    ]));
+    expect(byId(idle, "ingest").detail).toMatch(/No detections yet/);
+    expect(byId(idle, "ingest").fix).toMatch(/Start the ingest worker/);
   });
 
   it("flags a non-HTTPS project URL and a missing site URL", async () => {

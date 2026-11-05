@@ -31,6 +31,18 @@ type AuthCtx = {
 };
 
 const Ctx = createContext<AuthCtx | null>(null);
+
+/** Supabase Auth's messages, in words a label or artist can act on. */
+export function friendlyAuthError(message: string | undefined, during: "signin" | "signup"): string {
+  const m = (message ?? "").toLowerCase();
+  if (/already (been )?registered|already exists/.test(m)) return "This email already has an account. Choose “Sign in” instead (or reset your password).";
+  if (/invalid login credentials/.test(m)) return "Wrong email or password. Check both, or use “Forgot password?”.";
+  if (/email not confirmed/.test(m)) return "Confirm your email first — open the link we sent you, then sign in.";
+  if (/rate limit|too many/.test(m)) return "Too many attempts. Wait a few minutes and try again.";
+  if (/password should be|weak password/.test(m)) return "Choose a stronger password: at least 8 characters, not a common one.";
+  if (/failed to fetch|network/.test(m)) return "Can't reach the server. Check your connection and try again.";
+  return message || (during === "signin" ? "Sign-in failed." : "Sign-up failed.");
+}
 const DEMO_KEY = "est_demo_session";
 
 function writeDemoCookie(role: Role | null) {
@@ -124,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: true };
     }
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    if (error || !data.user) return { ok: false, error: error?.message ?? "Sign-in failed." };
+    if (error || !data.user) return { ok: false, error: friendlyAuthError(error?.message, "signin") };
     const { role: registered, name } = await loadProfileRole(data.user.id);
     if (!registered) {
       await sb.auth.signOut();
@@ -152,7 +164,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: { emailRedirectTo: redirect, data: { requested_role: role, display_name: displayName } },
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: friendlyAuthError(error.message, "signup") };
+    // Supabase hides "already registered" when email confirmation is on: it returns a user with no identities.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      return { ok: false, error: friendlyAuthError("already registered", "signup") };
+    }
     if (!data.session) return { ok: true, message: "Check your inbox to confirm your email, then sign in." };
     return { ok: true, message: role === "cmo" ? "CMO accounts are activated after verification by East Sound." : undefined };
   }, [signIn]);

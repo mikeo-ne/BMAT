@@ -27,6 +27,7 @@ describe("supabase/setup.sql", () => {
       "0006_public_ingest_health.sql",
       "0007_brand_mentions.sql",
       "0008_masters_upload.sql",
+      "0009_public_stats_honest.sql",
     ]);
     const positions = MIGRATIONS.map(([file]: [string, string]) => sql.indexOf(file));
     expect(positions.every((p: number) => p > -1)).toBe(true);

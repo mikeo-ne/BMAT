@@ -19,6 +19,7 @@ export const MIGRATIONS = [
   ["0006_public_ingest_health.sql", "Public ingest health: station count and last detection for /setup"],
   ["0007_brand_mentions.sql", "Brand mentions: tracked brands, spoken mentions, review"],
   ["0008_masters_upload.sql", "Masters: upload songs with details; artists upload their own; security fixes"],
+  ["0009_public_stats_honest.sql", "Homepage counts only stations that reported recently; permission tidy"],
 ];
 
 const BANNER = (n, name, note) => [

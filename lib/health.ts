@@ -291,8 +291,12 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
           id: "ingest",
           label: "Ingest worker reporting",
           state: "warn",
-          detail: "No detections yet — the worker has not written anything.",
-          fix: "Start the ingest worker with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then enroll at least one master.",
+          detail: monitored > 0
+            ? `The worker is listening to ${monitored} station${monitored === 1 ? "" : "s"}; no plays recorded yet.`
+            : "No detections yet — the worker has not written anything.",
+          fix: monitored > 0
+            ? "Upload songs (label: Upload Songs · artist: My Songs). Plays appear once a monitored station plays one."
+            : "Start the ingest worker with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then upload at least one song.",
         }
       : age <= staleAfter
         ? {
