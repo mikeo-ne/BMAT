@@ -26,7 +26,7 @@ export const ROLE_META: Record<Role, { label: string; useCase: string; path: str
     label: "Independent Artist",
     useCase: "For Artists",
     path: "/dashboard/artist",
-    blurb: "Your discography, spin velocity and split summary.",
+    blurb: "Upload your songs, then track plays, spin velocity and splits.",
   },
   broadcaster: {
     label: "Broadcaster",
@@ -58,13 +58,14 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
   label: [
     { id: "overview", label: "Overview" },
     { id: "roster", label: "Artist Roster" },
-    { id: "dropzone", label: "Batch Master Dropzone" },
-    { id: "catalogue", label: "ISRC / UPC Catalogue" },
+    { id: "dropzone", label: "Upload Songs" },
+    { id: "catalogue", label: "Catalogue" },
     { id: "revenue", label: "Label Revenue" },
     { id: "alerts", label: "WhatsApp Alerts" },
   ],
   artist: [
     { id: "overview", label: "Overview" },
+    { id: "songs", label: "My Songs" },
     { id: "discography", label: "Discography" },
     { id: "velocity", label: "Spin Velocity" },
     { id: "splits", label: "Split Summary" },

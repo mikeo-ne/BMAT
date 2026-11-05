@@ -37,7 +37,9 @@ $$;
 create table if not exists storage.buckets (
   id text primary key,
   name text not null,
-  public boolean not null default false
+  public boolean not null default false,
+  file_size_limit bigint,
+  allowed_mime_types text[]
 );
 create table if not exists storage.objects (
   id uuid primary key default gen_random_uuid(),
@@ -49,6 +51,7 @@ alter table storage.objects enable row level security;
 grant usage on schema public, auth, storage to anon, authenticated, service_role;
 grant execute on all functions in schema auth to anon, authenticated, service_role;
 grant select on storage.objects, storage.buckets to authenticated, anon;
+grant insert, update, delete on storage.objects to authenticated, anon;  -- as on Supabase; RLS decides
 grant all on storage.objects, storage.buckets to service_role;
 
 -- Supabase grants table access to the API roles by default; RLS decides rows.

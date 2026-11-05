@@ -7,18 +7,19 @@ import { useAuth } from "@/lib/auth-context";
 import { cx, fmtInt, fmtUGX, safeArray } from "@/lib/safe";
 import { Badge, DataTable, LineChart, LoadGate, Section, StatGrid } from "@/components/dashboard/ui";
 import { WhatsAppAlerts } from "@/components/dashboard/WhatsAppAlerts";
+import { SongCatalogue, SongUploader } from "@/components/dashboard/Songs";
 
 export function ArtistDashboard() {
   const { session } = useAuth();
   const state = useLoad(loadArtist);
   return (
     <LoadGate state={state}>
-      {(d) => <ArtistView d={d} name={session?.displayName} scope={`artist_${session?.userId ?? "anon"}`} />}
+      {(d) => <ArtistView d={d} name={session?.displayName} scope={`artist_${session?.userId ?? "anon"}`} reload={state.reload} />}
     </LoadGate>
   );
 }
 
-function ArtistView({ d, name, scope }: { d: Awaited<ReturnType<typeof loadArtist>>; name?: string; scope: string }) {
+function ArtistView({ d, name, scope, reload }: { d: Awaited<ReturnType<typeof loadArtist>>; name?: string; scope: string; reload: () => void }) {
   const byWork = useMemo(() => {
     const m = new Map<string, { party: string; share: number }[]>();
     for (const s of safeArray(d.splits)) m.set(s.work, [...(m.get(s.work) ?? []), { party: s.party, share: s.share }]);
@@ -40,6 +41,19 @@ function ArtistView({ d, name, scope }: { d: Awaited<ReturnType<typeof loadArtis
           { label: "Royalties (estimated)", value: fmtUGX(d.stats.estRoyaltyUgx), hint: "This month, before CMO distribution" },
         ]} />
       </section>
+
+      <Section id="songs" title="My Songs">
+        <SongUploader owner={{ kind: "artist", userId: d.userId }} defaultArtist={name || undefined} existing={d.songs} onSaved={reload} />
+        <div className="mt-6">
+          <SongCatalogue songs={d.songs} lockArtist={Boolean(name)} onChanged={reload}
+            empty="No songs yet — upload your first one above and fill in its details." />
+        </div>
+        {d.labelSongs > 0 && (
+          <p className="mt-3 text-xs text-slate-500">
+            {d.labelSongs} song{d.labelSongs > 1 ? "s were" : " was"} released through your label — your label manages {d.labelSongs > 1 ? "their" : "its"} details.
+          </p>
+        )}
+      </Section>
 
       <Section id="discography" title="Discography">
         <DataTable<Track> rows={d.discography} rowKey={(r) => r.id} empty="No recordings linked to your account yet."

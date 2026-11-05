@@ -46,6 +46,20 @@ Run it on any always-on Linux server (a $10–40/month VPS handles dozens of
 stations). **Not** Vercel — it's a long-running process, not a web request.
 The service-role key stays on this server only; never put it in the website.
 
+## Songs uploaded in the dashboards
+
+Labels (Upload Songs) and independent artists (My Songs) upload songs with their
+details. The browser stores a small mono 11 kHz reference copy in the private
+`masters` bucket; on Supabase, `run` checks every 2 minutes for songs that have
+a reference but aren't learned yet, adds them to the index under their
+recording id, and marks them **Recognisable on air** — or shows a plain error
+next to the song (too short, unreadable, missing). Replacing the audio re-learns
+the song. To learn pending uploads straight away:
+
+```bash
+python -m eastsound_ingest sync-masters
+```
+
 ## Stations
 
 `stations.csv` is a byte-identical copy of the panel of record,

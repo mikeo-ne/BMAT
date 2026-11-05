@@ -25,6 +25,7 @@ from .audio import decode_file
 from .config import Station, load_settings, slugify
 from .fingerprint import SAMPLE_RATE, landmarks
 from .index import FingerprintIndex
+from .masters import MasterSource, MasterSync, enroll_pending
 from .monitor import StationMonitor
 from .sinks import AsyncSink, EastSoundPlayoutSink, JsonlSink, Sink, SupabaseSink
 
@@ -222,6 +223,10 @@ def cmd_run(a, s) -> None:
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     signal.signal(signal.SIGINT, lambda *_: stop.set())
     pool, keywords = _mention_setup(sink) if mentions_enabled() else (None, None)
+    if s.sink_mode == "supabase":
+        # Songs uploaded in the dashboards are learned automatically.
+        MasterSync(MasterSource(s.supabase_url, s.supabase_service_key), idx, stop).start()
+        logging.info("watching for songs uploaded in the dashboards (every 2 minutes)")
     mons = [StationMonitor(st, idx, sink, s, stop, scanner=_scanner(st, pool, keywords, sink)) for st in s.stations]
     for m in mons:
         m.start()
@@ -235,6 +240,18 @@ def cmd_run(a, s) -> None:
     for m in mons:
         m.join(timeout=10)
     sink.close()
+
+
+def cmd_sync_masters(a, s) -> None:
+    """Learn every song uploaded in the dashboards right now (`run` also does this every 2 minutes)."""
+    import datetime as dt
+
+    if s.sink_mode != "supabase":
+        sys.exit("sync-masters needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
+    idx = FingerprintIndex(s.index_path)
+    ok, failed = enroll_pending(MasterSource(s.supabase_url, s.supabase_service_key), idx,
+                                lambda: dt.datetime.now(dt.timezone.utc).isoformat())
+    print(f"{ok} learned, {failed} failed · {len(idx.tracks)} recordings in index")
 
 
 def cmd_resolve(a, s) -> None:
@@ -257,6 +274,7 @@ def main() -> None:
     tc.add_argument("file"); tc.add_argument("--keywords", help="keywords.csv (default: database or bundled list)")
     sc.add_argument("--started-at", help="ISO time the recording began, e.g. 2026-11-04T08:00:00+03:00")
     sub.add_parser("run")
+    sub.add_parser("sync-masters", help="learn songs uploaded in the dashboards now")
     sub.add_parser("doctor")
     r = sub.add_parser("resolve"); r.add_argument("name")
     a = p.parse_args()
@@ -267,7 +285,7 @@ def main() -> None:
         sys.exit(doctor.main(s))
     {"enroll": cmd_enroll, "enroll-dir": cmd_enroll_dir, "enroll-list": cmd_enroll_list,
      "identify": cmd_identify, "scan": cmd_scan,
-     "run": cmd_run, "resolve": cmd_resolve, "transcribe": cmd_transcribe}[a.cmd](a, s)
+     "run": cmd_run, "resolve": cmd_resolve, "sync-masters": cmd_sync_masters, "transcribe": cmd_transcribe}[a.cmd](a, s)
 
 
 if __name__ == "__main__":

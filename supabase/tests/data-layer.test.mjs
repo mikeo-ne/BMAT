@@ -57,7 +57,7 @@ export function getSupabaseBrowser() {
   return c;
 }`);
 const entry = join(dir, "entry.ts");
-writeFileSync(entry, ["cmo", "label", "artist", "broadcaster", "venue", "shared"].map((m) => `export * as ${m} from "@/lib/db/${m}";`).join("\n"));
+writeFileSync(entry, ["cmo", "label", "artist", "broadcaster", "venue", "shared", "masters"].map((m) => `export * as ${m} from "@/lib/db/${m}";`).join("\n"));
 const out = join(dir, "bundle.mjs");
 await build({
   entryPoints: [entry], bundle: true, platform: "node", format: "esm", outfile: out, logLevel: "error",
@@ -111,6 +111,26 @@ let hacked = false;
 try { await M.label.saveCodes(sql("select id from recordings where title = 'Rival Anthem'"), "UG-HAK-26-00001", ""); hacked = sql("select isrc from recordings where title = 'Rival Anthem'") === "UG-HAK-26-00001"; } catch { /* refused */ }
 check("cannot edit a rival label's recording through the app", !hacked);
 
+// Upload flow (details part; the audio goes to Storage, covered by the RLS suite)
+const D = (o) => ({ title: "", artistName: "", artistId: null, featuring: "", producer: "", composer: "", publisher: "", genre: "", isrc: "", upc: "", releaseDate: "", ...o });
+const nalu = lab.roster.find((a) => a.name === "Nalu Akello");
+const newId = await M.masters.createSong({ kind: "label", orgId: lab.orgId }, D({ title: "Upload Test", artistName: nalu.name, artistId: nalu.id, producer: "Prod X", genre: "Afrobeat", isrc: "ugabc2600123", releaseDate: "2026-12-01" }));
+check("label creates a song with its details", sql(`select title || '|' || artist_name || '|' || producer || '|' || isrc || '|' || (artist_id is not null) from recordings where id = '${newId}'`) === "Upload Test|Nalu Akello|Prod X|UG-ABC-26-00123|true");
+const lab3 = await M.label.loadLabel();
+const up = lab3.catalogue.find((c) => c.id === newId);
+check("the new song shows in the catalogue with its details", up?.producer === "Prod X" && up?.genre === "Afrobeat" && up.masterPath === null);
+check("…and counts toward the artist's tracks", lab3.roster.find((a) => a.id === nalu.id).tracks === nalu.tracks + 1);
+await M.masters.updateSong(newId, { ...up, featuring: "Guest", composer: "N. Akello" });
+check("editing a song's details is saved", sql(`select featuring || '|' || composer from recordings where id = '${newId}'`) === "Guest|N. Akello");
+let dupMsg = "";
+try { await M.masters.createSong({ kind: "label", orgId: lab.orgId }, D({ title: "Dup", artistName: "X", isrc: "UG-ABC-26-00123" })); } catch (e) { dupMsg = e.message; }
+check("a duplicate ISRC is refused with a clear message", /already registered/.test(dupMsg), dupMsg);
+let fkMsg = "";
+try { await M.masters.deleteSong({ id: sql("select id from recordings where title = 'Kampala Nights'"), masterPath: null }); } catch (e) { fkMsg = e.message; }
+check("a song with airplay history can't be deleted (clear message)", /airplay history/.test(fkMsg), fkMsg);
+await M.masters.deleteSong({ id: newId, masterPath: null });
+check("deleting a new song works", sql(`select count(*) from recordings where id = '${newId}'`) === "0");
+
 // ---------------------------------------------------------------- Artist
 console.log("\nArtist dashboard (live)");
 as("artist@demo.eastsound.ug");
@@ -126,6 +146,15 @@ check("WhatsApp alert settings save and reload (number normalised)", prefs?.phon
 let badPhone = false;
 try { await M.shared.saveAlertPrefs({ phone: "12345", events: {} }); } catch { badPhone = true; }
 check("invalid phone number is rejected with a clear message", badPhone);
+check("artist sees their own songs as editable", art.songs.length === 2 && art.labelSongs === 0 && art.userId === uid("artist@demo.eastsound.ug"));
+const mySong = await M.masters.createSong({ kind: "artist", userId: art.userId }, D({ title: "Self Release", artistName: "Lamaro Grace", composer: "G. Lamaro" }));
+check("artist uploads their own song", sql(`select artist_profile_id = '${art.userId}' and label_org_id is null from recordings where id = '${mySong}'`) === "t");
+const art2 = await M.artist.loadArtist();
+check("…and it appears in My Songs and the discography", art2.songs.some((x) => x.id === mySong) && art2.discography.some((t) => t.id === mySong));
+let stole = "";
+try { await M.masters.updateSong(sql("select id from recordings where title = 'Kampala Nights'"), D({ title: "Mine now", artistName: "Lamaro Grace" })); } catch (e) { stole = e.message; }
+check("artist can't edit a label's song through the app", /isn't allowed/.test(stole) && sql("select count(*) from recordings where title = 'Mine now'") === "0", stole);
+await M.masters.deleteSong({ id: mySong, masterPath: null });
 
 // ---------------------------------------------------------------- Broadcaster
 console.log("\nBroadcaster dashboard (live)");

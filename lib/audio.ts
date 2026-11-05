@@ -179,7 +179,10 @@ export type Fingerprint = {
  * broadcast matching (noise, EQ, pitch shift) is done server-side.
  */
 export async function fingerprintFile(audio: AudioContext, file: File): Promise<Fingerprint> {
-  const buf = await audio.decodeAudioData(await file.arrayBuffer());
+  return fingerprintBuffer(await audio.decodeAudioData(await file.arrayBuffer()));
+}
+
+async function fingerprintBuffer(buf: AudioBuffer): Promise<Fingerprint> {
   const data = buf.getChannelData(0);
   const limit = Math.min(data.length, buf.sampleRate * 60);
   const frame = 4096;
@@ -225,4 +228,49 @@ export async function fingerprintFile(audio: AudioContext, file: File): Promise<
     sampleRate: buf.sampleRate,
     envelope: env.map((v) => v / max),
   };
+}
+
+/** Sample rate the ingest worker fingerprints at (see workers/ingest). */
+export const REFERENCE_RATE = 11025;
+/** Longest reference kept: 15 min of 16-bit mono at 11 kHz ≈ 20 MB (bucket limit 25 MB). */
+export const REFERENCE_MAX_SEC = 15 * 60;
+
+export type Reference = Fingerprint & { wav: Blob; truncated: boolean };
+
+/**
+ * Decode a master once and produce both the browser fingerprint (for duplicate
+ * checks) and a small mono 11 kHz WAV "reference copy" for the ingest worker.
+ * The reference is all the worker needs to recognise the song on air, and at a
+ * few MB per song it uploads quickly on mobile data. The full-quality master
+ * never leaves the user's device.
+ */
+export async function makeReference(audio: AudioContext, file: File): Promise<Reference> {
+  const buf = await audio.decodeAudioData(await file.arrayBuffer());
+  const fp = await fingerprintBuffer(buf);
+  const seconds = Math.min(buf.duration, REFERENCE_MAX_SEC);
+  const frames = Math.max(1, Math.ceil(seconds * REFERENCE_RATE));
+  const Offline = (globalThis as { OfflineAudioContext?: typeof OfflineAudioContext }).OfflineAudioContext;
+  if (!Offline) throw new Error("This browser can't prepare audio for upload.");
+  const off = new Offline(1, frames, REFERENCE_RATE);
+  const src = off.createBufferSource();
+  src.buffer = buf; // OfflineAudioContext down-mixes to mono and resamples
+  src.connect(off.destination);
+  src.start();
+  const rendered = await off.startRendering();
+  return { ...fp, wav: encodeWav16(rendered.getChannelData(0), REFERENCE_RATE), truncated: buf.duration > REFERENCE_MAX_SEC };
+}
+
+/** 16-bit PCM mono WAV. */
+export function encodeWav16(samples: Float32Array, rate: number): Blob {
+  const out = new DataView(new ArrayBuffer(44 + samples.length * 2));
+  const str = (o: number, t: string) => { for (let i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
+  str(0, "RIFF"); out.setUint32(4, 36 + samples.length * 2, true); str(8, "WAVE");
+  str(12, "fmt "); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+  out.setUint32(24, rate, true); out.setUint32(28, rate * 2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true);
+  str(36, "data"); out.setUint32(40, samples.length * 2, true);
+  for (let i = 0; i < samples.length; i++) {
+    const v = Math.max(-1, Math.min(1, samples[i] || 0));
+    out.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true);
+  }
+  return new Blob([out.buffer], { type: "audio/wav" });
 }
