@@ -7,9 +7,24 @@ Beat FM,96.3,Central,MP3,128,5230.cloudrad.io,https://www.facebook.com/BeatFama/
 Akaboozi FM,87.9,Central,MP3,64,162.244.80.52,https://www.akaboozi.com/,OK (stale),2026-10-11,https://radio.dubbeh.net/stations/akaboozi-fm-87-9-296
 Sanyu FM,88.2,Central,AAC,48,s44.myradiostream.com,http://sanyufm.com/,OK (stale),2026-10-12,https://radio.dubbeh.net/stations/sanyu-fm-3635
 CBS FM Buganda,88.8,Central,,,,http://cbsfm.ug,listed - stream URL not yet captured,,https://tunein.com/radio/CBS-888-FM-s7477
-KIIS Uganda,100.9,Central,MP3,,,,listed - not yet checked,,https://radio.dubbeh.net/stations/kiis-100-9-kampala-100-9-fm-553437
-Radio Maria Uganda,101.8,Central,MP3,,,,listed - not yet checked,,https://radio.dubbeh.net/stations/radio-maria-uganda-1058
-Christ FM,91.6,Central,MP3,,,,listed - not yet checked,,https://radio.dubbeh.net/stations/91-6-christ-fm-1613
+KIIS Uganda,100.9,Central,MP3,128,http://14867.cloudrad.io:9224/live,http://www.kiis1009.co.ug/,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/f9249ee5-c1f1-4f5d-a363-7323801a6f2a
+Radio Maria Uganda,101.8,Central,MP3,48,http://dreamsiteradiocp.com:8052/stream,,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/a0f396d3-6b01-4875-a504-b3a68ca05cce
+Christ FM,91.6,Central,MP3,128,http://5.135.154.69:15664/;,https://www.holycityentebbe.org/page/916-christ-fm,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/971b5ae7-1474-4c4b-841a-fce8fcfe43d9
 Radio Buddu,98.8,Central (Masaka),MP3,,,,listed - not yet checked,,https://radio.dubbeh.net/stations/98-8-radio-buddu-576501
-RX Radio,,Central,MP3,,,,listed - not yet checked,,https://radio.dubbeh.net/stations/rx-radio-5436
-Bugwere FM,,Eastern,,,,,listed - not yet checked,,https://radio.dubbeh.net/stations/bugwere-fm-48105
+RX Radio,,Central,MP3,128,https://c14.radioboss.fm:18223/stream,https://rxradio.ug,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/b488abb8-5597-4831-9681-2614e1f2904c
+Bugwere FM,,Eastern,MP3,96,https://stream.zeno.fm/jddn0e0z9f0uv,,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/dd80c893-fd09-4e6c-963c-64b4dadcc8a6
+Next Radio,106.1,Central,MP3,128,https://stream.zeno.fm/lbca7zintcnuv,https://nextradio.co.ug/,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/56d2d8d9-292b-470e-adfc-eea69932917b
+XFM,94.8,Central,MP3,128,https://stream.hydeinnovations.com:2020/stream/xfm/stream,http://xfm.co.ug/,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/8cd5841e-d908-4f5a-a16a-1f2c55d5b13b
+Bukedde FM,100.5,Central,MP3,128,https://stream.hydeinnovations.com:2020/stream/bukeddefm/stream,https://bukedde.co.ug/,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/4306ef39-c900-4189-a0e0-4c46ec606c73
+Galaxy FM,100.2,Central,MP3,128,https://stream.zeno.fm/ahtmyttw5mftv,https://galaxyfm.co.ug/,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/056d990a-7b48-4e95-b91e-ce59ca2701e8
+KFM,93.3,Central,MP3,128,http://radio.kfm.co.ug:8000/stream,https://kfm.co.ug/,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/24431da2-cb1f-4838-a3f6-fd206f59af12
+Radio Simba,97.3,Central,MP3,96,https://radiosimba-atunwadigital.streamguys1.com/radiosimba,,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/1af1c327-1872-462a-8b7b-d5aea5700e43
+Radio Ssese,101.9,Central (Kalangala),MP3,128,https://stream.zeno.fm/bphnslpg8p1uv,,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/4e6767da-05d0-4bde-8bde-b35014182be1
+Voice of Kyankwanzi,89.7,Central (Kiboga),MP3,128,https://stream.zeno.fm/eyzf4ddwqcmvv,,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/ab375f36-01fe-4c00-87cb-6e92316d1265
+Busoga One FM,90.6,Eastern (Jinja),MP3,112,https://stream.zeno.fm/xna2aad7gc9uv,,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/4cd715fe-82f8-4a6e-81a2-669d15981863
+Kyoga Veritas Radio,91.5,Eastern (Soroti),MP3,128,https://stream.zeno.fm/hyyzuphrsg0uv,,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/82b790e8-678a-4d74-b1a3-067e0e01ac65
+Open Gate FM,103.2,Eastern (Mbale),MP3,128,https://139.162.195.139:8010/radio.mp3,,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/7985c041-95a9-4e81-9f49-12ec8004582c
+Crooze FM,91.2,Western (Mbarara),MP3,128,https://stream.zeno.fm/vyxwdk08apxtv,https://croozefm.com/,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/801b0097-38b9-4247-a1cb-052d1cf737dd
+Jubilee Radio,105.6,Western (Fort Portal),MP3,128,https://stream.zeno.fm/f3y3up2k07zuv,,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/817318e5-0042-4603-b997-f155185ac011
+Radio Pacis,90.9,Northern (Arua),MP3,64,https://radiopacisuganda.radioca.st/stream,https://radiopacis.org/,OK,2026-11-05,https://de1.api.radio-browser.info/json/stations/byuuid/f5894eb9-7648-433f-bff1-26730c266301
+Radio One,90.0,Central,MP3,,,https://radioonefm90.com/,listed - stream not yet confirmed,,https://radio.dubbeh.net/stations/radio-one-fm-90-kampala-900-fm-mp3-9030
