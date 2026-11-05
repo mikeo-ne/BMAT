@@ -6,7 +6,7 @@ Two engines, chosen with EST_ASR_ENGINE:
   on the CPU. Models download once from the sherpa-onnx GitHub releases and are
   checked against pinned SHA-256 hashes. Measured on 2 CPU cores:
   base.en (default) ≈ 9× real time; small.en ≈ 2.5× real time and more accurate —
-  use it when the worker has ~4 cores for 7 stations.
+  use it when the worker has ~4 cores per 7 stations.
 * ``faster-whisper`` — any CTranslate2 Whisper model, e.g.
   ``Sunbird/faster-whisper-51-african-languages`` (Whisper large-v3 fine-tuned
   by Sunbird AI for 51 African languages including Luganda; use

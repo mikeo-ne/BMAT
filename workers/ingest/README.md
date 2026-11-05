@@ -49,7 +49,7 @@ The service-role key stays on this server only; never put it in the website.
 ## Stations
 
 `stations.csv` is a byte-identical copy of the panel of record,
-`supabase/seed/uganda_stream_stations.csv` — the same 14 stations the platform
+`supabase/seed/uganda_stream_stations.csv` — the same 29 stations the platform
 publishes. **Edit the seed, then copy it here** (or CI will fail the panel
 drift check):
 
@@ -65,8 +65,8 @@ The loader understands that panel's schema directly:
 | `directory_status` | `OK` / `OK (stale)` → station is monitored. `listed …` → known station, no captured stream yet, so it stays idle. An explicit `enabled` column, if present, overrides this. |
 | `region` | Parenthetical notes collapse to the reporting region (`Central (Masaka)` → `Central`). |
 
-Seven stations are monitored today; the other seven are listed but idle until
-their stream is captured. A legacy `stations.csv` with `stream_url` and
+26 stations across all four regions are monitored today; three (CBS FM, Radio
+Buddu, Radio One) are listed but idle until a stream we trust is captured. A legacy `stations.csv` with `stream_url` and
 `enabled` columns still loads, so existing deployments keep working.
 
 ```bash
@@ -109,7 +109,7 @@ live reads, presenter shout-outs, sponsor credits.
   a song (`enroll ad.mp3 --title "Bell Lager 30s" --artist "Advert"`); every airing then
   matches exactly. Speech recognition is for words a presenter says.
 - Talk is cut into 15 s pieces (2 s overlap) and transcribed with Whisper (`base.en` by
-  default; `small.en` is more accurate but needs ~4 CPU cores for 7 stations), downloaded once from the sherpa-onnx GitHub releases and checked against a
+  default; `small.en` is more accurate but needs ~4 CPU cores per 7 stations), downloaded once from the sherpa-onnx GitHub releases and checked against a
   pinned SHA-256). Brand names are matched by spelling **and** sound, because
   recognisers spell local names unpredictably ("Stanbic" → "Stambic", "Rwenzori" → "our wensory").
 - Brands come from the dashboard (**CMO → Brand Mentions**, table `tracked_keywords`,

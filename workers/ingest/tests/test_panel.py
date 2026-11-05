@@ -33,10 +33,18 @@ EXPECTED = [
     "Capital FM", "NRG Radio Uganda", "Pearl FM", "97 Radio City", "Beat FM",
     "Akaboozi FM", "Sanyu FM", "CBS FM Buganda", "KIIS Uganda",
     "Radio Maria Uganda", "Christ FM", "Radio Buddu", "RX Radio", "Bugwere FM",
+    # added 2026-11-05 — each stream played audio when checked
+    "Next Radio", "XFM", "Bukedde FM", "Galaxy FM", "KFM", "Radio Simba",
+    "Radio Ssese", "Voice of Kyankwanzi", "Busoga One FM", "Kyoga Veritas Radio",
+    "Open Gate FM", "Crooze FM", "Jubilee Radio", "Radio Pacis", "Radio One",
 ]
 EXPECTED_ENABLED = {
     "Capital FM", "NRG Radio Uganda", "Pearl FM", "97 Radio City",
     "Beat FM", "Akaboozi FM", "Sanyu FM",
+    "KIIS Uganda", "Radio Maria Uganda", "Christ FM", "RX Radio", "Bugwere FM",
+    "Next Radio", "XFM", "Bukedde FM", "Galaxy FM", "KFM", "Radio Simba",
+    "Radio Ssese", "Voice of Kyankwanzi", "Busoga One FM", "Kyoga Veritas Radio",
+    "Open Gate FM", "Crooze FM", "Jubilee Radio", "Radio Pacis",
 }
 
 checks = 0
@@ -84,6 +92,11 @@ def main() -> int:
     check(
         any(s.region == "Eastern" for s in stations),
         "a non-Central region is represented (panel is no longer Kampala-only)",
+    )
+    monitored_regions = {s.region for s in stations if s.enabled}
+    check(
+        {"Central", "Eastern", "Western", "Northern"} <= monitored_regions,
+        f"all four reporting regions have a monitored station ({sorted(monitored_regions)})",
     )
 
     # 4. Enable rules ------------------------------------------------------
