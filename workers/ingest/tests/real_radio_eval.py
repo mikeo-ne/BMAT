@@ -114,13 +114,16 @@ def main() -> int:
                 mix = np.concatenate([host[: at * SR], y, host[at * SR + y.size: at * SR + y.size + 120 * SR]])
                 ds = run(pkg, cat, mix, f"mix{i}")
                 hit = [d for d in ds if d[0] == title and abs(d[1] - at) <= 10]
+                # The host's own minutes 1–4 are catalogued too, so that play is expected.
+                own = [d for d in ds if d[0] == f"{names[(i + 1) % len(names)]}-song" and abs(d[1] - 60) <= 10]
+                other = [d for d in ds if d not in hit and d not in own]
                 found += bool(hit)
                 missed += not hit
-                spurious += len([d for d in ds if d not in hit])
-                print(f"     {title:18} {'found' if hit else 'MISSED'} {hit[0][1:] if hit else ''}  others: {[d for d in ds if d not in hit]}")
-            print(f"3. REAL PLAYS: {found}/{len(songs)} found, {spurious} other reports\n")
+                spurious += len(other)
+                print(f"     {title:18} {'found' if hit else 'MISSED'} {hit[0][1:] if hit else ''}  unexpected: {other}")
+            print(f"3. REAL PLAYS: {found}/{len(songs)} found, {spurious} unexpected reports\n")
             if pkg == "eastsound_ingest":
-                fails += missed
+                fails += missed + spurious
     print("PASS" if not fails else f"FAIL ({fails})")
     return 1 if fails else 0
 
