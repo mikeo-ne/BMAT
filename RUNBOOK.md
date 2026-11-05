@@ -42,17 +42,15 @@ does not change, so the website keeps working.
 1. <https://railway.app> → **New Project → Deploy from GitHub repo** → pick
    `mikeo-ne/BMAT`.
 2. Open the service → **Settings**:
-   - **Source → Branch**: `arena/c89d940d-bmat`
+   - **Source → Branch**: `main`
    - **Source → Root Directory**: `workers/ingest`  ← most common mistake
 3. **Variables → Raw Editor**, paste (filling in your key):
 
    ```
    SUPABASE_URL=https://vewkhidaajdrfkedeavs.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=paste-your-key-here
-   EST_INDEX_PATH=/data/fingerprints.db
-   EST_OUT_DIR=/data/out
    ```
-4. **Variables → Volumes → Add volume**, mount path `/data`, size 3 GB.
+4. **Volumes → Add volume**, mount path `/app/data`, size 3 GB.
 5. Deploy. The build takes ~2 minutes (it installs ffmpeg).
 
 <details>
@@ -134,12 +132,12 @@ DJ Ssem - Sunset Taxi.flac
 3. In the worker shell, write a manifest — one URL per line, `#` for comments:
 
    ```bash
-   cat > /data/masters.txt <<'EOF'
+   cat > /app/data/masters.txt <<'EOF'
    # masters, one per line
    https://vewkhidaajdrfkedeavs.supabase.co/storage/v1/object/public/masters-inbox/Jovan%20-%20Kampala%20Nights.wav
    https://vewkhidaajdrfkedeavs.supabase.co/storage/v1/object/public/masters-inbox/Ama%20-%20Nile%20Breeze.mp3
    EOF
-   python -m eastsound_ingest enroll-list /data/masters.txt
+   python -m eastsound_ingest enroll-list /app/data/masters.txt
    ```
 
    A bad link is reported and skipped; the batch keeps going. Re-running the
@@ -151,10 +149,10 @@ DJ Ssem - Sunset Taxi.flac
 ### Option 2 — copy the files onto the volume
 
 ```bash
-mkdir -p /data/masters
-# Fly:  fly sftp shell   →  put /local/path/"Jovan - Kampala Nights.wav" /data/masters/
+mkdir -p /app/data/masters
+# Fly:  fly sftp shell   →  put /local/path/"Jovan - Kampala Nights.wav" /app/data/masters/
 # Railway: railway ssh, then paste-base64 the files, or use Option 1
-python -m eastsound_ingest enroll-dir /data/masters
+python -m eastsound_ingest enroll-dir /app/data/masters
 ```
 
 ### Checkpoint
@@ -266,7 +264,8 @@ and the same screen lists the last alerts with "Sent by WhatsApp", "Queued" or
 | Symptom | Cause / fix |
 | --- | --- |
 | Railway build fails on `COPY stations.csv` | Root Directory not set to `workers/ingest` |
-| Worker logs `Permission denied: /data/fingerprints.db` | Volume not mounted at `/data` (or mounted at `/app/data`) |
+| Worker logs `Permission denied: …/fingerprints.db` | Volume not mounted at `/app/data` |
+| Railway build fails on `VOLUME` | Old Dockerfile — pull the latest `main` |
 | `doctor` says `! Fingerprint index empty` forever | Step 2 not done, or enrolled into a different `EST_INDEX_PATH` |
 | Chart empty on production | No detections yet — check the worker log for `detected` lines, then `doctor` |
 | `/api/cron/alerts` returns 503 | `CRON_SECRET` missing in Vercel (the endpoint refuses to run unauthenticated) |
