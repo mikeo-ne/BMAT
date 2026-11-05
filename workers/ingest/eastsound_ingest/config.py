@@ -26,7 +26,7 @@ class Settings:
     window_sec: float = 10.0  # audio analysed per check
     step_sec: float = 4.0  # how often each station is checked
     confirm_hits: int = 4  # windows on the song's own timeline before a play counts
-    end_gap_sec: float = 16.0  # no match for this long closes a detection
+    end_gap_sec: float = 32.0  # no consistent match for this long closes a play (talk-over, weak patches)
     min_detection_sec: float = 30.0  # confirmed air time; jingles/stings/coincidences are shorter
     unmatched_every_sec: float = 600.0  # at most one unmatched sample per station per 10 min
     supabase_url: str = ""
