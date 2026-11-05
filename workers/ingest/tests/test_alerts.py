@@ -57,14 +57,14 @@ def main() -> int:
     ghost = Pending("a3", "deleted", "firstspin", "First play", "x", None, 0)
     box = FakeOutbox([play, daily, ghost], {"artist": "nalu@example.com", "label": "pyong@example.com"})
     sent: list[tuple] = []
-    s = drain(box, lambda to, subj, text, html: sent.append((to, subj, text, html)), "https://bmat-rho.vercel.app")
+    s = drain(box, lambda to, subj, text, html: sent.append((to, subj, text, html)), "https://eastsound.vercel.app")
 
     print("\nDELIVERY")
     check(s.sent == 2 and s.skipped == 1 and s.failed == 0, f"2 emailed, 1 skipped ({s})")
     check([x[0] for x in sent] == ["nalu@example.com", "pyong@example.com"], "each alert goes to its owner's address")
     check(box.result["a3"] == ("skipped", "this account has no email address"), "an account without email is skipped with a reason")
     check(sent[0][1] == "Played on KFM 93.3: My Way", "subject is the alert title")
-    check("https://bmat-rho.vercel.app/dashboard/artist" in sent[0][2] and 'href="https://bmat-rho.vercel.app/dashboard/artist"' in sent[0][3],
+    check("https://eastsound.vercel.app/dashboard/artist" in sent[0][2] and 'href="https://eastsound.vercel.app/dashboard/artist"' in sent[0][3],
           "text and HTML link to the right dashboard")
     check("<br>• My Way — 3 plays" in sent[1][3], "the daily summary keeps its line breaks in HTML")
 

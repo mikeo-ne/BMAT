@@ -43,7 +43,7 @@ class Settings:
     brevo_api_key: str = ""
     alert_from_email: str = ""
     alert_from_name: str = "East Sound"
-    site_url: str = "https://bmat-rho.vercel.app"
+    site_url: str = "https://eastsound.vercel.app"
     stations: list[Station] = field(default_factory=list)
 
     @property
@@ -140,7 +140,7 @@ def load_settings(stations_path: str | None) -> Settings:
         brevo_api_key=os.getenv("BREVO_API_KEY", "").strip(),
         alert_from_email=os.getenv("ALERT_FROM_EMAIL", "").strip(),
         alert_from_name=os.getenv("ALERT_FROM_NAME", "East Sound").strip() or "East Sound",
-        site_url=os.getenv("SITE_URL", "https://bmat-rho.vercel.app").strip().rstrip("/"),
+        site_url=os.getenv("SITE_URL", "https://eastsound.vercel.app").strip().rstrip("/"),
     )
     for k in ("window_sec", "step_sec", "end_gap_sec", "min_detection_sec", "unmatched_every_sec"):
         v = os.getenv(f"EST_{k.upper()}")

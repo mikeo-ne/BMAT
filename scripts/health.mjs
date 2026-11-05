@@ -3,7 +3,7 @@
  * Ask a deployment how wired-up it is.
  *
  *   node scripts/health.mjs                          # localhost:3000
- *   node scripts/health.mjs https://bmat-rho.vercel.app
+ *   node scripts/health.mjs https://eastsound.vercel.app
  *   NEXT_PUBLIC_SITE_URL=... npm run health
  *
  * Exits 0 only when every blocking check passes, so CI or a cron can use it.

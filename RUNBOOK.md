@@ -10,7 +10,7 @@ verifiable.
 | Thing | Value |
 | --- | --- |
 | Supabase project | `vewkhidaajdrfkedeavs` → `https://vewkhidaajdrfkedeavs.supabase.co` |
-| Production site | `https://bmat-rho.vercel.app` |
+| Production site | `https://eastsound.vercel.app` |
 | Vercel project | `eastsound` (team `mike-1-ne`) |
 | GitHub repo / branch | `mikeo-ne/BMAT`, branch `arena/c89d940d-bmat` (PR #22) |
 
@@ -206,7 +206,7 @@ testing and not fine for real clients.
 5. **Turn confirmation back on**: Authentication → **Sign In / Providers →
    Email → Confirm email: ON** (it is currently off so you could sign in
    during setup).
-6. Confirm **Site URL** is `https://bmat-rho.vercel.app` (or your domain) under
+6. Confirm **Site URL** is `https://eastsound.vercel.app` (or your domain) under
    Authentication → URL Configuration.
 
 👉 Tell me when the test email arrives; I'll re-run the sign-up → confirm →
@@ -235,12 +235,12 @@ The sender is built and tested; it stays silent until it has credentials.
    variables.
 4. **Tell the scheduler where to knock:** GitHub → repo → Settings → Secrets and
    variables → Actions → new secrets `CRON_URL`
-   (`https://bmat-rho.vercel.app/api/cron/alerts`) and `CRON_SECRET` (same
+   (`https://eastsound.vercel.app/api/cron/alerts`) and `CRON_SECRET` (same
    string). The included workflow then sweeps every 15 minutes.
 5. **Prove it:**
 
    ```bash
-   curl -fsS "https://bmat-rho.vercel.app/api/cron/alerts?limit=1" \
+   curl -fsS "https://eastsound.vercel.app/api/cron/alerts?limit=1" \
      -H "Authorization: Bearer $CRON_SECRET"
    ```
 
