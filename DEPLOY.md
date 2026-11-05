@@ -71,7 +71,7 @@ Both hosts mount volumes as **root**, so the image starts with a tiny entrypoint
 
 1. railway.app → **New Project → Deploy from GitHub repo** → pick this repo.
 2. Set **Root Directory** to `workers/ingest`. `railway.json` supplies the Dockerfile and the start command.
-3. **Variables:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (Supabase → Project Settings → API). Add `EST_INDEX_PATH=/data/fingerprints.db` and `EST_OUT_DIR=/data/out`.
+3. **Variables:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (Supabase → Project Settings → API). Add a volume mounted at `/app/data` (the image already points its index and output there).
 4. Attach a **Volume** mounted at `/data` so the fingerprint index and any dry-run clips survive restarts.
 5. Run the pre-flight check before letting it loose on the streams:
 
