@@ -15,7 +15,7 @@ type Route = { match: string; status?: number; body?: unknown; throws?: string }
 const input = (routes: Route[], overrides: Partial<HealthInput> = {}): HealthInput => ({
   supabaseUrl: URL_,
   anonKey: KEY,
-  siteUrl: "https://bmat-rho.vercel.app",
+  siteUrl: "https://eastsound.vercel.app",
   now: () => NOW,
   fetch: async (url): Promise<FetchResult> => {
     const route = routes.find((r) => url.includes(r.match));

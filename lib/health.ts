@@ -153,7 +153,7 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
           label: "Public site URL set",
           state: "warn",
           detail: "NEXT_PUBLIC_SITE_URL is empty, so recovery links fall back to the request origin.",
-          fix: "Add NEXT_PUBLIC_SITE_URL (e.g. https://bmat-rho.vercel.app) and match it to Supabase → Authentication → URL Configuration.",
+          fix: "Add NEXT_PUBLIC_SITE_URL (e.g. https://eastsound.vercel.app) and match it to Supabase → Authentication → URL Configuration.",
         }
       : isHttps(siteUrl)
         ? { id: "site-url", label: "Public site URL set", state: "ok", detail: siteUrl }
