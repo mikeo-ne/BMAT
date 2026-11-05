@@ -10,7 +10,7 @@ export const LANGS = [
 ] as const;
 export type Lang = (typeof LANGS)[number]["code"];
 
-// NOTE: Luganda & Kiswahili strings are first drafts — have a native speaker review before launch.
+// Luganda & Kiswahili: reviewed 5 Nov 2026 for meaning and grammar; a native speaker should still sign off before launch.
 const DICT = {
   en: {
     solutions: "Solutions",
@@ -38,12 +38,12 @@ const DICT = {
     live: "Emikutu 32 n'ebifo 150+ biri ku mpewo",
     liveTpl: "Emikutu {s} n'ebifo {v} biri ku mpewo",
     liveStationsTpl: "Emikutu {s} biri ku mpewo",
-    heroTitle: "Buli luyimba, buli mukutu, buli shilingi kibalibwa.",
+    heroTitle: "Buli luyimba, buli mukutu, buli shilingi — byonna bibalibwa.",
     heroSub:
-      "East Sound ewuliriza leediyo mu Uganda essaawa zonna, n'ekakasa nnannyini nnyimba okusasulwa. TV n'ebifo by'okusanyukiramu bijja mangu.",
-    ctaCharts: "Laba Ebipimo",
-    ctaUseCase: "Londa Ekikozesebwa",
-    chartTitle: "Ennyimba 10 Ezisinga ku Leediyo",
+      "East Sound ewuliriza leediyo mu Uganda essaawa 24, n'ezuula nnannyini buli luyimba olukubiddwa, n'ekakasa nti bannannyini nnyimba basasulwa nga balina obujulizi. Okuwuliriza TV n'ebifo by'okusanyukiramu kujja mangu.",
+    ctaCharts: "Laba Ennyimba Ezisinga",
+    ctaUseCase: "Londa Ekikukwatako",
+    chartTitle: "Ennyimba 10 Ezisinga ku Leediyo mu Ggwanga",
     allRegions: "Uganda Yonna",
   },
   sw: {
@@ -52,15 +52,15 @@ const DICT = {
     blog: "Blogu",
     signIn: "Ingia",
     dashboard: "Dashibodi yangu",
-    live: "Vituo 32 na Kumbi 150+ Hai",
-    liveTpl: "Vituo {s} na Kumbi {v} Hai",
-    liveStationsTpl: "Vituo {s} Hai",
+    live: "Vituo 32 na Kumbi 150+ Hewani",
+    liveTpl: "Vituo {s} na Kumbi {v} Hewani",
+    liveStationsTpl: "Vituo {s} Vinafuatiliwa Moja kwa Moja",
     heroTitle: "Kila wimbo. Kila kituo. Kila shilingi inahesabiwa.",
     heroSub:
-      "East Sound hufuatilia redio za Uganda saa zote, na kugeuza kila uchezaji kuwa mrabaha wenye ushahidi. Ufuatiliaji wa TV na kumbi unakuja hivi karibuni.",
-    ctaCharts: "Tazama Chati Hai",
+      "East Sound hufuatilia redio za Uganda saa 24, hulinganisha kila wimbo unaochezwa na mmiliki wake, na kugeuza uchezaji kuwa mrabaha wenye ushahidi. Ufuatiliaji wa TV na kumbi unakuja hivi karibuni.",
+    ctaCharts: "Tazama Chati za Moja kwa Moja",
     ctaUseCase: "Chagua Matumizi",
-    chartTitle: "Nyimbo 10 Bora Redioni",
+    chartTitle: "Nyimbo 10 Bora Redioni Kitaifa",
     allRegions: "Uganda Yote",
   },
 } as const;

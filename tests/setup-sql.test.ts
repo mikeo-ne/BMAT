@@ -29,6 +29,7 @@ describe("supabase/setup.sql", () => {
       "0008_masters_upload.sql",
       "0009_public_stats_honest.sql",
       "0010_airplay_alerts.sql",
+      "0011_upc_check.sql",
     ]);
     const positions = MIGRATIONS.map(([file]: [string, string]) => sql.indexOf(file));
     expect(positions.every((p: number) => p > -1)).toBe(true);

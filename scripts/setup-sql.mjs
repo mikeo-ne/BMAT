@@ -21,6 +21,7 @@ export const MIGRATIONS = [
   ["0008_masters_upload.sql", "Masters: upload songs with details; artists upload their own; security fixes"],
   ["0009_public_stats_honest.sql", "Homepage counts only stations that reported recently; permission tidy"],
   ["0010_airplay_alerts.sql", "Airplay alerts: every play, daily summary, settings fix"],
+  ["0011_upc_check.sql", "Upload form: warn when a UPC is already used by another artist"],
 ];
 
 const BANNER = (n, name, note) => [
