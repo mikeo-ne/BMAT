@@ -280,6 +280,41 @@ def main() -> int:
         expect(f"reference files visible to {who}", got, want)
     expect("masters bucket is private", q("select public::text from storage.buckets where id = 'masters'"), "false")
 
+    print("\nAIRPLAY ALERTS — who is told, and the settings are obeyed")
+    gulu = q("select id from recordings where title = 'Gulu Gold'")
+    owner = q(f"select artist_profile_id from recordings where id = '{gulu}'")
+    new_st = q("insert into stations (name, frequency, region) values ('Alert Test FM', '99.9', 'Central') returning id")
+    def run_alerts(events: str) -> str:
+        psql(f"delete from alert_outbox; insert into alert_prefs (profile_id, events) values ('{owner}', '{events}') "
+             f"on conflict (profile_id) do update set events = excluded.events")
+        psql("select public.enqueue_alerts(now() - interval '1 hour')")
+        return q(f"select coalesce(string_agg(kind || ':' || title, ' | ' order by kind), '') from alert_outbox where profile_id = '{owner}' and title like '%Alert Test FM%'")
+    psql(f"insert into detections (recording_id, station_id, detected_at, ended_at, duration_sec, confidence, source) "
+         f"values ('{gulu}', '{new_st}', now() - interval '5 minutes', now() - interval '2 minutes', 185, 90, 'stream')")
+    got = run_alerts("{}")
+    expect("defaults: first play on a new station is announced", "firstspin" if got.startswith("firstspin:First play on Alert Test FM") else got, "firstspin")
+    expect("defaults: no every-play message", str("play:" in got), "False")
+    expect("switching first-play alerts off is obeyed (firstSpin key)", run_alerts('{"firstSpin": false}'), "")
+    got = run_alerts('{"everyPlay": true}')
+    expect("every-play on: one play message, replacing the first-play one", got.split(":")[0] if got.count("|") == 0 else got, "play")
+    expect("…which names the station and says it's a first play", str("Alert Test FM" in got and "first play" in q("select body from alert_outbox where kind = 'play' and title like '%Alert Test FM%'")), "True")
+    psql("select public.enqueue_alerts(now() - interval '1 hour')")
+    expect("running the sender again queues nothing twice", q(f"select count(*) from alert_outbox where profile_id = '{owner}' and title like '%Alert Test FM%'"), "1")
+    psql(f"insert into detections (recording_id, station_id, detected_at, ended_at, duration_sec, confidence, source) "
+         f"select '{gulu}', '{new_st}', ((now() at time zone 'Africa/Kampala')::date - 1 + time '10:00') at time zone 'Africa/Kampala' + n * interval '1 hour', "
+         f"((now() at time zone 'Africa/Kampala')::date - 1 + time '10:03') at time zone 'Africa/Kampala' + n * interval '1 hour', 180, 90, 'stream' from generate_series(0, 2) n")
+    psql("delete from alert_outbox")
+    psql("select public.enqueue_daily_alerts()")
+    body = q(f"select body from alert_outbox where kind = 'daily' and profile_id = '{owner}'")
+    expect("daily summary counts yesterday's plays", str(body.startswith("Yesterday your music was played") and "Alert Test FM 3" in body and "• Gulu Gold — " in body), "True")
+    psql("select public.enqueue_daily_alerts()")
+    expect("daily summary is sent once per day", q(f"select count(*) from alert_outbox where kind = 'daily' and profile_id = '{owner}'"), "1")
+    out, err = as_user(None, "select public.enqueue_daily_alerts()")
+    expect_refused("anonymous visitor enqueues the daily summary", err)
+    out, err = as_user(users["artist"], "select public.enqueue_daily_alerts()")
+    expect_refused("signed-in user enqueues the daily summary", err)
+    psql(f"delete from alert_outbox; delete from detections where station_id = '{new_st}'; delete from stations where id = '{new_st}'; delete from alert_prefs where profile_id = '{owner}'")
+
     print("\nHARDENING")
     got, _ = as_user(None, "select streams_online from public.public_platform_stats()")
     want = q("select count(*) from stations where stream_status = 'online' and last_heartbeat > now() - interval '10 minutes'")

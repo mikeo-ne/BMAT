@@ -61,7 +61,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { id: "dropzone", label: "Upload Songs" },
     { id: "catalogue", label: "Catalogue" },
     { id: "revenue", label: "Label Revenue" },
-    { id: "alerts", label: "WhatsApp Alerts" },
+    { id: "alerts", label: "Airplay Alerts" },
   ],
   artist: [
     { id: "overview", label: "Overview" },
@@ -69,7 +69,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { id: "discography", label: "Discography" },
     { id: "velocity", label: "Spin Velocity" },
     { id: "splits", label: "Split Summary" },
-    { id: "alerts", label: "WhatsApp Alerts" },
+    { id: "alerts", label: "Airplay Alerts" },
   ],
   broadcaster: [
     { id: "overview", label: "Overview" },

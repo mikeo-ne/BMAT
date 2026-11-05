@@ -58,6 +58,7 @@ jobs:
       - run: python -m tests.test_enroll_list
       - run: python -m tests.test_mentions
       - run: python -m tests.test_masters
+      - run: python -m tests.test_alerts
 
   worker-image:
     name: Ingest worker — Docker build

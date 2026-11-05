@@ -39,6 +39,11 @@ class Settings:
     evidence_dir: str = ""
     evidence_public_base: str = ""  # HTTPS base URL that serves evidence_dir
     send_unmatched: bool = False
+    # Airplay alerts by email (Brevo). Off until both are set.
+    brevo_api_key: str = ""
+    alert_from_email: str = ""
+    alert_from_name: str = "East Sound"
+    site_url: str = "https://bmat-rho.vercel.app"
     stations: list[Station] = field(default_factory=list)
 
     @property
@@ -48,6 +53,10 @@ class Settings:
         if self.supabase_url and self.supabase_service_key:
             return "supabase"
         return "dry-run"
+
+    @property
+    def alerts_on(self) -> bool:
+        return bool(self.brevo_api_key and self.alert_from_email and self.supabase_url and self.supabase_service_key)
 
     @property
     def dry_run(self) -> bool:
@@ -128,6 +137,10 @@ def load_settings(stations_path: str | None) -> Settings:
         evidence_dir=os.getenv("EST_EVIDENCE_DIR", ""),
         evidence_public_base=os.getenv("EST_EVIDENCE_PUBLIC_BASE", ""),
         send_unmatched=os.getenv("EST_SEND_UNMATCHED", "").lower() in ("1", "true", "yes"),
+        brevo_api_key=os.getenv("BREVO_API_KEY", "").strip(),
+        alert_from_email=os.getenv("ALERT_FROM_EMAIL", "").strip(),
+        alert_from_name=os.getenv("ALERT_FROM_NAME", "East Sound").strip() or "East Sound",
+        site_url=os.getenv("SITE_URL", "https://bmat-rho.vercel.app").strip().rstrip("/"),
     )
     for k in ("window_sec", "step_sec", "end_gap_sec", "min_detection_sec", "unmatched_every_sec"):
         v = os.getenv(f"EST_{k.upper()}")
