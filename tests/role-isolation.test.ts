@@ -34,8 +34,9 @@ describe("role data isolation", () => {
       expect(imports.length, `${file} imports no role data module`).toBeGreaterThan(0);
       for (const imported of imports) {
         const [kind, name] = imported.split("/");
-        // core/shared/live are role-agnostic plumbing, not tenant data.
-        const shared = kind === "db" && ["core", "shared", "live"].includes(name);
+        // core/shared/live are role-agnostic plumbing, not tenant data; masters
+        // (song upload) is shared by label and artist, and RLS decides ownership.
+        const shared = kind === "db" && ["core", "shared", "live", "masters"].includes(name);
         expect(shared || name === role, `${file} must not import ${imported}`).toBe(true);
       }
     }
@@ -45,8 +46,14 @@ describe("role data isolation", () => {
     const source = readFileSync(join(ROOT, "lib", "db", `${role}.ts`), "utf8");
     for (const imported of roleLibImports(source)) {
       const name = imported.split("/")[1];
-      expect(["core", "shared", "live", role], `lib/db/${role}.ts must not import ${imported}`).toContain(name);
+      expect(["core", "shared", "live", "masters", role], `lib/db/${role}.ts must not import ${imported}`).toContain(name);
     }
+  });
+
+  it("the shared song module never imports a role's fetchers", () => {
+    const source = readFileSync(join(ROOT, "lib", "db", "masters.ts"), "utf8");
+    expect(roleLibImports(source)).toEqual([]);
+    expect([...source.matchAll(/from\s+"(\.[^"]+)"/g)].map((m) => m[1])).toEqual(["./core"]);
   });
 
   it("keeps the public chart free of tenant-only fields", () => {
