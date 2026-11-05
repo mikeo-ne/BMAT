@@ -15,7 +15,10 @@ import numpy as np
 from .fingerprint import Landmarks, frames_to_seconds
 
 MIN_ALIGNED = 18  # hashes that must agree on one offset to count as a match
-MIN_MARGIN = 2.0  # best score must be this many times the runner-up
+MIN_MARGIN = 2.0  # best score must be this many times the background
+# Chance agreement grows with the number of hashes compared, so long/dense
+# windows need proportionally more agreeing hashes (fraction of the query).
+MIN_RATIO = 0.012
 
 
 @dataclass
@@ -34,6 +37,7 @@ class Match:
     score: int  # aligned hashes
     query_hashes: int
     track_offset_sec: float  # where in the master the query window starts
+    background: int = 0  # best chance alignment seen (other offsets / other songs)
 
     @property
     def confidence(self) -> float:
@@ -41,7 +45,8 @@ class Match:
         A heuristic for ranking evidence, not a calibrated probability."""
         import math
 
-        return round(min(99.9, 50 + 50 * (1 - math.exp(-(self.score - MIN_ALIGNED) / 15))), 1)
+        bar = max(MIN_ALIGNED, MIN_MARGIN * max(self.background, 1))
+        return round(min(99.9, 50 + 50 * (1 - math.exp(-max(0.0, self.score - bar) / 15))), 1)
 
 
 class FingerprintIndex:
@@ -128,11 +133,15 @@ class FingerprintIndex:
                 best_per_track[tid] = (n3, off)
         ranked = sorted(best_per_track.items(), key=lambda kv: kv[1][0], reverse=True)
         tid, (score, off) = ranked[0]
-        runner_up = ranked[1][1][0] if len(ranked) > 1 else 0
-        if score < MIN_ALIGNED or score < MIN_MARGIN * max(runner_up, 1):
+        # Background = the best other song. (The same song at another offset is not
+        # background: choruses repeat. Chance agreement on a one-song catalogue is
+        # handled by the detector, which needs the song to stay on its own timeline.)
+        background = ranked[1][1][0] if len(ranked) > 1 else 0
+        need = max(MIN_ALIGNED, MIN_MARGIN * max(background, 1), MIN_RATIO * lm.hashes.size)
+        if score < need:
             return None
         # Negative offset = the window started before the song did (song begins inside the window).
-        return Match(self._tracks[tid], score, int(lm.hashes.size), frames_to_seconds(off))
+        return Match(self._tracks[tid], score, int(lm.hashes.size), frames_to_seconds(off), background)
 
     def close(self) -> None:
         self._db.close()

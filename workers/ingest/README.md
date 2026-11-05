@@ -112,9 +112,27 @@ every play:
 - ~100× faster than real time per station (one CPU core ≈ dozens of stations)
 - Live HTTP stream test: detects while streaming, survives a dropped connection
 
-These are synthetic signals. Before going live, test against real recordings of
-each station with real masters enrolled, and tune `MIN_ALIGNED` in `index.py`
-if you see misses (lower) or wrong matches (higher).
+### Real radio (5 Nov 2026)
+
+`python -m tests.real_radio_eval REC_DIR` runs on real recordings. Checked on
+3.4 hours from 10 stations (KIIS, Christ FM, Next, XFM, Galaxy, KFM, Simba,
+Crooze, Radio Pacis, Voice of Kyankwanzi):
+
+| | before | now |
+|---|---|---|
+| False plays vs a catalogue of real broadcast sound that was never aired | **33** | **0** |
+| False plays with a one-song catalogue | — | **0** |
+| Real plays found (re-encoded, EQ'd, presenter over the intro) | — | **10/10**, start within 1 s |
+
+The false plays before were 14–34 s long, at random points in the song — the
+same pattern as the first live reports. A play now counts only when the song
+keeps matching **on its own timeline** (each window lands where the clock says
+it should be in the song) for **4 windows and 30 s of air time**; a shared beat,
+a jingle built from the song or chance agreement never does that. Tuning:
+`confirm_hits`, `min_detection_sec`, `end_gap_sec` (`config.py`), `MIN_ALIGNED`,
+`MIN_RATIO` (`index.py`), `DRIFT_SEC` (`detector.py`).
+
+`python -m tests.test_false_matches` keeps the one-song case in CI.
 
 ## Brand mentions (spoken on air)
 
