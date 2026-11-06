@@ -196,6 +196,10 @@ describe("alertStatus", () => {
   it("says which channel carried the message", () => {
     expect(alertStatus(row({ sent_at: "2026-11-04T09:01:00Z", channel: "whatsapp" }))).toEqual({ text: "Sent by WhatsApp", tone: "sent" });
     expect(alertStatus(row({ sent_at: "2026-11-04T09:01:00Z", channel: "email" }))).toEqual({ text: "Sent by email", tone: "sent" });
+    expect(alertStatus(row({ sent_at: "2026-11-04T09:01:00Z", channel: "email+sms" }))).toEqual({ text: "Sent by email and SMS", tone: "sent" });
+    expect(alertStatus(row({ sent_at: "2026-11-04T09:01:00Z", channel: "email+whatsapp+sms" }))).toEqual({ text: "Sent by email, WhatsApp and SMS", tone: "sent" });
+    expect(alertStatus(row({ sent_at: "2026-11-04T09:01:00Z", channel: "email", last_error: "sms: Africa's Talking: InsufficientBalance" }))).toEqual({
+      text: "Sent by email — not by SMS", tone: "failed" });
   });
 
   it("explains a message that could not go anywhere", () => {

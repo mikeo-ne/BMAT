@@ -5,17 +5,19 @@ import { CHARTS, type ChartRow, type Region } from "@/lib/data/public";
 import { safeArray } from "@/lib/safe";
 import { db, must } from "./core";
 
-export type AlertPrefs = { phone: string; events: Record<string, boolean> };
+export type AlertChannels = { email: boolean; whatsapp: boolean; sms: boolean };
+export type AlertPrefs = { phone: string; events: Record<string, boolean>; channels: AlertChannels };
 const DEFAULT_EVENTS = { firstSpin: true, dailySummary: true, everyPlay: false, chart: true, dispute: true, payout: false };
+export const DEFAULT_CHANNELS: AlertChannels = { email: true, whatsapp: false, sms: false };
 
 export async function loadAlertPrefs(): Promise<AlertPrefs | null> {
   const sb = db();
   if (!sb) return null; // demo mode keeps prefs in this browser
   const { data: u } = await sb.auth.getUser();
   if (!u.user) return null;
-  const row = must(await sb.from("alert_prefs").select("whatsapp_e164, events").eq("profile_id", u.user.id).maybeSingle(), "alert settings") as
-    { whatsapp_e164: string | null; events: Record<string, boolean> | null } | null;
-  return { phone: row?.whatsapp_e164 ?? "", events: { ...DEFAULT_EVENTS, ...(row?.events ?? {}) } };
+  const row = must(await sb.from("alert_prefs").select("whatsapp_e164, events, channels").eq("profile_id", u.user.id).maybeSingle(), "alert settings") as
+    { whatsapp_e164: string | null; events: Record<string, boolean> | null; channels: Partial<AlertChannels> | null } | null;
+  return { phone: row?.whatsapp_e164 ?? "", events: { ...DEFAULT_EVENTS, ...(row?.events ?? {}) }, channels: { ...DEFAULT_CHANNELS, ...(row?.channels ?? {}) } };
 }
 
 /** Normalises "+256 772 123 456" → "+256772123456" (the format the database enforces). */
@@ -32,7 +34,9 @@ export async function saveAlertPrefs(p: AlertPrefs): Promise<void> {
   if (!u.user) throw new Error("Sign in again to save alert settings.");
   const phone = p.phone.trim() ? toE164(p.phone) : null;
   if (p.phone.trim() && !phone) throw new Error("Use a Ugandan mobile number, e.g. +256 772 123 456.");
-  must(await sb.from("alert_prefs").upsert({ profile_id: u.user.id, whatsapp_e164: phone, events: p.events }).select("profile_id"), "save alert settings");
+  const channels = { ...DEFAULT_CHANNELS, ...p.channels };
+  if ((channels.whatsapp || channels.sms) && !phone) throw new Error("Add your mobile number to get WhatsApp or SMS alerts.");
+  must(await sb.from("alert_prefs").upsert({ profile_id: u.user.id, whatsapp_e164: phone, events: p.events, channels }).select("profile_id"), "save alert settings");
 }
 
 export type AlertLogRow = {

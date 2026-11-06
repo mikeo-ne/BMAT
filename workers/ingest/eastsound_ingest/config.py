@@ -43,6 +43,16 @@ class Settings:
     brevo_api_key: str = ""
     alert_from_email: str = ""
     alert_from_name: str = "East Sound"
+    # SMS alerts (Africa's Talking). Off until both are set.
+    at_username: str = ""
+    at_api_key: str = ""
+    at_sender_id: str = ""
+    at_sandbox: bool = False
+    # WhatsApp alerts (Meta WhatsApp Cloud API + an approved template). Off until both are set.
+    whatsapp_token: str = ""
+    whatsapp_phone_id: str = ""
+    whatsapp_template: str = "airplay_alert"
+    whatsapp_lang: str = "en"
     site_url: str = "https://eastsound.vercel.app"
     stations: list[Station] = field(default_factory=list)
 
@@ -55,8 +65,20 @@ class Settings:
         return "dry-run"
 
     @property
+    def email_on(self) -> bool:
+        return bool(self.brevo_api_key and self.alert_from_email)
+
+    @property
+    def sms_on(self) -> bool:
+        return bool(self.at_username and self.at_api_key)
+
+    @property
+    def whatsapp_on(self) -> bool:
+        return bool(self.whatsapp_token and self.whatsapp_phone_id)
+
+    @property
     def alerts_on(self) -> bool:
-        return bool(self.brevo_api_key and self.alert_from_email and self.supabase_url and self.supabase_service_key)
+        return bool((self.email_on or self.sms_on or self.whatsapp_on) and self.supabase_url and self.supabase_service_key)
 
     @property
     def dry_run(self) -> bool:
@@ -140,6 +162,14 @@ def load_settings(stations_path: str | None) -> Settings:
         brevo_api_key=os.getenv("BREVO_API_KEY", "").strip(),
         alert_from_email=os.getenv("ALERT_FROM_EMAIL", "").strip(),
         alert_from_name=os.getenv("ALERT_FROM_NAME", "East Sound").strip() or "East Sound",
+        at_username=os.getenv("AT_USERNAME", "").strip(),
+        at_api_key=os.getenv("AT_API_KEY", "").strip(),
+        at_sender_id=os.getenv("AT_SENDER_ID", "").strip(),
+        at_sandbox=os.getenv("AT_SANDBOX", "").lower() in ("1", "true", "yes"),
+        whatsapp_token=os.getenv("WHATSAPP_TOKEN", "").strip(),
+        whatsapp_phone_id=os.getenv("WHATSAPP_PHONE_ID", "").strip(),
+        whatsapp_template=os.getenv("WHATSAPP_TEMPLATE", "airplay_alert").strip() or "airplay_alert",
+        whatsapp_lang=os.getenv("WHATSAPP_LANG", "en").strip() or "en",
         site_url=os.getenv("SITE_URL", "https://eastsound.vercel.app").strip().rstrip("/"),
     )
     for k in ("window_sec", "step_sec", "end_gap_sec", "min_detection_sec", "unmatched_every_sec"):

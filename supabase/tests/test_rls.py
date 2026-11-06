@@ -225,6 +225,12 @@ def main() -> int:
     expect("venue logs a DJ set at its own venue", out or err, "1")
     out, err = as_user(users["artist"], f"with i as (insert into alert_prefs (profile_id, whatsapp_e164, events) values ('{uid['artist']}', '+256772123456', '{{}}') returning 1) select count(*) from i")
     expect("artist saves their own WhatsApp alert settings", out or err, "1")
+    out, err = as_user(users["artist"], f"with i as (insert into alert_prefs (profile_id, whatsapp_e164, channels) values ('{uid['artist']}', '+256772123456', jsonb_build_object('email', true, 'whatsapp', true, 'sms', true)) on conflict (profile_id) do update set channels = excluded.channels returning 1) select count(*) from i")
+    expect("artist switches on WhatsApp and SMS for their own alerts", out or err, "1")
+    psql(f"insert into alert_prefs (profile_id) values ('{uid['label']}') on conflict do nothing")
+    expect("email stays on by default", psql(f"select channels ->> 'email' from alert_prefs where profile_id = '{uid['label']}'").stdout.strip(), "true")
+    out, err = as_user(users["artist"], f"with u as (update alert_prefs set channels = '{{}}' where profile_id = '{uid['label']}' returning 1) select count(*) from u")
+    expect("…but cannot change someone else's channels", out or err, "0")
     # The queue is written by the service role; a person only reads their own history.
     psql(f"insert into alert_outbox (profile_id, kind, title, body, link, dedupe_key) values ('{uid['artist']}', 'firstspin', 'First spin on Capital FM', 'x', '/dashboard/artist', 'test-a'), ('{uid['label']}', 'firstspin', 'First spin for the label', 'x', '/dashboard/label', 'test-l')")
     got, _ = as_user(users["artist"], "select string_agg(title, ',') from alert_outbox")
@@ -233,6 +239,10 @@ def main() -> int:
     expect("label reads only their own alert history", got, "First spin for the label")
     got, _ = as_user(None, "select count(*) from alert_outbox")
     expect("anonymous visitor reads no alert history", got, "0")
+    psql("update alert_outbox set channel = 'email+whatsapp+sms', delivered = '{\"email\": \"sent\"}' where dedupe_key = 'test-a'")
+    expect("an alert can record several channels", psql("select channel from alert_outbox where dedupe_key = 'test-a'").stdout.strip(), "email+whatsapp+sms")
+    r = psql("update alert_outbox set channel = 'fax' where dedupe_key = 'test-a'", check=False)
+    expect("an unknown channel is refused", "refused" if r.returncode else "accepted", "refused")
 
     out, err = as_user(users["cmo"], "with u as (update mentions set status = 'confirmed', reviewed_at = now() returning 1) select count(*) from u")
     expect("approved CMO reviews brand mentions", out or err, q("select count(*) from mentions"))

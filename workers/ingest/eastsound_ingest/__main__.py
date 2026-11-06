@@ -25,7 +25,7 @@ from .audio import decode_file
 from .config import Station, load_settings, slugify
 from .fingerprint import SAMPLE_RATE, landmarks
 from .index import FingerprintIndex
-from .alerts import AlertSender, SupabaseOutbox, brevo_mailer
+from .alerts import AlertSender, Senders, SupabaseOutbox, africastalking_sms, brevo_mailer, whatsapp_cloud
 from .masters import MasterSource, MasterSync, enroll_pending
 from .monitor import StationMonitor
 from .sinks import AsyncSink, EastSoundPlayoutSink, JsonlSink, Sink, SupabaseSink
@@ -229,11 +229,17 @@ def cmd_run(a, s) -> None:
         MasterSync(MasterSource(s.supabase_url, s.supabase_service_key), idx, stop).start()
         logging.info("watching for songs uploaded in the dashboards (every 2 minutes)")
         if s.alerts_on:
-            AlertSender(SupabaseOutbox(s.supabase_url, s.supabase_service_key),
-                        brevo_mailer(s.brevo_api_key, s.alert_from_email, s.alert_from_name), s.site_url, stop).start()
-            logging.info("airplay alerts: emailing from %s (checks every minute)", s.alert_from_email)
+            senders = Senders(
+                email=brevo_mailer(s.brevo_api_key, s.alert_from_email, s.alert_from_name) if s.email_on else None,
+                sms=africastalking_sms(s.at_username, s.at_api_key, s.at_sender_id, s.at_sandbox) if s.sms_on else None,
+                whatsapp=whatsapp_cloud(s.whatsapp_token, s.whatsapp_phone_id, s.whatsapp_template, s.whatsapp_lang) if s.whatsapp_on else None,
+            )
+            AlertSender(SupabaseOutbox(s.supabase_url, s.supabase_service_key), senders, s.site_url, stop).start()
+            logging.info("airplay alerts: %s (checks every minute)%s", " + ".join(senders.names()),
+                         " — SMS in Africa's Talking sandbox" if s.sms_on and s.at_sandbox else "")
         else:
-            logging.info("airplay alerts: off (set BREVO_API_KEY and ALERT_FROM_EMAIL to email artists and labels)")
+            logging.info("airplay alerts: off (set BREVO_API_KEY + ALERT_FROM_EMAIL, AT_USERNAME + AT_API_KEY, "
+                         "or WHATSAPP_TOKEN + WHATSAPP_PHONE_ID)")
     mons = [StationMonitor(st, idx, sink, s, stop, scanner=_scanner(st, pool, keywords, sink)) for st in s.stations]
     for m in mons:
         m.start()
