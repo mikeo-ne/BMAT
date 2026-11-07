@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, KEYWORDS, ORG_NAME, SITE_NAME, SITE_URL, jsonLd, siteJsonLd } from "@/lib/seo";
+import { Analytics } from "@vercel/analytics/next";
 
 const verification: Metadata["verification"] = {
   ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION } : {}),
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen font-sans">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(siteJsonLd()) }} />
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );
