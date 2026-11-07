@@ -6,7 +6,7 @@ import { POSTS, type BlogPost } from "@/lib/data/public";
 import { cx, fmtInt, safeArray } from "@/lib/safe";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-const CATS = ["All", "Industry", "Product", "Charts", "Policy"] as const;
+const CATS = ["All", "Guides", "Industry", "Product", "Charts", "Policy"] as const;
 
 function MetricFeed() {
   if (isSupabaseConfigured) return null; // sample numbers: demo mode only, never on the live site
