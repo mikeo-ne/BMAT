@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import robots from "@/app/robots";
+// @ts-expect-error -- plain .mjs config has no type declarations
 import nextConfig from "../next.config.mjs";
 
 describe("site protection", () => {
