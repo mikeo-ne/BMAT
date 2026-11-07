@@ -6,9 +6,8 @@ import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, KEYWORDS, ORG_NAME, SITE_NAME, SITE
 const verification: Metadata["verification"] = {
   // Google Search Console ownership tag (public by design; env var overrides it).
   google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "yPHIT70HVuSpPPbGfq0EqU-26bDYaOM64qo4Ave26GI",
-  ...(process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
-    ? { other: { "msvalidate.01": process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION } }
-    : {}),
+  // Bing Webmaster Tools ownership tag (public by design; env var overrides it).
+  other: { "msvalidate.01": process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION || "8E8D38943AC38D0197BA11A6F446FCEB" },
 };
 
 export const metadata: Metadata = {
