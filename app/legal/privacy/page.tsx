@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal/LegalPage";
 
-export const metadata: Metadata = { title: "Privacy Notice" };
+export const metadata: Metadata = {
+  title: "Privacy Notice",
+  description: "How East Sound Technologies collects, uses and protects personal data under Uganda's Data Protection and Privacy Act, 2019.",
+  alternates: { canonical: "/legal/privacy" },
+};
 
 // DRAFT — for advocate review. Not legal advice.
 export default function PrivacyPage() {

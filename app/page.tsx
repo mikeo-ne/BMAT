@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
+import { og } from "@/lib/seo";
 import { Header } from "@/components/site/Header";
 import { Hero } from "@/components/site/Hero";
 import { AirplayChart } from "@/components/site/AirplayChart";
 import { Footer } from "@/components/site/Footer";
 import { UseCaseGrid } from "@/components/site/UseCaseGrid";
 import { SOLUTIONS } from "@/lib/data/public";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+  openGraph: og("/"),
+};
 
 export default function HomePage() {
   return (

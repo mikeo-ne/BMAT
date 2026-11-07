@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal/LegalPage";
 
-export const metadata: Metadata = { title: "Terms of Use" };
+export const metadata: Metadata = {
+  title: "Terms of Use",
+  description: "The terms for using East Sound Technologies, the airplay monitoring service run by 7H Music Group Ltd in Kampala, Uganda.",
+  alternates: { canonical: "/legal/terms" },
+};
 
 // DRAFT — for advocate review. Not legal advice.
 export default function TermsPage() {
