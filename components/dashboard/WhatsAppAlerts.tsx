@@ -16,11 +16,17 @@ const EVENTS = [
   { id: "payout", label: "Royalty statements", description: "A new statement is ready." },
 ] as const;
 const DEFAULTS: AlertPrefs = { phone: "", events: { firstSpin: true, dailySummary: true, everyPlay: false, chart: true, dispute: true, payout: false }, channels: DEFAULT_CHANNELS };
-const CHANNELS: { id: keyof AlertChannels; label: string; description: string }[] = [
+// Which delivery channels East Sound offers right now. Email only until WhatsApp/SMS
+// are switched on: set NEXT_PUBLIC_ALERT_CHANNELS="email,whatsapp,sms" on Vercel
+// (and the provider keys on the worker — see docs/alerts-whatsapp-sms.md).
+const OFFERED = (process.env.NEXT_PUBLIC_ALERT_CHANNELS || "email").split(",").map((c) => c.trim());
+const ALL_CHANNELS: { id: keyof AlertChannels; label: string; description: string }[] = [
   { id: "email", label: "Email", description: "To the address you sign in with." },
   { id: "whatsapp", label: "WhatsApp", description: "A short message with a link to your dashboard." },
   { id: "sms", label: "SMS", description: "A text message, for phones without data." },
 ];
+const CHANNELS = ALL_CHANNELS.filter((c) => c.id === "email" || OFFERED.includes(c.id));
+const PHONE_CHANNELS = CHANNELS.length > 1;
 
 /** Airplay alert settings: email, WhatsApp and SMS. Live: saved to your account. Demo: kept in this browser. */
 export function WhatsAppAlerts({ scope }: { scope: string }) {
@@ -70,6 +76,10 @@ export function WhatsAppAlerts({ scope }: { scope: string }) {
   return (
     <div className="grid gap-6 md:grid-cols-[1fr_1.4fr]">
       <div>
+        {!PHONE_CHANNELS ? (
+          <p className="text-sm text-slate-300">Alerts are emailed to the address you sign in with. WhatsApp and SMS alerts are coming later.</p>
+        ) : (
+          <>
         <p className="font-mono text-xs uppercase tracking-widest text-slate-500">Send my alerts by</p>
         <div className="mt-1 divide-y divide-slate-800">
           {CHANNELS.map((c) => (
@@ -81,6 +91,8 @@ export function WhatsAppAlerts({ scope }: { scope: string }) {
         <input id={`wa-${scope}`} className="input" placeholder="+256 7XX XXX XXX" inputMode="tel" autoComplete="tel"
           value={prefs.phone} onChange={(e) => change({ ...prefs, phone: e.target.value })} />
         <p className="mt-1.5 text-xs text-slate-500">A Ugandan mobile number. Every-play alerts always go by email only.</p>
+          </>
+        )}
         <div className="mt-4 flex items-center gap-3">
           <button type="button" className="btn-primary !py-2" onClick={onSave} disabled={!dirty || save.kind === "saving"}>Save alerts</button>
           <SaveNote state={save} />
