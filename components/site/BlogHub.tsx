@@ -5,12 +5,57 @@ import { useEffect, useMemo, useState } from "react";
 import { POSTS, type BlogPost } from "@/lib/data/public";
 import { cx, fmtInt, safeArray } from "@/lib/safe";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getSupabaseBrowser } from "@/lib/supabase/client";
 
 const CATS = ["All", "Guides", "Industry", "Product", "Charts", "Policy"] as const;
 
 function MetricFeed() {
-  if (isSupabaseConfigured) return null; // sample numbers: demo mode only, never on the live site
-  return <SampleMetrics />;
+  if (isSupabaseConfigured) return <LiveMetrics />;
+  return <SampleMetrics />; // sample numbers: demo mode only, never on the live site
+}
+
+type PublicStats = { stations_live: number; stations_total: number; songs: number; plays_7d: number; clips_24h: number; as_of: string };
+
+/** Real counts from the database (aggregate only), refreshed every minute. */
+function LiveMetrics() {
+  const [s, setS] = useState<PublicStats | null>(null);
+  useEffect(() => {
+    const sb = getSupabaseBrowser();
+    if (!sb) return;
+    let alive = true;
+    const load = () =>
+      sb.rpc("public_stats").then(({ data, error }) => {
+        if (alive && !error && data) setS(data as PublicStats);
+      });
+    load();
+    const id = window.setInterval(load, 60_000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, []);
+  if (!s) return null;
+  const cells = [
+    { k: "Stations online now", v: `${fmtInt(s.stations_live)} / ${fmtInt(s.stations_total)}` },
+    { k: "Songs fingerprinted", v: fmtInt(s.songs) },
+    { k: "Plays detected (7 days)", v: fmtInt(s.plays_7d) },
+    { k: "Unidentified clips (24h)", v: fmtInt(s.clips_24h) },
+  ];
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-live="polite">
+        {cells.map((c) => (
+          <div key={c.k} className="glass p-4">
+            <p className="text-xs uppercase tracking-wider text-slate-500">{c.k}</p>
+            <p className="mt-1 font-mono text-2xl font-bold text-emerald-300 glow-text">{c.v}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-slate-500">
+        Live from the East Sound database. Unidentified clips are music we heard on air that isn&apos;t in our catalogue yet — upload your songs so they can be matched.
+      </p>
+    </div>
+  );
 }
 
 function SampleMetrics() {
