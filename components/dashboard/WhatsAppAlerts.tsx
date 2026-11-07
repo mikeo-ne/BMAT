@@ -3,21 +3,32 @@
 import { useEffect, useState } from "react";
 import { DEMO_MODE } from "@/lib/auth-context";
 import { alertStatus } from "@/lib/alerts/compose";
-import { loadAlertPrefs, loadAlertLog, saveAlertPrefs, toE164, type AlertLogRow, type AlertPrefs } from "@/lib/db/shared";
+import { DEFAULT_CHANNELS, loadAlertPrefs, loadAlertLog, saveAlertPrefs, toE164, type AlertChannels, type AlertLogRow, type AlertPrefs } from "@/lib/db/shared";
 import { cx, safeStorage } from "@/lib/safe";
 import { SaveNote, Toggle } from "./ui";
 
 const EVENTS = [
-  { id: "firstSpin", label: "First play on a new station", description: "An email the moment a song of yours is played somewhere for the first time." },
+  { id: "firstSpin", label: "First play on a new station", description: "The moment a song of yours is played somewhere for the first time." },
   { id: "dailySummary", label: "Daily summary", description: "Every morning at 8: yesterday's plays, by song and station." },
-  { id: "everyPlay", label: "Every play", description: "An email each time a song of yours is played. A busy song can mean dozens a day." },
+  { id: "everyPlay", label: "Every play", description: "Each time a song of yours is played. Email only: a busy song can mean dozens a day." },
   { id: "chart", label: "Chart movement", description: "Weekly Top 100 entries and position changes." },
   { id: "dispute", label: "Ownership disputes", description: "Someone claims a share of your work." },
   { id: "payout", label: "Royalty statements", description: "A new statement is ready." },
 ] as const;
-const DEFAULTS: AlertPrefs = { phone: "", events: { firstSpin: true, dailySummary: true, everyPlay: false, chart: true, dispute: true, payout: false } };
+const DEFAULTS: AlertPrefs = { phone: "", events: { firstSpin: true, dailySummary: true, everyPlay: false, chart: true, dispute: true, payout: false }, channels: DEFAULT_CHANNELS };
+// Which delivery channels East Sound offers right now. Email only until WhatsApp/SMS
+// are switched on: set NEXT_PUBLIC_ALERT_CHANNELS="email,whatsapp,sms" on Vercel
+// (and the provider keys on the worker — see docs/alerts-whatsapp-sms.md).
+const OFFERED = (process.env.NEXT_PUBLIC_ALERT_CHANNELS || "email").split(",").map((c) => c.trim());
+const ALL_CHANNELS: { id: keyof AlertChannels; label: string; description: string }[] = [
+  { id: "email", label: "Email", description: "To the address you sign in with." },
+  { id: "whatsapp", label: "WhatsApp", description: "A short message with a link to your dashboard." },
+  { id: "sms", label: "SMS", description: "A text message, for phones without data." },
+];
+const CHANNELS = ALL_CHANNELS.filter((c) => c.id === "email" || OFFERED.includes(c.id));
+const PHONE_CHANNELS = CHANNELS.length > 1;
 
-/** Airplay alert settings (email now, WhatsApp later). Live: saved to your account. Demo: kept in this browser. */
+/** Airplay alert settings: email, WhatsApp and SMS. Live: saved to your account. Demo: kept in this browser. */
 export function WhatsAppAlerts({ scope }: { scope: string }) {
   const key = `est_wa_${scope}`;
   const [prefs, setPrefs] = useState<AlertPrefs>(DEFAULTS);
@@ -28,7 +39,8 @@ export function WhatsAppAlerts({ scope }: { scope: string }) {
 
   useEffect(() => {
     if (DEMO_MODE) {
-      setPrefs(safeStorage.get<AlertPrefs>(key, DEFAULTS));
+      const saved = safeStorage.get<AlertPrefs>(key, DEFAULTS);
+      setPrefs({ ...DEFAULTS, ...saved, channels: { ...DEFAULT_CHANNELS, ...saved.channels } });
       return;
     }
     loadAlertPrefs().then((p) => p && setPrefs(p)).catch(() => setSave({ kind: "error", msg: "Couldn't load your alert settings." }));
@@ -46,6 +58,10 @@ export function WhatsAppAlerts({ scope }: { scope: string }) {
       setSave({ kind: "error", msg: "Use a Ugandan mobile number, e.g. +256 772 123 456." });
       return;
     }
+    if ((prefs.channels.whatsapp || prefs.channels.sms) && !prefs.phone.trim()) {
+      setSave({ kind: "error", msg: "Add your mobile number to get WhatsApp or SMS alerts." });
+      return;
+    }
     setSave({ kind: "saving" });
     try {
       if (DEMO_MODE) safeStorage.set(key, prefs);
@@ -60,11 +76,23 @@ export function WhatsAppAlerts({ scope }: { scope: string }) {
   return (
     <div className="grid gap-6 md:grid-cols-[1fr_1.4fr]">
       <div>
-        <p className="text-sm text-slate-300">Alerts are emailed to the address you sign in with.</p>
-        <label className="label mt-5" htmlFor={`wa-${scope}`}>WhatsApp number <span className="font-normal text-slate-500">(optional)</span></label>
-        <input id={`wa-${scope}`} className="input" placeholder="+256 7XX XXX XXX" inputMode="tel"
+        {!PHONE_CHANNELS ? (
+          <p className="text-sm text-slate-300">Alerts are emailed to the address you sign in with. WhatsApp and SMS alerts are coming later.</p>
+        ) : (
+          <>
+        <p className="font-mono text-xs uppercase tracking-widest text-slate-500">Send my alerts by</p>
+        <div className="mt-1 divide-y divide-slate-800">
+          {CHANNELS.map((c) => (
+            <Toggle key={c.id} label={c.label} description={c.description} checked={Boolean(prefs.channels?.[c.id])}
+              onChange={(v) => change({ ...prefs, channels: { ...DEFAULT_CHANNELS, ...prefs.channels, [c.id]: v } })} />
+          ))}
+        </div>
+        <label className="label mt-5" htmlFor={`wa-${scope}`}>Mobile number <span className="font-normal text-slate-500">(for WhatsApp and SMS)</span></label>
+        <input id={`wa-${scope}`} className="input" placeholder="+256 7XX XXX XXX" inputMode="tel" autoComplete="tel"
           value={prefs.phone} onChange={(e) => change({ ...prefs, phone: e.target.value })} />
-        <p className="mt-1.5 text-xs text-slate-500">WhatsApp messages are coming later. Save your number now and they'll start automatically.</p>
+        <p className="mt-1.5 text-xs text-slate-500">A Ugandan mobile number. Every-play alerts always go by email only.</p>
+          </>
+        )}
         <div className="mt-4 flex items-center gap-3">
           <button type="button" className="btn-primary !py-2" onClick={onSave} disabled={!dirty || save.kind === "saving"}>Save alerts</button>
           <SaveNote state={save} />

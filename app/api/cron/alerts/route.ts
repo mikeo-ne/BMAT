@@ -7,6 +7,12 @@ import { drain, supabaseStore } from "@/lib/alerts/outbox";
 import { SITE_URL, SUPABASE_URL } from "@/lib/supabase/config";
 
 /**
+ * RETIRED: airplay alerts (email, WhatsApp, SMS) are now sent by the monitoring
+ * worker every minute (workers/ingest/eastsound_ingest/alerts.py). The Vercel
+ * cron and GitHub Action that called this route are removed; it stays only so
+ * an old scheduler gets a clear answer instead of a 404. Don't schedule it again:
+ * two senders would message people twice.
+ *
  * Alert sender. Called by a scheduler (Vercel cron once a day on Hobby, or any
  * 10-minute cron elsewhere — a GitHub Action is included in the repo).
  *

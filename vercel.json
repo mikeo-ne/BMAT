@@ -5,11 +5,5 @@
   "buildCommand": "npm run build",
   "regions": [
     "fra1"
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/alerts",
-      "schedule": "0 6 * * *"
-    }
   ]
 }

@@ -17,6 +17,7 @@ vi.mock("@/lib/db/shared", () => ({
   saveAlertPrefs: async () => undefined,
   loadAlertLog: async () => log.rows,
   toE164: (phone: string) => (/^\+2567\d{8}$/.test(phone) ? phone : null),
+  DEFAULT_CHANNELS: { email: true, whatsapp: false, sms: false },
 }));
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -57,16 +58,24 @@ describe("WhatsAppAlerts delivery log", () => {
     expect(await screen.findByText(/Nothing yet\. Your first alert arrives/)).toBeTruthy();
   });
 
-  it("offers email alerts for first plays, a daily summary and every play", async () => {
+  it("offers email alerts for first plays, a daily summary and every play (WhatsApp/SMS not offered yet)", async () => {
     render(<WhatsAppAlerts scope="artist" />);
     expect(await screen.findByText(/emailed to the address you sign in with/)).toBeTruthy();
+    expect(screen.queryByText("SMS")).toBeNull();
+    expect(screen.queryByLabelText(/Mobile number/)).toBeNull();
     expect(screen.getByText("First play on a new station")).toBeTruthy();
     expect(screen.getByText("Daily summary")).toBeTruthy();
     expect(screen.getByText("Every play")).toBeTruthy();
   });
 
-  it("keeps the saved number in the field", async () => {
-    render(<WhatsAppAlerts scope="artist" />);
-    await waitFor(() => expect((screen.getByLabelText(/WhatsApp number/) as HTMLInputElement).value).toBe("+256772123456"));
+  it("offers WhatsApp and SMS, and keeps the saved number, once they are switched on", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ALERT_CHANNELS", "email,whatsapp,sms");
+    vi.resetModules();
+    const { WhatsAppAlerts: WithPhone } = await import("@/components/dashboard/WhatsAppAlerts");
+    render(<WithPhone scope="artist" />);
+    expect(await screen.findByText("SMS")).toBeTruthy();
+    expect(screen.getByText(/Every-play alerts always go by email only/)).toBeTruthy();
+    await waitFor(() => expect((screen.getByLabelText(/Mobile number/) as HTMLInputElement).value).toBe("+256772123456"));
+    vi.unstubAllEnvs();
   });
 });

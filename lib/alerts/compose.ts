@@ -75,11 +75,25 @@ export type AlertLog = {
   attempts: number;
 };
 
+const CHANNEL_NAME: Record<string, string> = { email: "email", whatsapp: "WhatsApp", sms: "SMS" };
+
+/** "email+sms" → "email and SMS"; "email+whatsapp+sms" → "email, WhatsApp and SMS". */
+export function channelNames(channel: string): string {
+  const n = channel.split("+").filter(Boolean).map((c) => CHANNEL_NAME[c] ?? c);
+  return n.length <= 1 ? (n[0] ?? "") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`;
+}
+
+/** "whatsapp: template not approved; sms: InsufficientBalance" → "WhatsApp or SMS". */
+function failedNames(err: string): string {
+  const n = [...err.matchAll(/(?:^|;\s*)(email|whatsapp|sms):/g)].map((m) => CHANNEL_NAME[m[1]]);
+  return n.length ? n.join(" or ") : "every channel";
+}
+
 /** One human line for the dashboard: did this alert actually leave the building? */
 export function alertStatus(row: AlertLog): { text: string; tone: "sent" | "pending" | "failed" } {
   if (row.sent_at && row.channel) {
-    const how = row.channel === "whatsapp" ? "WhatsApp" : row.channel === "email" ? "email" : row.channel;
-    return { text: `Sent by ${how}`, tone: "sent" };
+    if (!row.last_error) return { text: `Sent by ${channelNames(row.channel)}`, tone: "sent" };
+    return { text: `Sent by ${channelNames(row.channel)} — not by ${failedNames(row.last_error)}`, tone: "failed" };
   }
   if (row.sent_at) return { text: row.last_error ? `Not delivered — ${row.last_error}` : "Nothing to deliver to", tone: "failed" };
   if (row.attempts > 0) return { text: `Retrying (attempt ${row.attempts + 1})`, tone: "pending" };
