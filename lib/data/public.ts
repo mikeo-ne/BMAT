@@ -1,3 +1,4 @@
+import { GUIDES } from "./guides";
 // Public, non-sensitive data shown on the marketing site. Sample data only.
 import { seeded } from "../safe";
 
@@ -74,14 +75,16 @@ export const SOLUTIONS = [
 export type BlogPost = {
   slug: string;
   title: string;
-  category: "Industry" | "Product" | "Charts" | "Policy";
+  category: "Guides" | "Industry" | "Product" | "Charts" | "Policy";
   excerpt: string;
   date: string;
   minutes: number;
   body: string[];
+  sources?: { title: string; url: string }[];
 };
 
 export const POSTS: BlogPost[] = [
+  ...GUIDES,
   {
     slug: "why-proof-of-play-matters",
     title: "Why proof-of-play changes royalty conversations in Uganda",

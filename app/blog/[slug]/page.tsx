@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { POSTS } from "@/lib/data/public";
+import { ArticleBody, RelatedPosts } from "@/components/site/ArticleBody";
 import { ORG_NAME, SITE_NAME, abs, jsonLd, og } from "@/lib/seo";
 
 export function generateStaticParams() {
@@ -58,11 +59,23 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         <p className="mt-2 text-sm text-slate-500">
           {post.date} · {post.minutes} min read
         </p>
-        <div className="mt-8 space-y-5 text-lg leading-relaxed text-slate-300">
-          {(post.body || []).map((para, i) => (
-            <p key={i}>{para}</p>
-          ))}
-        </div>
+        <ArticleBody lines={post.body || []} />
+        {post.sources?.length ? (
+          <section className="mt-12 border-t border-slate-800 pt-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Sources</h2>
+            <ul className="mt-3 space-y-2 text-sm">
+              {post.sources.map((s) => (
+                <li key={s.url}>
+                  <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300">
+                    {s.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-xs text-slate-500">General information, not legal advice. Fees and rules change — check with UPRS or URSB before acting.</p>
+          </section>
+        ) : null}
+        <RelatedPosts current={post.slug} />
       </main>
       <Footer />
     </>
