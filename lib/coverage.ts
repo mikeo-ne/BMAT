@@ -9,10 +9,12 @@
  * upcountry coverage is never hidden behind Kampala.
  */
 
-export type RegionCoverage = { region: string; stations: number; monitored: number; live: number };
+export type RegionCoverage = { region: string; stations: number; tv: number; monitored: number; live: number };
 
 export type Coverage = {
   stations: number;
+  radio: number;
+  tv: number;
   monitored: number;
   live: number;
   regions: RegionCoverage[];
@@ -37,12 +39,15 @@ export function normaliseCoverage(raw: unknown): Coverage | null {
     .map((x) => ({
       region: String(x.region ?? "Unspecified"),
       stations: num(x.stations),
+      tv: num(x.tv),
       monitored: num(x.monitored),
       live: num(x.live),
     }))
     .filter((x) => x.stations > 0);
   return {
     stations: num(r.stations),
+    radio: r.radio === undefined ? num(r.stations) - num(r.tv) : num(r.radio),
+    tv: num(r.tv),
     monitored: num(r.monitored),
     live: num(r.live),
     regions: orderRegions(regions),
@@ -68,14 +73,16 @@ export function shareMonitored(c: Coverage): number {
 
 /** What the page shows before (or without) a live project: clearly a sample. */
 export const DEMO_COVERAGE: Coverage = {
-  stations: 28,
-  monitored: 25,
-  live: 25,
+  stations: 31,
+  radio: 28,
+  tv: 3,
+  monitored: 28,
+  live: 28,
   regions: [
-    { region: "Central", stations: 21, monitored: 18, live: 18 },
-    { region: "Western", stations: 2, monitored: 2, live: 2 },
-    { region: "Eastern", stations: 4, monitored: 4, live: 4 },
-    { region: "Northern", stations: 1, monitored: 1, live: 1 },
+    { region: "Central", stations: 24, tv: 3, monitored: 21, live: 21 },
+    { region: "Western", stations: 2, tv: 0, monitored: 2, live: 2 },
+    { region: "Eastern", stations: 4, tv: 0, monitored: 4, live: 4 },
+    { region: "Northern", stations: 1, tv: 0, monitored: 1, live: 1 },
   ],
   lastHeartbeat: null,
   lastDetection: null,

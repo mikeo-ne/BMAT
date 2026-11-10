@@ -3,6 +3,7 @@
 // CMO / Auditor data. RLS gives an approved CMO workspace-wide reads.
 import * as demo from "@/lib/data/cmo";
 import { safeArray } from "@/lib/safe";
+import { buildMonthlyPack, monthRange, type MonthlyPack } from "@/lib/cmo-report";
 import { db, must } from "./core";
 import type { Mention, MentionStatus, TrackedBrand } from "@/lib/mentions";
 
@@ -115,6 +116,160 @@ export async function loadCmo(): Promise<CmoData> {
       seed: 900 + i,
     })),
     works: recRows.map((r) => ({ id: r.id, title: r.title })),
+  };
+}
+
+// ── Monthly distribution pack (per-station report + top works) ─────────────
+
+const SAMPLE_STATIONS: [string, string, number, number, number][] = [
+  // station, region, plays, works, artists
+  ["Capital FM", "Central", 2841, 412, 148],
+  ["CBS FM", "Central", 2610, 398, 141],
+  ["Galaxy FM", "Central", 2104, 366, 132],
+  ["Radio Simba", "Central", 1873, 341, 124],
+  ["Sanyu FM", "Central", 1642, 322, 118],
+  ["Pearl FM", "Eastern", 1188, 274, 101],
+  ["Jinja FM", "Eastern", 903, 231, 88],
+  ["Mbale Times", "Eastern", 742, 198, 74],
+  ["Voice of Toro", "Western", 688, 187, 71],
+  ["Hope Radio", "Western", 512, 164, 63],
+  ["Radio Gulu", "Northern", 431, 142, 57],
+  ["Radio Lira", "Northern", 296, 118, 48],
+];
+
+function demoPack(month: string): MonthlyPack {
+  const offset = monthRange(month).days % 7;
+  const stations = SAMPLE_STATIONS.map(([station, region, plays, works, artists], i) => {
+    const spins = Math.max(0, plays - offset * (i % 3) * 12);
+    return {
+      station_id: `demo-${i}`,
+      station,
+      region,
+      spins,
+      works,
+      artists,
+      with_evidence: Math.round(spins * 0.97),
+      first_play: `${month}-02T05:14:00Z`,
+      last_play: `${month}-27T22:41:00Z`,
+      kind: i % 7 === 6 ? "tv" : "radio",
+      // Audience figures are sample values, and labelled as such in the UI.
+      aqh: i < 6 ? [18_000, 15_400, 12_900, 9_800, 8_200, 4_100][i] : null,
+      listen_seconds: spins * 198,
+    };
+  });
+  const works = demo.TOP100.slice(0, 20).map((w) => ({
+    rank: w.rank,
+    title: w.title,
+    artist: w.owner,
+    owner: w.owner,
+    spins: w.spins,
+    stations: w.stations,
+  }));
+  return buildMonthlyPack(stations, works, month, false);
+}
+
+/**
+ * The rows behind the CMO's monthly report. The two RPCs are SECURITY INVOKER,
+ * so a CMO sees the whole panel and a label sees only its own catalogue —
+ * exactly what the dashboard shows, no wider.
+ */
+export async function loadMonthlyPack(month: string): Promise<MonthlyPack> {
+  const range = monthRange(month);
+  const sb = db();
+  if (!sb) return demoPack(month);
+  const [stations, works] = await Promise.all([
+    sb.rpc("station_month_report", { p_from: range.from, p_to: range.to }),
+    sb.rpc("month_top_works", { p_from: range.from, p_to: range.to, p_limit: 20 }),
+  ]);
+  return buildMonthlyPack(must(stations, "station report"), must(works, "month top works"), month, true);
+}
+
+// ── Station requests (a broadcaster claiming or adding a station) ──────────
+
+export type StationRequestAdmin = {
+  id: string;
+  status: string;
+  kind: string;
+  name: string | null;
+  frequency: string | null;
+  region: string | null;
+  streamUrl: string | null;
+  note: string | null;
+  requestedBy: string;
+  created: string;
+};
+
+const DEMO_STATION_REQUESTS: StationRequestAdmin[] = [
+  { id: "sr1", status: "pending", kind: "radio", name: "Next Radio", frequency: "106.1", region: "Central", streamUrl: null, note: "Claiming our own station", requestedBy: "Next Radio", created: "2026-11-10" },
+  { id: "sr2", status: "pending", kind: "tv", name: "UBC TV", frequency: null, region: "Central", streamUrl: "https://example.invalid/ubc.m3u8", note: "We can supply the HLS endpoint", requestedBy: "UBC", created: "2026-11-09" },
+];
+
+export async function loadStationRequests(): Promise<{ rows: StationRequestAdmin[]; live: boolean }> {
+  const sb = db();
+  if (!sb) return { rows: DEMO_STATION_REQUESTS, live: false };
+  const { data } = await sb
+    .from("station_requests")
+    .select("id, status, kind, name, frequency, region, stream_url, note, created_at, profiles(display_name)")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  type Row = {
+    id: string; status: string; kind: string; name: string | null; frequency: string | null; region: string | null;
+    stream_url: string | null; note: string | null; created_at: string;
+    profiles: { display_name: string } | { display_name: string }[] | null;
+  };
+  return {
+    live: true,
+    rows: safeArray(data as Row[]).map((r) => {
+      const who = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+      return {
+        id: r.id, status: r.status, kind: r.kind, name: r.name, frequency: r.frequency, region: r.region,
+        streamUrl: r.stream_url, note: r.note, requestedBy: who?.display_name ?? "Broadcaster",
+        created: String(r.created_at ?? "").slice(0, 10),
+      };
+    }),
+  };
+}
+
+export async function approveStationRequest(id: string): Promise<void> {
+  const sb = db();
+  if (!sb) return;
+  must(await sb.rpc("approve_station_request", { p_id: id }), "approve station request");
+}
+
+export async function rejectStationRequest(id: string, note: string): Promise<void> {
+  const sb = db();
+  if (!sb) return;
+  must(await sb.rpc("reject_station_request", { p_id: id, p_note: note }), "reject station request");
+}
+
+// ── Plan requests (self-serve upgrades waiting to be billed) ───────────────
+
+export type PlanRequestRow = {
+  id: string; reference: string; plan: string; billing: string; amountUgx: number;
+  msisdn: string | null; status: string; created: string; note: string | null;
+};
+
+const DEMO_PLAN_REQUESTS: PlanRequestRow[] = [
+  { id: "p1", reference: "ES-ART-7KQ4MP", plan: "artist", billing: "monthly", amountUgx: 35_000, msisdn: "+256772000111", status: "pending", created: "2026-11-08", note: "Catalogue of 12 songs" },
+  { id: "p2", reference: "ES-LAB-3XF9RT", plan: "label", billing: "annual", amountUgx: 2_500_000, msisdn: "+256701000222", status: "contacted", created: "2026-11-05", note: null },
+];
+
+export async function loadPlanRequests(): Promise<{ rows: PlanRequestRow[]; live: boolean }> {
+  const sb = db();
+  if (!sb) return { rows: DEMO_PLAN_REQUESTS, live: false };
+  const { data } = await sb
+    .from("plan_requests")
+    .select("id, reference, plan, billing, amount_ugx, msisdn, status, created_at, note")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  type Row = { id: string; reference: string; plan: string; billing: string; amount_ugx: number; msisdn: string | null; status: string; created_at: string; note: string | null };
+  return {
+    live: true,
+    rows: safeArray(data as Row[]).map((r) => ({
+      id: r.id, reference: r.reference, plan: r.plan, billing: r.billing,
+      amountUgx: Number(r.amount_ugx ?? 0), msisdn: r.msisdn, status: r.status,
+      created: String(r.created_at ?? "").slice(0, 10), note: r.note,
+    })),
   };
 }
 

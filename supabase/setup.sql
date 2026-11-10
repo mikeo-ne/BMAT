@@ -1281,4 +1281,504 @@ $$;
 revoke all on function public.public_coverage() from public;
 grant execute on function public.public_coverage() to anon, authenticated;
 
+-- ==========================================================================
+-- 15. 0015_cmo_station_report.sql
+-- CMO pack: per-station monthly report and monthly top works
+-- ==========================================================================
+
+-- ── CMO distribution pack: per-station monthly report + monthly top works ──
+--
+-- UPRS (and any CMO) distributes money per station, per month. The numbers they
+-- need are: how many plays each station generated, how many distinct works and
+-- artists that represents, and how many of those plays carry an evidence clip.
+--
+-- Both functions are SECURITY INVOKER on purpose: whoever calls them sees only
+-- the detections their RLS already allows. A CMO sees the whole panel; a label
+-- sees its own catalogue; nobody sees more through the report than through the
+-- dashboard. The feed endpoint uses the same rule.
+
+create or replace function public.station_month_report(p_from date, p_to date)
+returns table (
+  station_id uuid,
+  station text,
+  region text,
+  spins bigint,
+  works bigint,
+  artists bigint,
+  with_evidence bigint,
+  first_play timestamptz,
+  last_play timestamptz
+)
+language sql
+stable
+set search_path = public
+as $$
+  select
+    s.id,
+    s.name,
+    s.region,
+    count(d.id) as spins,
+    count(distinct d.recording_id) as works,
+    count(distinct r.artist_name) as artists,
+    count(*) filter (where d.evidence_path is not null) as with_evidence,
+    min(d.detected_at),
+    max(d.detected_at)
+  from public.detections d
+  join public.stations s on s.id = d.station_id
+  left join public.recordings r on r.id = d.recording_id
+  where d.detected_at >= (p_from::timestamp at time zone 'Africa/Kampala')
+    and d.detected_at <  ((p_to + 1)::timestamp at time zone 'Africa/Kampala')
+  group by s.id, s.name, s.region
+  order by count(d.id) desc, s.name
+$$;
+
+create or replace function public.month_top_works(p_from date, p_to date, p_limit int default 20)
+returns table (rank bigint, title text, artist text, owner text, spins bigint, stations bigint)
+language sql
+stable
+set search_path = public
+as $$
+  select row_number() over (order by count(*) desc, r.title),
+         r.title,
+         r.artist_name,
+         o.name,
+         count(*),
+         count(distinct d.station_id)
+  from public.detections d
+  join public.recordings r on r.id = d.recording_id
+  left join public.organizations o on o.id = r.label_org_id
+  where d.detected_at >= (p_from::timestamp at time zone 'Africa/Kampala')
+    and d.detected_at <  ((p_to + 1)::timestamp at time zone 'Africa/Kampala')
+  group by r.id, r.title, r.artist_name, o.name
+  order by count(*) desc, r.title
+  limit least(greatest(p_limit, 1), 100)
+$$;
+
+revoke all on function public.station_month_report(date, date) from public;
+revoke all on function public.month_top_works(date, date, int) from public;
+grant execute on function public.station_month_report(date, date) to authenticated;
+grant execute on function public.month_top_works(date, date, int) to authenticated;
+
+-- ==========================================================================
+-- 16. 0016_tv_stations.sql
+-- TV: stations are radio or television; coverage counts both
+-- ==========================================================================
+
+-- ── TV ingest: a station is now radio *or* television ─────────────────────
+--
+-- The monitor already pulls any stream ffmpeg can decode, so a TV channel is a
+-- station row with `kind = 'tv'` and an HLS/RTMP URL. Keeping one table means
+-- charts, evidence, alerts and the CMO pack work for TV without a second
+-- pipeline — and the homepage can stop promising "TV next" once a channel is
+-- actually in the panel.
+
+alter table public.stations
+  add column if not exists kind text not null default 'radio';
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'stations_kind_check') then
+    alter table public.stations
+      add constraint stations_kind_check check (kind in ('radio', 'tv'));
+  end if;
+end $$;
+
+create index if not exists stations_kind on public.stations (kind);
+
+-- TV plays are recorded with their own source so reports can separate them
+-- from radio without guessing from the station name.
+alter table public.detections drop constraint if exists detections_source_check;
+alter table public.detections
+  add constraint detections_source_check
+  check (source in ('stream', 'fm', 'venue', 'manual', 'tv'));
+
+-- Coverage now reports radio and TV separately: "28 stations, 25 reporting"
+-- is less useful than "25 radio, 3 TV".
+create or replace function public.public_coverage()
+returns json
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with per_region as (
+    select
+      coalesce(region, 'Unspecified') as region,
+      count(*) as stations,
+      count(*) filter (where kind = 'tv') as tv,
+      count(*) filter (where stream_status in ('starting', 'online', 'reconnecting')) as monitored,
+      count(*) filter (where stream_status = 'online') as live
+    from public.stations
+    group by 1
+  )
+  select json_build_object(
+    'stations',   (select count(*) from public.stations),
+    'radio',      (select count(*) from public.stations where kind = 'radio'),
+    'tv',         (select count(*) from public.stations where kind = 'tv'),
+    'monitored',  (select count(*) from public.stations
+                    where stream_status in ('starting', 'online', 'reconnecting')),
+    'live',       (select count(*) from public.stations where stream_status = 'online'),
+    'regions',    (select coalesce(json_agg(json_build_object(
+                     'region', region, 'stations', stations, 'tv', tv,
+                     'monitored', monitored, 'live', live
+                   ) order by region), '[]'::json) from per_region),
+    'last_heartbeat', (select max(last_heartbeat) from public.stations),
+    'last_detection', (select max(detected_at) from public.detections)
+  );
+$$;
+
+revoke all on function public.public_coverage() from public;
+grant execute on function public.public_coverage() to anon, authenticated;
+
+-- ==========================================================================
+-- 17. 0017_reach.sql
+-- Reach: declared AQH per station, report carries kind and listen seconds
+-- ==========================================================================
+
+-- ── Reach & impressions: audience data is declared, never invented ─────────
+--
+-- Advertisers ask "how many people heard this?" and the honest answer needs a
+-- per-station audience figure we did not make up. So the figure lives on the
+-- station with its provenance attached: who supplied it and when it was
+-- measured. No source, no number — the UI then shows "no audience data"
+-- instead of a plausible fiction.
+--
+-- Methodology: docs/reach-methodology.md.
+--   impressions ≈ Σ (plays × station AQH × clip duration / 15 min)
+-- AQH = average quarter-hour listeners, the metric radio stations already sell
+-- advertising against, so a station can supply it from its own survey or
+-- agency rate card.
+
+alter table public.stations
+  add column if not exists aqh int check (aqh is null or aqh >= 0),
+  add column if not exists audience_source text,
+  add column if not exists audience_as_of date;
+
+comment on column public.stations.aqh is
+  'Average quarter-hour listeners, declared by the station or its agency. NULL = unknown, never estimated.';
+comment on column public.stations.audience_source is
+  'Who supplied the audience figure (survey name, agency, broadcaster document).';
+comment on column public.stations.audience_as_of is
+  'Date the audience figure was measured. Impressions are labelled as estimates of that date.';
+
+-- The monthly report now carries kind and the audience figure, so the CMO pack
+-- and the reach section use one query.
+drop function if exists public.station_month_report(date, date);
+
+create function public.station_month_report(p_from date, p_to date)
+returns table (
+  station_id uuid,
+  station text,
+  region text,
+  kind text,
+  spins bigint,
+  works bigint,
+  artists bigint,
+  with_evidence bigint,
+  first_play timestamptz,
+  last_play timestamptz,
+  aqh int,
+  listen_seconds bigint
+)
+language sql
+stable
+set search_path = public
+as $$
+  select
+    s.id,
+    s.name,
+    s.region,
+    s.kind,
+    count(d.id) as spins,
+    count(distinct d.recording_id) as works,
+    count(distinct r.artist_name) as artists,
+    count(*) filter (where d.evidence_path is not null) as with_evidence,
+    min(d.detected_at),
+    max(d.detected_at),
+    max(s.aqh) as aqh,
+    coalesce(sum(d.duration_sec), 0) as listen_seconds
+  from public.detections d
+  join public.stations s on s.id = d.station_id
+  left join public.recordings r on r.id = d.recording_id
+  where d.detected_at >= (p_from::timestamp at time zone 'Africa/Kampala')
+    and d.detected_at <  ((p_to + 1)::timestamp at time zone 'Africa/Kampala')
+  group by s.id, s.name, s.region, s.kind
+  order by count(d.id) desc, s.name
+$$;
+
+revoke all on function public.station_month_report(date, date) from public;
+grant execute on function public.station_month_report(date, date) to authenticated;
+
+-- ==========================================================================
+-- 18. 0018_push_subscriptions.sql
+-- Push: one row per installed device, owned by its profile
+-- ==========================================================================
+
+-- ── Web push: one row per browser a person has installed ───────────────────
+--
+-- Alerts already leave by email, WhatsApp and SMS from the worker. Push is the
+-- "it's in my pocket" channel SongBoost sells, and it belongs to the same
+-- person: a subscription is tied to the signed-in profile, so an artist can
+-- only ever register their own devices.
+
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles (id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  user_agent text,
+  created_at timestamptz not null default now(),
+  last_seen timestamptz not null default now(),
+  failures int not null default 0
+);
+
+create index if not exists push_subscriptions_profile on public.push_subscriptions (profile_id);
+
+alter table public.push_subscriptions enable row level security;
+
+drop policy if exists push_own_read on public.push_subscriptions;
+create policy push_own_read on public.push_subscriptions for select
+  using (profile_id = auth.uid() or public.my_role() = 'cmo');
+
+drop policy if exists push_own_insert on public.push_subscriptions;
+create policy push_own_insert on public.push_subscriptions for insert
+  with check (profile_id = auth.uid());
+
+drop policy if exists push_own_update on public.push_subscriptions;
+create policy push_own_update on public.push_subscriptions for update
+  using (profile_id = auth.uid()) with check (profile_id = auth.uid());
+
+drop policy if exists push_own_delete on public.push_subscriptions;
+create policy push_own_delete on public.push_subscriptions for delete
+  using (profile_id = auth.uid());
+
+-- Called by /api/push/send when a push provider rejects a device (not 404/410).
+create or replace function public.bump_push_failures(p_ids uuid[])
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.push_subscriptions
+     set failures = failures + 1
+   where id = any(p_ids);
+$$;
+
+revoke all on function public.bump_push_failures(uuid[]) from public;
+revoke all on function public.bump_push_failures(uuid[]) from anon, authenticated;
+
+-- ==========================================================================
+-- 19. 0019_plan_requests.sql
+-- Plans: self-serve requests with a reference a human can bill
+-- ==========================================================================
+
+-- ── Self-serve plans: the request a person makes, not a payment we pretend ─
+--
+-- SongBoost's advantage is a $10 button. Ours is the same price point in
+-- shillings, but money only moves once a mobile-money collection account is
+-- live. Until then the honest product is a request that reaches a human with
+-- everything needed to bill: plan, amount, number, reference.
+--
+-- When the MoMo API credentials exist, `status` moves pending → active from the
+-- payment callback and nothing else in the app has to change.
+
+create table if not exists public.plan_requests (
+  id uuid primary key default gen_random_uuid(),
+  reference text not null unique,
+  profile_id uuid references public.profiles (id) on delete set null,
+  org_id uuid references public.organizations (id) on delete set null,
+  plan text not null check (plan in ('artist', 'label', 'broadcaster', 'venue', 'cmo')),
+  billing text not null default 'monthly' check (billing in ('monthly', 'annual')),
+  amount_ugx int not null check (amount_ugx >= 0),
+  msisdn text,
+  note text,
+  status text not null default 'pending' check (status in ('pending', 'contacted', 'active', 'cancelled')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists plan_requests_status on public.plan_requests (status, created_at desc);
+create index if not exists plan_requests_profile on public.plan_requests (profile_id);
+
+alter table public.plan_requests enable row level security;
+
+drop policy if exists plan_requests_own_read on public.plan_requests;
+create policy plan_requests_own_read on public.plan_requests for select
+  using (profile_id = auth.uid() or public.my_role() = 'cmo');
+
+drop policy if exists plan_requests_own_insert on public.plan_requests;
+create policy plan_requests_own_insert on public.plan_requests for insert
+  with check (profile_id = auth.uid() and status = 'pending');
+
+drop policy if exists plan_requests_own_cancel on public.plan_requests;
+create policy plan_requests_own_cancel on public.plan_requests for update
+  using (profile_id = auth.uid()) with check (profile_id = auth.uid() and status = 'cancelled');
+
+drop policy if exists plan_requests_cmo_update on public.plan_requests;
+create policy plan_requests_cmo_update on public.plan_requests for update
+  using (public.my_role() = 'cmo');
+
+-- ==========================================================================
+-- 20. 0020_station_requests.sql
+-- Station onboarding: broadcasters claim or add a station, CMO approves
+-- ==========================================================================
+
+-- ── Self-serve station onboarding ─────────────────────────────────────────
+--
+-- A broadcaster signing up had no way to say "this is my station" — the
+-- dashboard just told them to ask East Sound. That is a dead end at the exact
+-- moment someone is willing to work.
+--
+-- So a broadcaster can now submit a request: claim a station already in the
+-- panel, or add a new one (with its stream URL). Approval stays with the CMO,
+-- because linking an organisation to a station is a rights decision, not a
+-- self-service toggle — and because a wrong link would expose someone else's
+-- playout data.
+
+create table if not exists public.station_requests (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles (id) on delete cascade,
+  org_id uuid references public.organizations (id) on delete set null,
+  station_id uuid references public.stations (id) on delete set null,
+  name text,
+  frequency text,
+  region text,
+  kind text not null default 'radio' check (kind in ('radio', 'tv')),
+  stream_url text,
+  note text,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'cancelled')),
+  review_note text,
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz,
+  reviewed_by uuid references public.profiles (id),
+  constraint station_request_target check (
+    station_id is not null or (name is not null and length(btrim(name)) > 1)
+  )
+);
+
+create index if not exists station_requests_status on public.station_requests (status, created_at desc);
+create index if not exists station_requests_profile on public.station_requests (profile_id);
+
+alter table public.station_requests enable row level security;
+
+drop policy if exists station_requests_own_insert on public.station_requests;
+create policy station_requests_own_insert on public.station_requests for insert
+  with check (profile_id = auth.uid() and status = 'pending');
+
+drop policy if exists station_requests_read on public.station_requests;
+create policy station_requests_read on public.station_requests for select
+  using (profile_id = auth.uid() or public.my_role() = 'cmo');
+
+drop policy if exists station_requests_own_cancel on public.station_requests;
+create policy station_requests_own_cancel on public.station_requests for update
+  using (profile_id = auth.uid())
+  with check (profile_id = auth.uid() and status = 'cancelled');
+
+-- Stations nobody has claimed yet. Name, region and frequency are public
+-- information; a broadcaster cannot read the stations table directly, so this
+-- SECURITY DEFINER function exposes exactly the fields needed to recognise
+-- their own station — no stream URLs, no playout data.
+create or replace function public.claimable_stations()
+returns table (id uuid, name text, region text, frequency text, kind text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select s.id, s.name, s.region, s.frequency, s.kind
+  from public.stations s
+  where s.broadcaster_org_id is null
+    and coalesce(s.stream_status, '') <> 'disabled'
+  order by s.name
+  limit 500
+$$;
+
+revoke all on function public.claimable_stations() from public;
+grant execute on function public.claimable_stations() to authenticated;
+
+-- Approving links the station to the requesting organisation (or creates it),
+-- then marks the request approved. Only a CMO can do this.
+create or replace function public.approve_station_request(p_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  r public.station_requests;
+  new_id uuid;
+  new_slug text;
+begin
+  if public.my_role() is distinct from 'cmo' then
+    raise exception 'only a CMO can approve a station request';
+  end if;
+
+  select * into r from public.station_requests where id = p_id for update;
+  if not found then
+    raise exception 'station request not found';
+  end if;
+  if r.status <> 'pending' then
+    raise exception 'station request is already %', r.status;
+  end if;
+
+  if r.station_id is not null then
+    update public.stations
+       set broadcaster_org_id = coalesce(r.org_id, broadcaster_org_id),
+           stream_url = coalesce(nullif(btrim(r.stream_url), ''), stream_url)
+     where id = r.station_id
+     returning id into new_id;
+    if new_id is null then
+      raise exception 'the station no longer exists';
+    end if;
+  else
+    new_slug := btrim(lower(regexp_replace(coalesce(r.name, '') || ' ' || coalesce(r.frequency, ''), '[^a-zA-Z0-9]+', '-', 'g')), '-');
+    insert into public.stations (name, slug, frequency, region, kind, stream_url, broadcaster_org_id, stream_status)
+    values (
+      btrim(r.name),
+      new_slug,
+      nullif(btrim(coalesce(r.frequency, '')), ''),
+      nullif(btrim(coalesce(r.region, '')), ''),
+      coalesce(r.kind, 'radio'),
+      nullif(btrim(coalesce(r.stream_url, '')), ''),
+      r.org_id,
+      case when nullif(btrim(coalesce(r.stream_url, '')), '') is null then 'no_stream_url' else 'starting' end
+    )
+    on conflict (slug) do update
+      set broadcaster_org_id = coalesce(excluded.broadcaster_org_id, public.stations.broadcaster_org_id),
+          stream_url = coalesce(excluded.stream_url, public.stations.stream_url)
+    returning id into new_id;
+  end if;
+
+  update public.station_requests
+     set status = 'approved', reviewed_at = now(), reviewed_by = auth.uid()
+   where id = p_id;
+
+  return new_id;
+end $$;
+
+create or replace function public.reject_station_request(p_id uuid, p_note text default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.my_role() is distinct from 'cmo' then
+    raise exception 'only a CMO can reject a station request';
+  end if;
+  update public.station_requests
+     set status = 'rejected', review_note = nullif(btrim(coalesce(p_note, '')), ''),
+         reviewed_at = now(), reviewed_by = auth.uid()
+   where id = p_id and status = 'pending';
+  if not found then
+    raise exception 'no pending station request with that id';
+  end if;
+end $$;
+
+revoke all on function public.approve_station_request(uuid) from public;
+revoke all on function public.reject_station_request(uuid, text) from public;
+grant execute on function public.approve_station_request(uuid) to authenticated;
+grant execute on function public.reject_station_request(uuid, text) to authenticated;
+
 commit;

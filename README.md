@@ -38,6 +38,11 @@ Additional rules:
 | Route | Purpose |
 |---|---|
 | `/` | Landing: sticky nav, live badge, EN/LG/SW, Solutions & Use Cases dropdowns, hero visualizer, playout ticker, Top 10 with regional filters + 10s evidence player |
+| Broadcaster dashboard | Claim an unclaimed station or add a new one; CMO approves in **Station Requests** |
+| `/pricing` | Plans in shillings; **free during early access** (payments paused via `NEXT_PUBLIC_PAYMENTS_ENABLED`) |
+| `/offline`, `/manifest.webmanifest` | Installed-app shell: offline page, install prompt, push subscription |
+| `/api/push/send` | Send one push payload to subscribed devices (CRON_SECRET + VAPID keys) |
+| `/api/feed/airplay` | Read-only JSON/CSV airplay feed for CMO systems — bearer token, RLS decides rows |
 | `/coverage` | Per-region station counts from the live panel, evidence and compliance claims, manual-logs comparison |
 | `/blog`, `/blog/[slug]` | Live metric feed, category pills, search |
 | `/dashboard` | Routes to the caller's own dashboard |

@@ -33,6 +33,12 @@ describe("supabase/setup.sql", () => {
       "0012_alert_channels.sql",
       "0013_public_stats.sql",
       "0014_public_coverage.sql",
+      "0015_cmo_station_report.sql",
+      "0016_tv_stations.sql",
+      "0017_reach.sql",
+      "0018_push_subscriptions.sql",
+      "0019_plan_requests.sql",
+      "0020_station_requests.sql",
     ]);
     const positions = MIGRATIONS.map(([file]: [string, string]) => sql.indexOf(file));
     expect(positions.every((p: number) => p > -1)).toBe(true);

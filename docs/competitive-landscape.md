@@ -136,23 +136,37 @@ Legend: ✅ present · ➖ partial/partner · ❌ absent.
 
 ## Roadmap this implies
 
-**P0 — distribution-ready data (do first, cheap):**
-- CSV export on every table — *shipped in this release* (catalogue, roster,
-  registry, Top 100; cue sheets already had PDF/Excel).
-- Read-only JSON API + signed data feed for CMOs and broadcasters, keyed to the
-  same RLS rules.
-- Monthly per-station work report (one PDF: plays, evidence index, unpaid).
+**P0 — distribution-ready data (do first, cheap):** *shipped*
+- CSV export on every table — catalogue, roster, registry, Top 100 (cue sheets
+  already had PDF/Excel).
+- Read-only feed — `GET /api/feed/airplay`, JSON or CSV, bearer token, RLS
+  decides rows. See `docs/cmo-data-feed.md`.
+- Monthly per-station report — the **CMO Monthly Distribution Pack**: PDF with
+  per-station plays/works/artists/evidence share plus top works, a matching CSV,
+  and the same month served by the feed. Backed by
+  `station_month_report()` + `month_top_works()` (SECURITY INVOKER).
+- Still open in P0: an evidence index inside the PDF (clip links per detection)
+  and the unpaid/outstanding column, which need royalty statements to be live.
 
-**P1 — close the visible gaps:**
-- TV ingest (start with the stations that also stream: NBS, Bukedde, UBC).
-- Installable PWA (add-to-home-screen, offline shell, push notifications) as the
-  cheapest answer to "SongBoost has an app".
-- MoMo/Flutterwave self-serve plans: artist $10/mo (SongBoost's proven price),
-  label tier, CMO licence.
+**P1 — close the visible gaps:** *capability shipped, activation pending*
+- **TV ingest** — `stations.kind = radio | tv`, HLS live-edge capture in the
+  worker, `source: "tv"` detections, radio/TV split on `/coverage`
+  (`docs/tv-ingest.md`). No channel is monitored yet: NBS, Bukedde and UBC need
+  an official HLS endpoint and a monitoring agreement before a row goes in.
+- **Installable PWA + push** — manifest, generated icons, service worker,
+  offline page, install prompt; push subscriptions in `push_subscriptions` and a
+  VAPID-gated sender (`docs/pwa-and-push.md`). Alert *rules* still reach email
+  and WhatsApp, not push, until the outbox sender is extended.
+- **Self-serve plans** — `/pricing` in shillings (artist UGX 35,000), request flow
+  with a quotable reference, CMO list (`docs/billing.md`). **Payments are paused:
+  early access is free** while we onboard users; charging is one env var away
+  (`NEXT_PUBLIC_PAYMENTS_ENABLED`), plus a mobile-money collection account.
 
-**P2 — moat:**
-- Reach/impressions metric with a documented methodology (needed before selling
-  ad-side analytics).
+**P2 — moat:** *metric shipped, data pending*
+- **Reach/impressions** — AQH-based estimate with the caveat attached and a
+  published methodology (`docs/reach-methodology.md`). Production shows "no
+  station has supplied an audience figure yet" until broadcasters hand theirs
+  over; that is the designed state, not a gap to paper over.
 - Regional expansion via partners (Kenya, Rwanda, Tanzania) rather than build-out.
 - Publish the national chart with a media partner; tie it to UPRS distribution.
 

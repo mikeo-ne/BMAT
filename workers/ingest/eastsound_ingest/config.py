@@ -18,6 +18,11 @@ class Station:
     stream_url: str | None = None  # explicit URL wins; otherwise resolved via Radio Browser
     radio_browser_uuid: str | None = None
     enabled: bool = True
+    kind: str = "radio"  # "radio" | "tv" — a TV channel is a station with an HLS/RTMP URL
+
+    @property
+    def is_tv(self) -> bool:
+        return self.kind == "tv"
 
 
 @dataclass
@@ -142,6 +147,7 @@ def load_stations(path: str | Path) -> list[Station]:
                 frequency=row.get("frequency") or "",
                 stream_url=_stream_url(row),
                 radio_browser_uuid=(row.get("radio_browser_uuid") or "").strip() or None,
+                kind=((row.get("kind") or "radio").strip().lower() or "radio"),
                 enabled=_enabled(row),
             ))
     return out
