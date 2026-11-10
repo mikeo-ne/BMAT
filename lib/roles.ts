@@ -47,6 +47,7 @@ export type NavItem = { id: string; label: string };
 export const ROLE_NAV: Record<Role, NavItem[]> = {
   cmo: [
     { id: "overview", label: "Overview" },
+    { id: "monthly-pack", label: "Distribution Pack" },
     { id: "registry", label: "Master Catalogue Registry" },
     { id: "splits", label: "Split Sheet Calculator" },
     { id: "top100", label: "National Top 100" },
