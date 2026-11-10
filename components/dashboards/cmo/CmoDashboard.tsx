@@ -10,6 +10,7 @@ import { Badge, DataTable, LoadGate, Section, StatGrid } from "@/components/dash
 import { ExportCsv } from "@/components/dashboard/ExportCsv";
 import { EvidencePlayer } from "@/components/site/EvidencePlayer";
 import { BrandMentions } from "./BrandMentions";
+import { MonthlyPack } from "./MonthlyPack";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const BLOCKS = ["00–04", "04–08", "08–12", "12–16", "16–20", "20–24"];
@@ -278,6 +279,7 @@ export function CmoDashboard() {
               { label: "To review", value: String(d.stats.unmatched), tone: d.stats.unmatched ? "bad" : "ok" },
             ]} />
           </section>
+          <MonthlyPack />
           <Registry rows={d.registry} />
           <SplitCalculator />
           <Top100 rows={d.top100} />

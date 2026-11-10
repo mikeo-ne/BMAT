@@ -25,6 +25,7 @@ export const MIGRATIONS = [
   ["0012_alert_channels.sql", "Airplay alerts on WhatsApp and SMS as well as email"],
   ["0013_public_stats.sql", "Aggregate counts for the public website"],
   ["0014_public_coverage.sql", "Coverage: anonymous per-region station counts for /coverage"],
+  ["0015_cmo_station_report.sql", "CMO pack: per-station monthly report and monthly top works"],
 ];
 
 const BANNER = (n, name, note) => [

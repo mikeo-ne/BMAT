@@ -3,6 +3,7 @@
 // CMO / Auditor data. RLS gives an approved CMO workspace-wide reads.
 import * as demo from "@/lib/data/cmo";
 import { safeArray } from "@/lib/safe";
+import { buildMonthlyPack, monthRange, type MonthlyPack } from "@/lib/cmo-report";
 import { db, must } from "./core";
 import type { Mention, MentionStatus, TrackedBrand } from "@/lib/mentions";
 
@@ -116,6 +117,67 @@ export async function loadCmo(): Promise<CmoData> {
     })),
     works: recRows.map((r) => ({ id: r.id, title: r.title })),
   };
+}
+
+// ── Monthly distribution pack (per-station report + top works) ─────────────
+
+const SAMPLE_STATIONS: [string, string, number, number, number][] = [
+  // station, region, plays, works, artists
+  ["Capital FM", "Central", 2841, 412, 148],
+  ["CBS FM", "Central", 2610, 398, 141],
+  ["Galaxy FM", "Central", 2104, 366, 132],
+  ["Radio Simba", "Central", 1873, 341, 124],
+  ["Sanyu FM", "Central", 1642, 322, 118],
+  ["Pearl FM", "Eastern", 1188, 274, 101],
+  ["Jinja FM", "Eastern", 903, 231, 88],
+  ["Mbale Times", "Eastern", 742, 198, 74],
+  ["Voice of Toro", "Western", 688, 187, 71],
+  ["Hope Radio", "Western", 512, 164, 63],
+  ["Radio Gulu", "Northern", 431, 142, 57],
+  ["Radio Lira", "Northern", 296, 118, 48],
+];
+
+function demoPack(month: string): MonthlyPack {
+  const offset = monthRange(month).days % 7;
+  const stations = SAMPLE_STATIONS.map(([station, region, plays, works, artists], i) => {
+    const spins = Math.max(0, plays - offset * (i % 3) * 12);
+    return {
+      station_id: `demo-${i}`,
+      station,
+      region,
+      spins,
+      works,
+      artists,
+      with_evidence: Math.round(spins * 0.97),
+      first_play: `${month}-02T05:14:00Z`,
+      last_play: `${month}-27T22:41:00Z`,
+    };
+  });
+  const works = demo.TOP100.slice(0, 20).map((w) => ({
+    rank: w.rank,
+    title: w.title,
+    artist: w.owner,
+    owner: w.owner,
+    spins: w.spins,
+    stations: w.stations,
+  }));
+  return buildMonthlyPack(stations, works, month, false);
+}
+
+/**
+ * The rows behind the CMO's monthly report. The two RPCs are SECURITY INVOKER,
+ * so a CMO sees the whole panel and a label sees only its own catalogue —
+ * exactly what the dashboard shows, no wider.
+ */
+export async function loadMonthlyPack(month: string): Promise<MonthlyPack> {
+  const range = monthRange(month);
+  const sb = db();
+  if (!sb) return demoPack(month);
+  const [stations, works] = await Promise.all([
+    sb.rpc("station_month_report", { p_from: range.from, p_to: range.to }),
+    sb.rpc("month_top_works", { p_from: range.from, p_to: range.to, p_limit: 20 }),
+  ]);
+  return buildMonthlyPack(must(stations, "station report"), must(works, "month top works"), month, true);
 }
 
 export async function resolveDispute(id: string, status: DisputeStatus): Promise<void> {

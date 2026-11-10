@@ -136,12 +136,17 @@ Legend: ✅ present · ➖ partial/partner · ❌ absent.
 
 ## Roadmap this implies
 
-**P0 — distribution-ready data (do first, cheap):**
-- CSV export on every table — *shipped in this release* (catalogue, roster,
-  registry, Top 100; cue sheets already had PDF/Excel).
-- Read-only JSON API + signed data feed for CMOs and broadcasters, keyed to the
-  same RLS rules.
-- Monthly per-station work report (one PDF: plays, evidence index, unpaid).
+**P0 — distribution-ready data (do first, cheap):** *shipped*
+- CSV export on every table — catalogue, roster, registry, Top 100 (cue sheets
+  already had PDF/Excel).
+- Read-only feed — `GET /api/feed/airplay`, JSON or CSV, bearer token, RLS
+  decides rows. See `docs/cmo-data-feed.md`.
+- Monthly per-station report — the **CMO Monthly Distribution Pack**: PDF with
+  per-station plays/works/artists/evidence share plus top works, a matching CSV,
+  and the same month served by the feed. Backed by
+  `station_month_report()` + `month_top_works()` (SECURITY INVOKER).
+- Still open in P0: an evidence index inside the PDF (clip links per detection)
+  and the unpaid/outstanding column, which need royalty statements to be live.
 
 **P1 — close the visible gaps:**
 - TV ingest (start with the stations that also stream: NBS, Bukedde, UBC).
