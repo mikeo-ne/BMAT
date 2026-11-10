@@ -18,6 +18,7 @@ import { cx, safeArray } from "@/lib/safe";
 import { Badge, DataTable, LoadGate, Section, StatGrid } from "@/components/dashboard/ui";
 import { EvidencePlayer } from "@/components/site/EvidencePlayer";
 import { StationMentions } from "./StationMentions";
+import { StationSetup } from "./StationSetup";
 
 const KIND: Record<SegmentKind, { bar: string; label: string }> = {
   music: { bar: "bg-emerald-400", label: "Music" },
@@ -174,7 +175,18 @@ function BroadcasterView({ d, date, setDate, loading, freshness }: { d: Broadcas
   const short = useMemo(() => adShortfallCount(d.ads), [d.ads]);
 
   if (!d.station) {
-    return <div className="glass p-6 text-sm text-slate-400">No station is linked to your account yet. Ask East Sound to connect your station.</div>;
+    return (
+      <div className="space-y-6">
+        <section className="glass p-6">
+          <h1 className="text-xl font-bold text-white">Connect your station</h1>
+          <p className="mt-2 text-sm text-slate-400">
+            Your playout timeline, cue sheets and ad control appear here once a station is linked to your
+            organisation. Claim yours below — it takes a minute and a CMO approves it.
+          </p>
+        </section>
+        <StationSetup hasStation={false} />
+      </div>
+    );
   }
   return (
     <>
@@ -203,6 +215,7 @@ function BroadcasterView({ d, date, setDate, loading, freshness }: { d: Broadcas
       <CueSheet data={d} />
       <AdControl ads={d.ads} />
       <StationMentions />
+      <StationSetup hasStation />
     </>
   );
 }

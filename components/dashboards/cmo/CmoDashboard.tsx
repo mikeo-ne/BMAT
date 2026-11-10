@@ -13,6 +13,7 @@ import { BrandMentions } from "./BrandMentions";
 import { MonthlyPack } from "./MonthlyPack";
 import { Reach } from "./Reach";
 import { PlanRequests } from "./PlanRequests";
+import { StationRequests } from "./StationRequests";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const BLOCKS = ["00–04", "04–08", "08–12", "12–16", "16–20", "20–24"];
@@ -274,6 +275,20 @@ export function CmoDashboard() {
               <h1 className="text-2xl font-bold text-white">National audit</h1>
               <Freshness live={state.live} lastUpdated={state.lastUpdated} />
             </div>
+            <details className="mb-4 rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-400">
+              <summary className="cursor-pointer font-medium text-slate-200">What this dashboard is for</summary>
+              <ul className="mt-3 space-y-1.5">
+                <li><span className="text-white">Distribution Pack</span> — the monthly per-station report a CMO files: plays, works, artists, evidence share; PDF and CSV.</li>
+                <li><span className="text-white">Reach &amp; Impressions</span> — audience estimates, only for stations whose AQH someone declared.</li>
+                <li><span className="text-white">Master Catalogue Registry</span> — every recording, its rights owner and ISRC status.</li>
+                <li><span className="text-white">Split Sheet Calculator</span> — test a pool split before you agree to it.</li>
+                <li><span className="text-white">National Top 100 / Regional Heatmap</span> — what the country is playing, and when.</li>
+                <li><span className="text-white">Rights &amp; Disputes</span> — conflicting claims, with the plays at stake.</li>
+                <li><span className="text-white">Unmatched Audio</span> — clips the matcher could not name; review them to grow the catalogue.</li>
+                <li><span className="text-white">Station Requests</span> — approve a broadcaster claiming its station.</li>
+                <li><span className="text-white">Plan Requests</span> — people who asked for a paid plan, with a reference to bill against.</li>
+              </ul>
+            </details>
             <StatGrid items={[
               { label: "Plays · 24h", value: fmtInt(d.stats.detections24h) },
               { label: "Matched", value: `${d.stats.matchedRate}%` },
@@ -289,6 +304,7 @@ export function CmoDashboard() {
           <Heatmap regions={d.regions} data={d.heatmap} />
           <Disputes initial={d.disputes} />
           <UnmatchedQueue initial={d.unmatched} works={d.works} />
+          <StationRequests />
           <PlanRequests />
           <BrandMentions />
         </>

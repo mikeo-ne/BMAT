@@ -30,6 +30,7 @@ export const MIGRATIONS = [
   ["0017_reach.sql", "Reach: declared AQH per station, report carries kind and listen seconds"],
   ["0018_push_subscriptions.sql", "Push: one row per installed device, owned by its profile"],
   ["0019_plan_requests.sql", "Plans: self-serve requests with a reference a human can bill"],
+  ["0020_station_requests.sql", "Station onboarding: broadcasters claim or add a station, CMO approves"],
 ];
 
 const BANNER = (n, name, note) => [

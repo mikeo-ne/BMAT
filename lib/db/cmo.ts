@@ -184,6 +184,64 @@ export async function loadMonthlyPack(month: string): Promise<MonthlyPack> {
   return buildMonthlyPack(must(stations, "station report"), must(works, "month top works"), month, true);
 }
 
+// ── Station requests (a broadcaster claiming or adding a station) ──────────
+
+export type StationRequestAdmin = {
+  id: string;
+  status: string;
+  kind: string;
+  name: string | null;
+  frequency: string | null;
+  region: string | null;
+  streamUrl: string | null;
+  note: string | null;
+  requestedBy: string;
+  created: string;
+};
+
+const DEMO_STATION_REQUESTS: StationRequestAdmin[] = [
+  { id: "sr1", status: "pending", kind: "radio", name: "Next Radio", frequency: "106.1", region: "Central", streamUrl: null, note: "Claiming our own station", requestedBy: "Next Radio", created: "2026-11-10" },
+  { id: "sr2", status: "pending", kind: "tv", name: "UBC TV", frequency: null, region: "Central", streamUrl: "https://example.invalid/ubc.m3u8", note: "We can supply the HLS endpoint", requestedBy: "UBC", created: "2026-11-09" },
+];
+
+export async function loadStationRequests(): Promise<{ rows: StationRequestAdmin[]; live: boolean }> {
+  const sb = db();
+  if (!sb) return { rows: DEMO_STATION_REQUESTS, live: false };
+  const { data } = await sb
+    .from("station_requests")
+    .select("id, status, kind, name, frequency, region, stream_url, note, created_at, profiles(display_name)")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  type Row = {
+    id: string; status: string; kind: string; name: string | null; frequency: string | null; region: string | null;
+    stream_url: string | null; note: string | null; created_at: string;
+    profiles: { display_name: string } | { display_name: string }[] | null;
+  };
+  return {
+    live: true,
+    rows: safeArray(data as Row[]).map((r) => {
+      const who = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+      return {
+        id: r.id, status: r.status, kind: r.kind, name: r.name, frequency: r.frequency, region: r.region,
+        streamUrl: r.stream_url, note: r.note, requestedBy: who?.display_name ?? "Broadcaster",
+        created: String(r.created_at ?? "").slice(0, 10),
+      };
+    }),
+  };
+}
+
+export async function approveStationRequest(id: string): Promise<void> {
+  const sb = db();
+  if (!sb) return;
+  must(await sb.rpc("approve_station_request", { p_id: id }), "approve station request");
+}
+
+export async function rejectStationRequest(id: string, note: string): Promise<void> {
+  const sb = db();
+  if (!sb) return;
+  must(await sb.rpc("reject_station_request", { p_id: id, p_note: note }), "reject station request");
+}
+
 // ── Plan requests (self-serve upgrades waiting to be billed) ───────────────
 
 export type PlanRequestRow = {
