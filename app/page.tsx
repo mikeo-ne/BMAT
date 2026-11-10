@@ -6,6 +6,7 @@ import { Hero } from "@/components/site/Hero";
 import { AirplayChart } from "@/components/site/AirplayChart";
 import { Footer } from "@/components/site/Footer";
 import { UseCaseGrid } from "@/components/site/UseCaseGrid";
+import { EARLY_ACCESS } from "@/lib/plans";
 import { SOLUTIONS } from "@/lib/data/public";
 
 export const metadata: Metadata = {
@@ -19,6 +20,22 @@ export default function HomePage() {
       <Header />
       <main>
         <Hero />
+        {EARLY_ACCESS.active && (
+          <section className="mx-auto max-w-7xl px-4 pt-8 sm:px-6">
+            <Link
+              href="/pricing"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-4 transition hover:border-emerald-400/60"
+            >
+              <p className="text-sm text-emerald-100">
+                <span className="mr-2 rounded-full bg-emerald-400/20 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-emerald-200">
+                  {EARLY_ACCESS.badge}
+                </span>
+                {EARLY_ACCESS.headline} Every plan is free while we onboard our first artists, labels and stations.
+              </p>
+              <span className="text-sm font-semibold text-emerald-300">Join free →</span>
+            </Link>
+          </section>
+        )}
         <AirplayChart />
 
         <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
