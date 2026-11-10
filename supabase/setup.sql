@@ -1781,4 +1781,161 @@ revoke all on function public.reject_station_request(uuid, text) from public;
 grant execute on function public.approve_station_request(uuid) to authenticated;
 grant execute on function public.reject_station_request(uuid, text) to authenticated;
 
+-- ==========================================================================
+-- 21. 0021_panel_stats.sql
+-- Public stats report panel size as well as live streams
+-- ==========================================================================
+
+-- ── Panel size in the public stats ─────────────────────────────────────────
+--
+-- public_platform_stats() is deliberately strict about "monitoring": a station
+-- only counts as live if its worker heartbeat is under ten minutes old (0009).
+-- That is the right rule, but it left the header reading "0 Stations Monitored
+-- Live" whenever the worker was between runs — true, and useless to a visitor
+-- deciding whether to sign up.
+--
+-- So the same call now also reports two build-out facts that hold whether or
+-- not a worker is running: how many stations are in the panel, and how many
+-- have a stream URL we can read. The header shows the live figure when it
+-- exists and the panel figure when it does not. Nothing here claims a play has
+-- been heard; detections_24h still answers that, and it is still zero.
+
+drop function if exists public.public_platform_stats();
+
+create function public.public_platform_stats()
+returns table (
+  streams_online bigint,
+  venues bigint,
+  detections_24h bigint,
+  panel_stations bigint,
+  stream_ready bigint
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select (select count(*) from public.stations
+           where stream_status = 'online'
+             and last_heartbeat > now() - interval '10 minutes'),
+         (select count(*) from public.venues),
+         (select count(*) from public.detections
+           where detected_at >= now() - interval '24 hours'),
+         (select count(*) from public.stations
+           where coalesce(stream_status, '') <> 'disabled'),
+         (select count(*) from public.stations
+           where coalesce(stream_status, '') <> 'disabled'
+             and nullif(btrim(coalesce(stream_url, '')), '') is not null)
+$$;
+
+revoke execute on function public.public_platform_stats() from public;
+grant execute on function public.public_platform_stats() to anon, authenticated;
+
+-- The readiness board made the same mistake in a different place: it read
+-- `monitored` (a settable status column) and reported "25 streaming" while no
+-- worker was running. Expose the stream-URL count so the board can describe
+-- the panel without implying anyone is listening.
+create or replace function public.public_ingest_health()
+returns json
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select json_build_object(
+    'stations',       (select count(*) from public.stations),
+    'monitored',      (select count(*) from public.stations
+                        where stream_status in ('starting', 'online', 'reconnecting')),
+    'stream_ready',   (select count(*) from public.stations
+                        where nullif(btrim(coalesce(stream_url, '')), '') is not null),
+    'last_heartbeat', (select max(last_heartbeat) from public.stations),
+    'last_detection', (select max(detected_at) from public.detections)
+  );
+$$;
+
+revoke all on function public.public_ingest_health() from public;
+grant execute on function public.public_ingest_health() to anon, authenticated;
+
+-- ==========================================================================
+-- 22. 0022_recording_credits.sql
+-- Many songwriters and featured artists per song
+-- ==========================================================================
+
+-- ── More than one songwriter, more than one feature ───────────────────────
+--
+-- `recordings.composer` and `recordings.featuring` were single text fields, so
+-- a song with three writers had to be typed as one blob ("A, B & C") and a
+-- cue sheet printed that blob as if it were a person's name. UPRS distributes
+-- to people, so the writer list is not a display detail — it is the royalty
+-- claim.
+--
+-- Credits now live in their own table: one row per person, with a role and an
+-- order. The two old text columns are still written (joined with "; ") because
+-- the worker, the cue-sheet generator, the broadcaster timeline and the CSV
+-- exports all read them — that keeps this additive instead of a migration of
+-- every consumer.
+
+create table if not exists public.recording_credits (
+  id uuid primary key default gen_random_uuid(),
+  recording_id uuid not null references public.recordings (id) on delete cascade,
+  role text not null check (role in ('songwriter', 'featured')),
+  name text not null check (length(btrim(name)) > 0),
+  -- Set when the person has an East Sound account, so a writer can later see
+  -- their own credits. Null is normal: most writers are typed in by name.
+  profile_id uuid references public.profiles (id) on delete set null,
+  position int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+-- The same person cannot be credited twice in the same role on one song,
+-- whatever the capitalisation ("Nalu" vs "nalu").
+create unique index if not exists recording_credits_unique
+  on public.recording_credits (recording_id, role, lower(btrim(name)));
+create index if not exists recording_credits_recording
+  on public.recording_credits (recording_id, role, position);
+
+-- Who may edit credits: exactly who may edit the recording itself.
+create or replace function public.owns_recording(p_recording uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+      from public.recordings r
+     where r.id = p_recording
+       and (
+            (public.my_role() = 'label'  and r.label_org_id = public.my_org())
+         or (public.my_role() = 'artist' and r.artist_profile_id = auth.uid() and r.label_org_id is null)
+       )
+  )
+$$;
+revoke all on function public.owns_recording(uuid) from public;
+grant execute on function public.owns_recording(uuid) to authenticated;
+
+alter table public.recording_credits enable row level security;
+
+-- The owner, their label, the CMO — and a writer whose account is credited.
+drop policy if exists recording_credits_read on public.recording_credits;
+create policy recording_credits_read on public.recording_credits for select using (
+  public.my_role() = 'cmo'
+  or public.owns_recording(recording_id)
+  or profile_id = auth.uid()
+);
+
+drop policy if exists recording_credits_write on public.recording_credits;
+create policy recording_credits_write on public.recording_credits for insert
+  with check (public.owns_recording(recording_id));
+
+drop policy if exists recording_credits_update on public.recording_credits;
+create policy recording_credits_update on public.recording_credits for update
+  using (public.owns_recording(recording_id))
+  with check (public.owns_recording(recording_id));
+
+drop policy if exists recording_credits_delete on public.recording_credits;
+create policy recording_credits_delete on public.recording_credits for delete
+  using (public.owns_recording(recording_id));
+
 commit;

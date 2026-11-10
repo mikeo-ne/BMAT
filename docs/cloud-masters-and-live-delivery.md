@@ -87,3 +87,29 @@ The PostgreSQL suites always use disposable loopback databases and test-only acc
 Configure edge abuse controls, storage/egress quotas and billing alerts before public upload rollout; per-account request limits are not a tenant-wide storage budget.
 
 Review/merge the change, connect the production-only private store/provider secrets, deploy, and verify real provider readiness and a controlled, consented workflow before calling live delivery activated. Keep the live switch off if any provider/consent prerequisite remains unverified. Static export remains a public-only showcase with no private APIs or sends.
+
+## 4. Credits: more than one writer, more than one feature
+
+A song is rarely one person, and UPRS pays people rather than blobs, so credits
+are stored one row per person:
+
+| Where | What it holds |
+| --- | --- |
+| `recordings.composer` / `recordings.featuring` | The joined line (`"Nalu Akello; R. Mutebi"`) that cue sheets, the worker, the broadcaster timeline and the CSV exports still read |
+| `recording_credits` | One row per person: `role` (`songwriter` / `featured`), `name`, `position`, optional `profile_id` |
+| `split_shares` | Money. Untouched by credits — naming a writer never moves a shilling |
+
+In the UI (`My Songs` for artists, `Upload Songs` for labels) both lists are
+repeatable rows: **+ Add another songwriter**, **+ Add another featured
+artist**. Names are trimmed, blanks dropped, repeats removed case-insensitively
+(`"Nalu"` and `"nalu"` are one person), and each list caps at 12.
+
+Writing credits is limited by RLS to whoever may edit the recording itself
+(`owns_recording()`): the artist who uploaded it, or its label. A second artist
+cannot add a name to someone else's song, and a credited account can read its
+own credit. If the credit table has not been deployed yet, the song still saves —
+the joined text columns are the fallback.
+
+The artist dashboard also flags songs where **writers are named but no split is
+agreed** (the split sheet only pays what has been signed), with the even share
+for reference.

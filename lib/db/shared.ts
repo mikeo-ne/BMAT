@@ -92,10 +92,38 @@ export async function loadPublicChart(region: "All" | Region): Promise<PublicCha
   };
 }
 
-export async function loadPublicStats(): Promise<{ streams: number; venues: number } | null> {
+export type PublicStats = {
+  /** Stations whose worker heartbeat is under ten minutes old — real monitoring. */
+  streams: number;
+  venues: number;
+  /** Stations in the panel: true whether or not a worker is running. */
+  panel: number;
+  /** Panel stations with a stream URL we can actually read. */
+  ready: number;
+};
+
+/**
+ * Which line the header badge shows. Pure, so the honesty rule is testable:
+ * "monitored live" only with a recent heartbeat, otherwise the panel size —
+ * never a proud zero.
+ */
+export function badgeLine(
+  stats: PublicStats | null,
+  configured: boolean,
+): { key: "live" | "liveTpl" | "liveStationsTpl" | "livePanelTpl"; values: Record<string, string> } | null {
+  if (!stats) return configured ? null : { key: "live", values: {} };
+  if (stats.venues > 0) return { key: "liveTpl", values: { s: String(stats.streams), v: String(stats.venues) } };
+  if (stats.streams > 0) return { key: "liveStationsTpl", values: { s: String(stats.streams) } };
+  if (stats.panel > 0) return { key: "livePanelTpl", values: { s: String(stats.panel), r: String(stats.ready) } };
+  return null;
+}
+
+export async function loadPublicStats(): Promise<PublicStats | null> {
   const sb = db();
   if (!sb) return null;
   const { data, error } = await sb.rpc("public_platform_stats");
   if (error || !Array.isArray(data) || !data[0]) return null;
-  return { streams: Number(data[0].streams_online), venues: Number(data[0].venues) };
+  const row = data[0] as Record<string, unknown>;
+  const n = (v: unknown) => Number(v ?? 0);
+  return { streams: n(row.streams_online), venues: n(row.venues), panel: n(row.panel_stations), ready: n(row.stream_ready) };
 }

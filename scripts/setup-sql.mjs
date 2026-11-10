@@ -31,6 +31,8 @@ export const MIGRATIONS = [
   ["0018_push_subscriptions.sql", "Push: one row per installed device, owned by its profile"],
   ["0019_plan_requests.sql", "Plans: self-serve requests with a reference a human can bill"],
   ["0020_station_requests.sql", "Station onboarding: broadcasters claim or add a station, CMO approves"],
+  ["0021_panel_stats.sql", "Public stats report panel size as well as live streams"],
+  ["0022_recording_credits.sql", "Many songwriters and featured artists per song"],
 ];
 
 const BANNER = (n, name, note) => [

@@ -29,11 +29,11 @@ const input = (routes: Route[], overrides: Partial<HealthInput> = {}): HealthInp
 const HEALTHY: Route[] = [
   { match: "/auth/v1/health", body: { name: "GoTrue", version: "2.1" } },
   { match: "profiles?select=id", body: [{ id: "u1" }] },
-  { match: "rpc/public_ingest_health", body: { stations: 14, monitored: 7, last_heartbeat: "2026-11-04T11:59:00Z", last_detection: "2026-11-04T11:58:00Z" } },
+  { match: "rpc/public_ingest_health", body: { stations: 14, monitored: 7, stream_ready: 12, last_heartbeat: "2026-11-04T11:59:00Z", last_detection: "2026-11-04T11:58:00Z" } },
 ];
-const withDetection = (at: string | null): Route[] => [
+const withDetection = (at: string | null, heartbeat: string | null = "2026-11-04T11:59:00Z"): Route[] => [
   ...HEALTHY.filter((r) => !r.match.includes("public_ingest_health")),
-  { match: "rpc/public_ingest_health", body: { stations: 14, monitored: 7, last_heartbeat: null, last_detection: at } },
+  { match: "rpc/public_ingest_health", body: { stations: 14, monitored: 7, stream_ready: 12, last_heartbeat: heartbeat, last_detection: at } },
 ];
 
 const byId = (r: Awaited<ReturnType<typeof buildReadiness>>, id: string) => r.checks.find((c) => c.id === id)!;
@@ -56,7 +56,7 @@ describe("buildReadiness", () => {
     expect(report.ready).toBe(true);
     expect(report.project).toBe("abcdefghijkl.supabase.co");
     expect(report.checks.filter((c) => c.state === "fail")).toHaveLength(0);
-    expect(byId(report, "stations").detail).toBe("14 stations in the panel, 7 streaming.");
+    expect(byId(report, "stations").detail).toBe("14 stations in the panel, 12 with a stream URL.");
     expect(byId(report, "ingest").detail).toMatch(/Last detection/);
   });
 
@@ -110,11 +110,26 @@ describe("buildReadiness", () => {
     expect(byId(fresh, "ingest").state).toBe("ok");
     expect(byId(fresh, "ingest").detail).toBe("Last detection 10 minutes ago.");
 
+    // Worker up, matching nothing: the fix is masters, not hosting.
+    const quiet = await buildReadiness(
+      input(withDetection("2026-11-02T09:00:00Z", "2026-11-04T11:59:00Z")),
+    );
+    expect(byId(quiet, "ingest").state).toBe("warn");
+    expect(byId(quiet, "ingest").detail).toMatch(/worker is up, but the last detection was 2 days ago/);
+    expect(byId(quiet, "ingest").fix).toMatch(/Upload songs/);
+    expect(quiet.ready).toBe(true);
+  });
+
+  it("says the worker is stopped when the heartbeat goes quiet", async () => {
+    // Status columns can say "online" forever; only the heartbeat knows.
     const stale = await buildReadiness(
-      input(withDetection("2026-11-02T09:00:00Z")),
+      input(withDetection("2026-11-02T09:00:00Z", "2026-11-02T08:59:00Z")),
     );
     expect(byId(stale, "ingest").state).toBe("warn");
-    expect(byId(stale, "ingest").detail).toContain("looks stopped");
+    expect(byId(stale, "ingest").detail).toBe(
+      "The worker last reported 2 days ago — it is not running, so no station is being recorded.",
+    );
+    expect(byId(stale, "ingest").fix).toMatch(/always-on host/);
     expect(stale.ready).toBe(true);
   });
 
@@ -143,14 +158,21 @@ describe("buildReadiness", () => {
   it("warns, rather than claiming success, when no detection has ever arrived", async () => {
     const report = await buildReadiness(input(withDetection(null)));
     expect(byId(report, "ingest").state).toBe("warn");
-    expect(byId(report, "ingest").detail).toMatch(/listening to 7 stations; no plays recorded yet/);
+    expect(byId(report, "ingest").detail).toMatch(/worker is up; no plays recorded yet/i);
     expect(byId(report, "ingest").fix).toMatch(/Upload songs/);
+
+    // Never started at all: a different fix (hosting, not masters).
+    const never = await buildReadiness(input(withDetection(null, null)));
+    expect(byId(never, "ingest").detail).toMatch(/never reported/);
+    expect(byId(never, "ingest").fix).toMatch(/always-on host/);
+
+    // Up, but no station enabled: don't send the operator hunting for masters.
     const idle = await buildReadiness(input([
       ...HEALTHY.filter((r) => !r.match.includes("public_ingest_health")),
-      { match: "rpc/public_ingest_health", body: { stations: 14, monitored: 0, last_heartbeat: null, last_detection: null } },
+      { match: "rpc/public_ingest_health", body: { stations: 14, monitored: 0, stream_ready: 12, last_heartbeat: "2026-11-04T11:59:00Z", last_detection: null } },
     ]));
-    expect(byId(idle, "ingest").detail).toMatch(/No detections yet/);
-    expect(byId(idle, "ingest").fix).toMatch(/Start the ingest worker/);
+    expect(byId(idle, "ingest").state).toBe("warn");
+    expect(byId(idle, "ingest").fix).toMatch(/Enable at least one station/);
   });
 
   it("flags a non-HTTPS project URL and a missing site URL", async () => {

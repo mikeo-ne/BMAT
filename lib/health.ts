@@ -46,6 +46,8 @@ export type HealthInput = {
 };
 
 export const STALE_AFTER_MS = 30 * 60 * 1000;
+/** A running worker heartbeats well inside ten minutes; silence means it stopped. */
+export const HEARTBEAT_STALE_MS = 10 * 60 * 1000;
 
 export function projectHost(url: string): string {
   try {
@@ -237,7 +239,13 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
   const { res: hRes, error: hError } = await attempt(input.fetch, rest(url, "rpc/public_ingest_health"), headers);
   const hFailure = hError ?? apiError(hRes?.body);
   const health = !hFailure && hRes?.body && typeof hRes.body === "object" && !Array.isArray(hRes.body)
-    ? (hRes.body as { stations?: number; monitored?: number; last_detection?: string | null })
+    ? (hRes.body as {
+        stations?: number;
+        monitored?: number;
+        stream_ready?: number;
+        last_heartbeat?: string | null;
+        last_detection?: string | null;
+      })
     : null;
   const missingFn = !health && /PGRST202|42883|could not find the function|does not exist/i.test(hFailure ?? "");
 
@@ -266,6 +274,10 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
 
   const rows = Number(health.stations) || 0;
   const monitored = Number(health.monitored) || 0;
+  const ready = Number(health.stream_ready) || 0;
+  const heardAt = health.last_heartbeat ? Date.parse(health.last_heartbeat) : NaN;
+  const heartbeatAge = now().getTime() - heardAt;
+  const workerUp = Number.isFinite(heartbeatAge) && heartbeatAge <= HEARTBEAT_STALE_MS;
   checks.push(
     rows === 0
       ? {
@@ -279,38 +291,50 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
           id: "stations",
           label: "Station panel loaded",
           state: "ok",
-          detail: `${rows} station${rows === 1 ? "" : "s"} in the panel` + (monitored ? `, ${monitored} streaming.` : "."),
+          // Count a stream URL, not a status column: "streaming" should mean we
+          // have somewhere to listen, not that someone once set a flag.
+          detail:
+            `${rows} station${rows === 1 ? "" : "s"} in the panel` +
+            (ready ? `, ${ready} with a stream URL.` : "."),
         },
   );
 
   const at = health.last_detection ? Date.parse(health.last_detection) : NaN;
   const age = now().getTime() - at;
+  const WORKER_FIX =
+    "Deploy the worker on an always-on host — Vercel cannot hold 25 streams open. RUNBOOK.md step 1 has the Railway/Fly recipe (10 minutes).";
+
   checks.push(
-    !Number.isFinite(at)
+    Number.isFinite(at) && age <= staleAfter
       ? {
           id: "ingest",
           label: "Ingest worker reporting",
-          state: "warn",
-          detail: monitored > 0
-            ? `The worker is listening to ${monitored} station${monitored === 1 ? "" : "s"}; no plays recorded yet.`
-            : "No detections yet — the worker has not written anything.",
-          fix: monitored > 0
-            ? "Upload songs (label: Upload Songs · artist: My Songs). Plays appear once a monitored station plays one."
-            : "Start the ingest worker with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then upload at least one song.",
+          state: "ok",
+          detail: `Last detection ${humanAge(age)}.`,
         }
-      : age <= staleAfter
+      : !workerUp
+        // The old copy said "listening to N stations" whenever the status
+        // column said online — which is how a stopped worker still looked
+        // healthy. Heartbeat silence is the only honest signal.
         ? {
             id: "ingest",
             label: "Ingest worker reporting",
-            state: "ok",
-            detail: `Last detection ${humanAge(age)}.`,
+            state: "warn",
+            detail: Number.isFinite(heardAt)
+              ? `The worker last reported ${humanAge(heartbeatAge)} — it is not running, so no station is being recorded.`
+              : "The ingest worker has never reported — nothing is being recorded.",
+            fix: WORKER_FIX,
           }
         : {
             id: "ingest",
             label: "Ingest worker reporting",
             state: "warn",
-            detail: `Last detection ${humanAge(age)} — the worker looks stopped.`,
-            fix: "Check the worker host (Railway/Fly logs) and that stations.csv has enabled stations.",
+            detail: Number.isFinite(at)
+              ? `The worker is up, but the last detection was ${humanAge(age)} — nothing it hears is matching a master.`
+              : "The worker is up; no plays recorded yet.",
+            fix: monitored > 0
+              ? "Upload songs (label: Upload Songs · artist: My Songs). Plays appear once a monitored station plays one."
+              : "Enable at least one station in stations.csv so the worker has something to listen to.",
           },
   );
 

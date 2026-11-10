@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { getAudioContext, makeReference, type Reference } from "@/lib/audio";
 import {
-  GENRES, ISRC_RE, UPC_RE, attachReference, createSong, deleteSong, detailProblems, emptyDetails, guessFromFilename, recognition, upcConflict, updateSong,
+  GENRES, ISRC_RE, MAX_CREDITS, UPC_RE, attachReference, createSong, deleteSong, detailProblems, emptyDetails, guessFromFilename, recognition, upcConflict, updateSong,
   type Owner, type Song, type SongDetails,
 } from "@/lib/db/masters";
 import { cx, safeArray } from "@/lib/safe";
@@ -37,6 +37,69 @@ function useUpcWarning(upc: string, artistName: string, songId?: string | null):
     return () => { live = false; window.clearTimeout(t); };
   }, [upc, artistName, songId]);
   return clash;
+}
+
+/**
+ * One person per row, because that is how a cue sheet reads them. A single
+ * text box forced "A, B & C" into one field, and UPRS pays people, not blobs.
+ */
+function NamesField({ label, hint, addLabel, placeholder, value, onChange, suggestions, wide }: {
+  label: string;
+  hint?: string;
+  addLabel: string;
+  placeholder?: string;
+  value: string[];
+  onChange: (next: string[]) => void;
+  suggestions?: string[];
+  wide?: boolean;
+}) {
+  const listId = useId();
+  const names = safeArray(value);
+  const rows = names.length ? names : [""];
+  const setAt = (i: number, v: string) => onChange(rows.map((n, j) => (j === i ? v : n)));
+  const removeAt = (i: number) => onChange(rows.filter((_, j) => j !== i));
+  const options = safeArray(suggestions).filter((s) => s.trim());
+  return (
+    <div className={cx("block", wide && "sm:col-span-2")}>
+      <span className="mb-1 block text-xs font-medium text-slate-400">{label}</span>
+      <ul className="space-y-2">
+        {rows.map((name, i) => (
+          <li key={i} className="flex items-center gap-2">
+            <input
+              className="input !py-2"
+              value={name}
+              maxLength={120}
+              placeholder={i === 0 ? placeholder : undefined}
+              aria-label={`${label} ${i + 1}`}
+              list={options.length ? listId : undefined}
+              onChange={(e) => setAt(i, e.target.value)}
+            />
+            {rows.length > 1 && (
+              <button
+                type="button"
+                aria-label={`Remove ${label} ${i + 1}`}
+                onClick={() => removeAt(i)}
+                className="shrink-0 rounded-lg border border-slate-800 px-2.5 py-1.5 text-slate-500 transition hover:border-rose-400/40 hover:text-rose-300"
+              >
+                ×
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {options.length > 0 && (
+        <datalist id={listId}>
+          {options.map((o) => <option key={o} value={o} />)}
+        </datalist>
+      )}
+      {rows.length < MAX_CREDITS && (
+        <button type="button" className="mt-2 text-xs font-medium text-emerald-300 transition hover:text-emerald-200" onClick={() => onChange([...rows, ""])}>
+          + {addLabel}
+        </button>
+      )}
+      {hint && <span className="mt-1 block text-[11px] text-slate-500">{hint}</span>}
+    </div>
+  );
 }
 
 export const ISRC_HINT =
@@ -73,17 +136,30 @@ export function SongForm({ value, onChange, artists, lockArtist, songId }: {
             onChange={(e) => set({ artistName: e.target.value })} />
         )}
       </Field>
-      <Field label="Featuring" hint="Other performers, comma separated">
-        <input className="input !py-2" value={value.featuring} maxLength={200} onChange={(e) => set({ featuring: e.target.value })} />
-      </Field>
+      <NamesField
+        label="Featured artists"
+        wide
+        addLabel="Add another featured artist"
+        placeholder="Who is featured on this song?"
+        hint="Every name here is credited as “feat.” on airplay reports and cue sheets. Leave empty for a solo record."
+        value={value.featured}
+        onChange={(featured) => set({ featured })}
+        suggestions={roster.map((a) => a.name)}
+      />
+      <NamesField
+        label="Songwriters / composers"
+        wide
+        addLabel="Add another songwriter"
+        placeholder="Full name of the first writer"
+        hint="One row per writer — three writers means three rows, and three names on the cue sheet. Money is split on the split sheet, not here."
+        value={value.songwriters}
+        onChange={(songwriters) => set({ songwriters })}
+      />
       <Field label="Genre">
         <select className="input !py-2" value={value.genre} onChange={(e) => set({ genre: e.target.value })}>
           <option value="">—</option>
           {GENRES.map((g) => <option key={g}>{g}</option>)}
         </select>
-      </Field>
-      <Field label="Songwriter(s) / composer" hint="Used on cue sheets and royalty splits">
-        <input className="input !py-2" value={value.composer} maxLength={200} onChange={(e) => set({ composer: e.target.value })} />
       </Field>
       <Field label="Producer">
         <input className="input !py-2" value={value.producer} maxLength={200} onChange={(e) => set({ producer: e.target.value })} />
@@ -340,7 +416,12 @@ export function SongCatalogue({ songs, artists, lockArtist, onChanged, empty }: 
               <tr key={s.id} className="transition hover:bg-slate-800/30">
                 <td className="td pl-4 sm:pl-5">
                   <span className="font-medium text-white">{s.title}</span>
-                  {s.featuring && <span className="block text-xs text-slate-500">feat. {s.featuring}</span>}
+                  {s.featured.length > 0 && <span className="block text-xs text-slate-500">feat. {s.featured.join(", ")}</span>}
+                  {s.songwriters.length > 0 ? (
+                    <span className="block text-[11px] text-slate-600">written by {s.songwriters.join(", ")}</span>
+                  ) : (
+                    <span className="block text-[11px] text-amber-300/80">no writer named yet — add one so cue sheets pay the right person</span>
+                  )}
                 </td>
                 <td className="td">{s.artistName || "—"}</td>
                 <td className="td"><span className={cx("font-mono text-xs", !s.isrc && "text-amber-300")}>{s.isrc || "missing"}</span></td>
