@@ -48,6 +48,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
   cmo: [
     { id: "overview", label: "Overview" },
     { id: "monthly-pack", label: "Distribution Pack" },
+    { id: "reach", label: "Reach & Impressions" },
     { id: "registry", label: "Master Catalogue Registry" },
     { id: "splits", label: "Split Sheet Calculator" },
     { id: "top100", label: "National Top 100" },
@@ -55,6 +56,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { id: "disputes", label: "Rights & Disputes" },
     { id: "unmatched", label: "Unmatched Audio Queue" },
     { id: "mentions", label: "Brand Mentions" },
+    { id: "plan-requests", label: "Plan Requests" },
   ],
   label: [
     { id: "overview", label: "Overview" },
@@ -78,6 +80,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { id: "cuesheet", label: "UPRS Cue Sheet" },
     { id: "adcontrol", label: "Ad Control Auditor" },
     { id: "mentions", label: "Brand Mentions" },
+    { id: "plan-requests", label: "Plan Requests" },
   ],
   venue: [
     { id: "overview", label: "Compliance" },

@@ -87,7 +87,7 @@ class StationMonitor(threading.Thread):
         base = self.base_override or dt.datetime.now(dt.timezone.utc)
         last_beat = 0.0
         try:
-            proc = subprocess.Popen(stream_command(url), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            proc = subprocess.Popen(stream_command(url, self.st.kind), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except OSError as e:
             log.error("[%s] ffmpeg failed to start: %s", self.st.slug, e)
             return False

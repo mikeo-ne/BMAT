@@ -17,6 +17,9 @@ export type StationMonthRow = {
   withEvidence: number;
   firstPlay: string | null;
   lastPlay: string | null;
+  kind: "radio" | "tv";
+  aqh: number | null;
+  listenSeconds: number;
 };
 
 export type TopWorkRow = {
@@ -114,6 +117,9 @@ export function buildMonthlyPack(
       withEvidence: n(r.with_evidence),
       firstPlay: typeof r.first_play === "string" ? r.first_play : null,
       lastPlay: typeof r.last_play === "string" ? r.last_play : null,
+      kind: r.kind === "tv" ? ("tv" as const) : ("radio" as const),
+      aqh: r.aqh === null || r.aqh === undefined || r.aqh === "" ? null : n(r.aqh),
+      listenSeconds: n(r.listen_seconds),
     }))
     .sort((a, b) => b.spins - a.spins || a.station.localeCompare(b.station));
 

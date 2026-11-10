@@ -104,6 +104,7 @@ class SupabaseSink(Sink):
         if st.slug in self._station_ids and stream_url is None:
             return self._station_ids[st.slug]
         row = {"slug": st.slug, "name": st.name, "frequency": st.frequency or None,
+               "kind": "tv" if st.is_tv else "radio",
                "region": st.region if st.region in ("Central", "Western", "Eastern", "Northern") else None}
         if stream_url:
             row["stream_url"] = stream_url
@@ -125,7 +126,7 @@ class SupabaseSink(Sink):
             "recording_id": rid, "station_id": sid, "detected_at": _iso(d.started_at), "ended_at": _iso(d.ended_at),
             "duration_sec": d.duration_sec, "confidence": d.confidence, "match_score": d.score,
             "track_offset_sec": d.track_offset_sec, "matched_title": d.track.title, "matched_artist": d.track.artist,
-            "source": "stream", "evidence_path": path,
+            "source": "tv" if d.station.is_tv else "stream", "evidence_path": path,
         }])
 
     def unmatched(self, u: Unmatched) -> None:

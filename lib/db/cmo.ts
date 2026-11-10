@@ -151,6 +151,10 @@ function demoPack(month: string): MonthlyPack {
       with_evidence: Math.round(spins * 0.97),
       first_play: `${month}-02T05:14:00Z`,
       last_play: `${month}-27T22:41:00Z`,
+      kind: i % 7 === 6 ? "tv" : "radio",
+      // Audience figures are sample values, and labelled as such in the UI.
+      aqh: i < 6 ? [18_000, 15_400, 12_900, 9_800, 8_200, 4_100][i] : null,
+      listen_seconds: spins * 198,
     };
   });
   const works = demo.TOP100.slice(0, 20).map((w) => ({
@@ -178,6 +182,37 @@ export async function loadMonthlyPack(month: string): Promise<MonthlyPack> {
     sb.rpc("month_top_works", { p_from: range.from, p_to: range.to, p_limit: 20 }),
   ]);
   return buildMonthlyPack(must(stations, "station report"), must(works, "month top works"), month, true);
+}
+
+// ── Plan requests (self-serve upgrades waiting to be billed) ───────────────
+
+export type PlanRequestRow = {
+  id: string; reference: string; plan: string; billing: string; amountUgx: number;
+  msisdn: string | null; status: string; created: string; note: string | null;
+};
+
+const DEMO_PLAN_REQUESTS: PlanRequestRow[] = [
+  { id: "p1", reference: "ES-ART-7KQ4MP", plan: "artist", billing: "monthly", amountUgx: 35_000, msisdn: "+256772000111", status: "pending", created: "2026-11-08", note: "Catalogue of 12 songs" },
+  { id: "p2", reference: "ES-LAB-3XF9RT", plan: "label", billing: "annual", amountUgx: 2_500_000, msisdn: "+256701000222", status: "contacted", created: "2026-11-05", note: null },
+];
+
+export async function loadPlanRequests(): Promise<{ rows: PlanRequestRow[]; live: boolean }> {
+  const sb = db();
+  if (!sb) return { rows: DEMO_PLAN_REQUESTS, live: false };
+  const { data } = await sb
+    .from("plan_requests")
+    .select("id, reference, plan, billing, amount_ugx, msisdn, status, created_at, note")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  type Row = { id: string; reference: string; plan: string; billing: string; amount_ugx: number; msisdn: string | null; status: string; created_at: string; note: string | null };
+  return {
+    live: true,
+    rows: safeArray(data as Row[]).map((r) => ({
+      id: r.id, reference: r.reference, plan: r.plan, billing: r.billing,
+      amountUgx: Number(r.amount_ugx ?? 0), msisdn: r.msisdn, status: r.status,
+      created: String(r.created_at ?? "").slice(0, 10), note: r.note,
+    })),
+  };
 }
 
 export async function resolveDispute(id: string, status: DisputeStatus): Promise<void> {

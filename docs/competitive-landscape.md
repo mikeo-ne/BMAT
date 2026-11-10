@@ -148,16 +148,24 @@ Legend: ✅ present · ➖ partial/partner · ❌ absent.
 - Still open in P0: an evidence index inside the PDF (clip links per detection)
   and the unpaid/outstanding column, which need royalty statements to be live.
 
-**P1 — close the visible gaps:**
-- TV ingest (start with the stations that also stream: NBS, Bukedde, UBC).
-- Installable PWA (add-to-home-screen, offline shell, push notifications) as the
-  cheapest answer to "SongBoost has an app".
-- MoMo/Flutterwave self-serve plans: artist $10/mo (SongBoost's proven price),
-  label tier, CMO licence.
+**P1 — close the visible gaps:** *capability shipped, activation pending*
+- **TV ingest** — `stations.kind = radio | tv`, HLS live-edge capture in the
+  worker, `source: "tv"` detections, radio/TV split on `/coverage`
+  (`docs/tv-ingest.md`). No channel is monitored yet: NBS, Bukedde and UBC need
+  an official HLS endpoint and a monitoring agreement before a row goes in.
+- **Installable PWA + push** — manifest, generated icons, service worker,
+  offline page, install prompt; push subscriptions in `push_subscriptions` and a
+  VAPID-gated sender (`docs/pwa-and-push.md`). Alert *rules* still reach email
+  and WhatsApp, not push, until the outbox sender is extended.
+- **Self-serve plans** — `/pricing` in shillings (artist UGX 35,000), mobile-money
+  request flow with a quotable reference, CMO request list (`docs/billing.md`).
+  No money moves: a collection account is the remaining step.
 
-**P2 — moat:**
-- Reach/impressions metric with a documented methodology (needed before selling
-  ad-side analytics).
+**P2 — moat:** *metric shipped, data pending*
+- **Reach/impressions** — AQH-based estimate with the caveat attached and a
+  published methodology (`docs/reach-methodology.md`). Production shows "no
+  station has supplied an audience figure yet" until broadcasters hand theirs
+  over; that is the designed state, not a gap to paper over.
 - Regional expansion via partners (Kenya, Rwanda, Tanzania) rather than build-out.
 - Publish the national chart with a media partner; tie it to UPRS distribution.
 

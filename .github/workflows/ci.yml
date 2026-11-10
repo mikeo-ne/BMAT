@@ -54,6 +54,7 @@ jobs:
       - run: python -m tests.test_broadcast
       - run: python -m tests.test_false_matches
       - run: python -m tests.test_panel
+      - run: python -m tests.test_tv
       - run: python -m tests.test_doctor
       - run: python -m tests.test_enroll_list
       - run: python -m tests.test_mentions

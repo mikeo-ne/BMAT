@@ -1359,4 +1359,264 @@ revoke all on function public.month_top_works(date, date, int) from public;
 grant execute on function public.station_month_report(date, date) to authenticated;
 grant execute on function public.month_top_works(date, date, int) to authenticated;
 
+-- ==========================================================================
+-- 16. 0016_tv_stations.sql
+-- TV: stations are radio or television; coverage counts both
+-- ==========================================================================
+
+-- ── TV ingest: a station is now radio *or* television ─────────────────────
+--
+-- The monitor already pulls any stream ffmpeg can decode, so a TV channel is a
+-- station row with `kind = 'tv'` and an HLS/RTMP URL. Keeping one table means
+-- charts, evidence, alerts and the CMO pack work for TV without a second
+-- pipeline — and the homepage can stop promising "TV next" once a channel is
+-- actually in the panel.
+
+alter table public.stations
+  add column if not exists kind text not null default 'radio';
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'stations_kind_check') then
+    alter table public.stations
+      add constraint stations_kind_check check (kind in ('radio', 'tv'));
+  end if;
+end $$;
+
+create index if not exists stations_kind on public.stations (kind);
+
+-- TV plays are recorded with their own source so reports can separate them
+-- from radio without guessing from the station name.
+alter table public.detections drop constraint if exists detections_source_check;
+alter table public.detections
+  add constraint detections_source_check
+  check (source in ('stream', 'fm', 'venue', 'manual', 'tv'));
+
+-- Coverage now reports radio and TV separately: "28 stations, 25 reporting"
+-- is less useful than "25 radio, 3 TV".
+create or replace function public.public_coverage()
+returns json
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with per_region as (
+    select
+      coalesce(region, 'Unspecified') as region,
+      count(*) as stations,
+      count(*) filter (where kind = 'tv') as tv,
+      count(*) filter (where stream_status in ('starting', 'online', 'reconnecting')) as monitored,
+      count(*) filter (where stream_status = 'online') as live
+    from public.stations
+    group by 1
+  )
+  select json_build_object(
+    'stations',   (select count(*) from public.stations),
+    'radio',      (select count(*) from public.stations where kind = 'radio'),
+    'tv',         (select count(*) from public.stations where kind = 'tv'),
+    'monitored',  (select count(*) from public.stations
+                    where stream_status in ('starting', 'online', 'reconnecting')),
+    'live',       (select count(*) from public.stations where stream_status = 'online'),
+    'regions',    (select coalesce(json_agg(json_build_object(
+                     'region', region, 'stations', stations, 'tv', tv,
+                     'monitored', monitored, 'live', live
+                   ) order by region), '[]'::json) from per_region),
+    'last_heartbeat', (select max(last_heartbeat) from public.stations),
+    'last_detection', (select max(detected_at) from public.detections)
+  );
+$$;
+
+revoke all on function public.public_coverage() from public;
+grant execute on function public.public_coverage() to anon, authenticated;
+
+-- ==========================================================================
+-- 17. 0017_reach.sql
+-- Reach: declared AQH per station, report carries kind and listen seconds
+-- ==========================================================================
+
+-- ── Reach & impressions: audience data is declared, never invented ─────────
+--
+-- Advertisers ask "how many people heard this?" and the honest answer needs a
+-- per-station audience figure we did not make up. So the figure lives on the
+-- station with its provenance attached: who supplied it and when it was
+-- measured. No source, no number — the UI then shows "no audience data"
+-- instead of a plausible fiction.
+--
+-- Methodology: docs/reach-methodology.md.
+--   impressions ≈ Σ (plays × station AQH × clip duration / 15 min)
+-- AQH = average quarter-hour listeners, the metric radio stations already sell
+-- advertising against, so a station can supply it from its own survey or
+-- agency rate card.
+
+alter table public.stations
+  add column if not exists aqh int check (aqh is null or aqh >= 0),
+  add column if not exists audience_source text,
+  add column if not exists audience_as_of date;
+
+comment on column public.stations.aqh is
+  'Average quarter-hour listeners, declared by the station or its agency. NULL = unknown, never estimated.';
+comment on column public.stations.audience_source is
+  'Who supplied the audience figure (survey name, agency, broadcaster document).';
+comment on column public.stations.audience_as_of is
+  'Date the audience figure was measured. Impressions are labelled as estimates of that date.';
+
+-- The monthly report now carries kind and the audience figure, so the CMO pack
+-- and the reach section use one query.
+drop function if exists public.station_month_report(date, date);
+
+create function public.station_month_report(p_from date, p_to date)
+returns table (
+  station_id uuid,
+  station text,
+  region text,
+  kind text,
+  spins bigint,
+  works bigint,
+  artists bigint,
+  with_evidence bigint,
+  first_play timestamptz,
+  last_play timestamptz,
+  aqh int,
+  listen_seconds bigint
+)
+language sql
+stable
+set search_path = public
+as $$
+  select
+    s.id,
+    s.name,
+    s.region,
+    s.kind,
+    count(d.id) as spins,
+    count(distinct d.recording_id) as works,
+    count(distinct r.artist_name) as artists,
+    count(*) filter (where d.evidence_path is not null) as with_evidence,
+    min(d.detected_at),
+    max(d.detected_at),
+    max(s.aqh) as aqh,
+    coalesce(sum(d.duration_sec), 0) as listen_seconds
+  from public.detections d
+  join public.stations s on s.id = d.station_id
+  left join public.recordings r on r.id = d.recording_id
+  where d.detected_at >= (p_from::timestamp at time zone 'Africa/Kampala')
+    and d.detected_at <  ((p_to + 1)::timestamp at time zone 'Africa/Kampala')
+  group by s.id, s.name, s.region, s.kind
+  order by count(d.id) desc, s.name
+$$;
+
+revoke all on function public.station_month_report(date, date) from public;
+grant execute on function public.station_month_report(date, date) to authenticated;
+
+-- ==========================================================================
+-- 18. 0018_push_subscriptions.sql
+-- Push: one row per installed device, owned by its profile
+-- ==========================================================================
+
+-- ── Web push: one row per browser a person has installed ───────────────────
+--
+-- Alerts already leave by email, WhatsApp and SMS from the worker. Push is the
+-- "it's in my pocket" channel SongBoost sells, and it belongs to the same
+-- person: a subscription is tied to the signed-in profile, so an artist can
+-- only ever register their own devices.
+
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles (id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  user_agent text,
+  created_at timestamptz not null default now(),
+  last_seen timestamptz not null default now(),
+  failures int not null default 0
+);
+
+create index if not exists push_subscriptions_profile on public.push_subscriptions (profile_id);
+
+alter table public.push_subscriptions enable row level security;
+
+drop policy if exists push_own_read on public.push_subscriptions;
+create policy push_own_read on public.push_subscriptions for select
+  using (profile_id = auth.uid() or public.my_role() = 'cmo');
+
+drop policy if exists push_own_insert on public.push_subscriptions;
+create policy push_own_insert on public.push_subscriptions for insert
+  with check (profile_id = auth.uid());
+
+drop policy if exists push_own_update on public.push_subscriptions;
+create policy push_own_update on public.push_subscriptions for update
+  using (profile_id = auth.uid()) with check (profile_id = auth.uid());
+
+drop policy if exists push_own_delete on public.push_subscriptions;
+create policy push_own_delete on public.push_subscriptions for delete
+  using (profile_id = auth.uid());
+
+-- Called by /api/push/send when a push provider rejects a device (not 404/410).
+create or replace function public.bump_push_failures(p_ids uuid[])
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.push_subscriptions
+     set failures = failures + 1
+   where id = any(p_ids);
+$$;
+
+revoke all on function public.bump_push_failures(uuid[]) from public;
+revoke all on function public.bump_push_failures(uuid[]) from anon, authenticated;
+
+-- ==========================================================================
+-- 19. 0019_plan_requests.sql
+-- Plans: self-serve requests with a reference a human can bill
+-- ==========================================================================
+
+-- ── Self-serve plans: the request a person makes, not a payment we pretend ─
+--
+-- SongBoost's advantage is a $10 button. Ours is the same price point in
+-- shillings, but money only moves once a mobile-money collection account is
+-- live. Until then the honest product is a request that reaches a human with
+-- everything needed to bill: plan, amount, number, reference.
+--
+-- When the MoMo API credentials exist, `status` moves pending → active from the
+-- payment callback and nothing else in the app has to change.
+
+create table if not exists public.plan_requests (
+  id uuid primary key default gen_random_uuid(),
+  reference text not null unique,
+  profile_id uuid references public.profiles (id) on delete set null,
+  org_id uuid references public.organizations (id) on delete set null,
+  plan text not null check (plan in ('artist', 'label', 'broadcaster', 'venue', 'cmo')),
+  billing text not null default 'monthly' check (billing in ('monthly', 'annual')),
+  amount_ugx int not null check (amount_ugx >= 0),
+  msisdn text,
+  note text,
+  status text not null default 'pending' check (status in ('pending', 'contacted', 'active', 'cancelled')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists plan_requests_status on public.plan_requests (status, created_at desc);
+create index if not exists plan_requests_profile on public.plan_requests (profile_id);
+
+alter table public.plan_requests enable row level security;
+
+drop policy if exists plan_requests_own_read on public.plan_requests;
+create policy plan_requests_own_read on public.plan_requests for select
+  using (profile_id = auth.uid() or public.my_role() = 'cmo');
+
+drop policy if exists plan_requests_own_insert on public.plan_requests;
+create policy plan_requests_own_insert on public.plan_requests for insert
+  with check (profile_id = auth.uid() and status = 'pending');
+
+drop policy if exists plan_requests_own_cancel on public.plan_requests;
+create policy plan_requests_own_cancel on public.plan_requests for update
+  using (profile_id = auth.uid()) with check (profile_id = auth.uid() and status = 'cancelled');
+
+drop policy if exists plan_requests_cmo_update on public.plan_requests;
+create policy plan_requests_cmo_update on public.plan_requests for update
+  using (public.my_role() = 'cmo');
+
 commit;

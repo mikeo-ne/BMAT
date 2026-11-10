@@ -22,6 +22,7 @@ vi.mock("@/lib/supabase/config", () => ({ isSupabaseConfigured: false }));
 const region = (over: Partial<RegionCoverage> = {}): RegionCoverage => ({
   region: "Central",
   stations: 10,
+  tv: 0,
   monitored: 8,
   live: 8,
   ...over,
@@ -46,7 +47,7 @@ describe("normaliseCoverage", () => {
       last_detection: null,
     });
     expect(c).toMatchObject({ stations: 28, monitored: 25, live: 25, lastDetection: null });
-    expect(c?.regions[0]).toEqual({ region: "Eastern", stations: 4, monitored: 4, live: 4 });
+    expect(c?.regions[0]).toEqual({ region: "Eastern", stations: 4, tv: 0, monitored: 4, live: 4 });
   });
 
   it("refuses anything it cannot verify", () => {

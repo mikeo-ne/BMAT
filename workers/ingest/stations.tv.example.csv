@@ -1,0 +1,4 @@
+station,frequency,region,kind,stream_url,directory_status,checked,source_page
+NBS TV,,Central,tv,,pending - add the official HLS URL,,
+UBC TV,,Central,tv,,pending - add the official HLS URL,,
+Bukedde TV,,Central,tv,,pending - add the official HLS URL,,

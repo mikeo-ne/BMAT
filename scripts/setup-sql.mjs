@@ -26,6 +26,10 @@ export const MIGRATIONS = [
   ["0013_public_stats.sql", "Aggregate counts for the public website"],
   ["0014_public_coverage.sql", "Coverage: anonymous per-region station counts for /coverage"],
   ["0015_cmo_station_report.sql", "CMO pack: per-station monthly report and monthly top works"],
+  ["0016_tv_stations.sql", "TV: stations are radio or television; coverage counts both"],
+  ["0017_reach.sql", "Reach: declared AQH per station, report carries kind and listen seconds"],
+  ["0018_push_subscriptions.sql", "Push: one row per installed device, owned by its profile"],
+  ["0019_plan_requests.sql", "Plans: self-serve requests with a reference a human can bill"],
 ];
 
 const BANNER = (n, name, note) => [

@@ -28,8 +28,14 @@ def encode_mp3(x: np.ndarray, bitrate: str = "64k") -> bytes:
     return res.stdout
 
 
-def stream_command(url: str) -> list[str]:
-    """ffmpeg command that pulls a live stream forever, reconnecting on drops."""
+def stream_command(url: str, kind: str = "radio") -> list[str]:
+    """ffmpeg command that pulls a live stream forever, reconnecting on drops.
+
+    TV channels are usually HLS playlists rather than an Icecast MP3 stream. The
+    http reconnect flags apply to the playlist fetches too, but HLS needs a
+    longer probe and a window that follows the live edge instead of starting at
+    segment zero (which would replay the last hour of television).
+    """
     cmd = ["ffmpeg", "-loglevel", "error", "-nostdin"]
     if url.startswith(("http://", "https://")):
         cmd += [
@@ -37,5 +43,7 @@ def stream_command(url: str) -> list[str]:
             "-reconnect_delay_max", "30", "-rw_timeout", "15000000",
             "-user_agent", "EastSoundMonitor/0.1 (+https://eastsound.ug)",
         ]
-    cmd += ["-i", url, "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "s16le", "-"]
+    if kind == "tv" or ".m3u8" in url:
+        cmd += ["-fflags", "+genpts", "-live_start_index", "-1", "-analyzeduration", "10000000"]
+    cmd += ["-vn", "-ac", "1", "-ar", str(SAMPLE_RATE), "-i", url, "-f", "s16le", "-"]
     return cmd

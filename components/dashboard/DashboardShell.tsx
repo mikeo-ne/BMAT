@@ -6,6 +6,7 @@ import { Logo } from "@/components/site/Logo";
 import { DEMO_MODE, useAuth } from "@/lib/auth-context";
 import { ROLE_META, ROLE_NAV, type Role } from "@/lib/roles";
 import { cx } from "@/lib/safe";
+import { PushToggle } from "./PushToggle";
 import { RoleGuard } from "./RoleGuard";
 
 function Shell({ role, children }: { role: Role; children: ReactNode }) {
@@ -62,6 +63,10 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
         </button>
       ))}
       <div className="mt-auto space-y-3 border-t border-slate-800 pt-4">
+        <div className="px-3">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Alerts on this phone</p>
+          <PushToggle />
+        </div>
         <div className="px-3">
           <p className="truncate text-sm font-medium text-white">{session?.displayName}</p>
           <p className="truncate text-xs text-slate-500">{session?.email}</p>

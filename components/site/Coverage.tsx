@@ -39,7 +39,11 @@ export function CoverageSection() {
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         {[
-          { label: "Stations in the panel", value: fmtInt(coverage.stations), hint: "Radio streams we catalogue and fingerprint" },
+          {
+            label: "Stations in the panel",
+            value: fmtInt(coverage.stations),
+            hint: `${fmtInt(coverage.radio)} radio${coverage.tv ? ` · ${fmtInt(coverage.tv)} TV` : ""} — catalogue and fingerprint`,
+          },
           { label: "Monitored right now", value: `${fmtInt(coverage.monitored)} · ${shareMonitored(coverage)}%`, hint: "Enabled and reporting to the matcher" },
           { label: "Regions covered", value: fmtInt(regions.length), hint: "Central · Western · Eastern · Northern" },
         ].map((s) => (
@@ -62,8 +66,9 @@ export function CoverageSection() {
                 aria-hidden
               />
             </div>
-            <span className="w-40 shrink-0 text-right font-mono text-xs text-slate-400">
+            <span className="w-44 shrink-0 text-right font-mono text-xs text-slate-400">
               {fmtInt(r.monitored)} of {fmtInt(r.stations)} monitored
+              {r.tv > 0 && <span className="ml-1 text-sky-300">· {fmtInt(r.tv)} TV</span>}
             </span>
           </div>
         ))}

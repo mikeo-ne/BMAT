@@ -171,7 +171,16 @@ export function MonthlyPack() {
             maxHeight={320}
             empty="No stations reported this month."
             columns={[
-              { key: "station", header: "Station", render: (s) => <span className="font-medium text-white">{s.station}</span> },
+              {
+                key: "station",
+                header: "Station",
+                render: (s) => (
+                  <span className="flex items-center gap-2 font-medium text-white">
+                    {s.station}
+                    {s.kind === "tv" && <span className="rounded bg-sky-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">TV</span>}
+                  </span>
+                ),
+              },
               { key: "region", header: "Region", render: (s) => s.region },
               { key: "spins", header: "Plays", render: (s) => <span className="font-mono text-xs">{fmtInt(s.spins)}</span> },
               { key: "works", header: "Works", render: (s) => <span className="font-mono text-xs">{fmtInt(s.works)}</span> },
