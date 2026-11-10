@@ -2,6 +2,7 @@
 
 // Account-level settings shared by roles, plus public-site data.
 import { CHARTS, type ChartRow, type Region } from "@/lib/data/public";
+import { normaliseCoverage, type Coverage } from "@/lib/coverage";
 import { safeArray } from "@/lib/safe";
 import { db, must } from "./core";
 
@@ -64,6 +65,19 @@ export async function loadAlertLog(limit = 10): Promise<AlertLogRow[] | null> {
     .limit(limit);
   if (error) return null;
   return safeArray(data) as AlertLogRow[];
+}
+
+/**
+ * Live coverage counts for /coverage. The RPC is SECURITY DEFINER so an
+ * anonymous visitor gets numbers per region and nothing else — no station
+ * names, no stream URLs.
+ */
+export async function loadPublicCoverage(): Promise<Coverage | null> {
+  const sb = db();
+  if (!sb) return null;
+  const { data, error } = await sb.rpc("public_coverage");
+  if (error) return null;
+  return normaliseCoverage(data);
 }
 
 export type PublicChart = { rows: ChartRow[]; live: boolean };

@@ -15,6 +15,7 @@ const DICT = {
   en: {
     solutions: "Solutions",
     useCases: "Use Cases",
+    coverage: "Coverage",
     blog: "Blog",
     signIn: "Sign in",
     dashboard: "My dashboard",
@@ -88,7 +89,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     safeStorage.set("est_lang", l);
   };
 
-  const t = (k: DictKey) => DICT[lang]?.[k] ?? DICT.en[k];
+  // Luganda and Kiswahili may lag behind English; missing keys fall back.
+  const t = (k: DictKey) => (DICT[lang] as Record<string, string> | undefined)?.[k] ?? DICT.en[k];
   return <Ctx.Provider value={{ lang, setLang, t }}>{children}</Ctx.Provider>;
 }
 

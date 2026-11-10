@@ -7,6 +7,7 @@ import { Freshness, useLiveLoad } from "@/lib/db/live";
 import { cx, fmtInt, fmtUGX, safeArray } from "@/lib/safe";
 import { allocatePool, sanitizeShare, splitBalance, splitTotal, type SplitRow } from "@/lib/splits";
 import { Badge, DataTable, LoadGate, Section, StatGrid } from "@/components/dashboard/ui";
+import { ExportCsv } from "@/components/dashboard/ExportCsv";
 import { EvidencePlayer } from "@/components/site/EvidencePlayer";
 import { BrandMentions } from "./BrandMentions";
 
@@ -30,6 +31,14 @@ function Registry({ rows }: { rows: Work[] }) {
         <select className="input !w-36 !py-1.5" value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Status filter">
           {["All", "Registered", "Pending", "Conflict"].map((s) => <option key={s}>{s}</option>)}
         </select>
+        <ExportCsv
+          label="Export"
+          sheets={[{
+            subject: "east-sound-registry",
+            headers: ["Title", "Artist", "Rights owner", "ISRC", "Status"],
+            rows: list.map((w) => [w.title, w.artist, w.owner, w.isrc, w.status]),
+          }]}
+        />
       </div>
     }>
       <DataTable<Work> rows={list} rowKey={(r) => r.id} maxHeight={380} empty="No recordings match."
@@ -97,7 +106,18 @@ function Top100({ rows }: { rows: CmoData["top100"] }) {
   const [limit, setLimit] = useState(25);
   const list = safeArray(rows);
   return (
-    <Section id="top100" title="National Top 100" actions={<span className="text-xs text-slate-500">Last 7 days · all monitored stations</span>}>
+    <Section id="top100" title="National Top 100" actions={
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-slate-500">Last 7 days · all monitored stations</span>
+        <ExportCsv
+          sheets={[{
+            subject: "east-sound-top-100",
+            headers: ["Rank", "Title", "Rights owner", "Spins", "Stations"],
+            rows: list.map((r) => [r.rank, r.title, r.owner, r.spins, r.stations]),
+          }]}
+        />
+      </div>
+    }>
       <DataTable rows={list.slice(0, limit)} rowKey={(r) => `${r.rank}-${r.title}`} empty="No plays detected in the last 7 days."
         columns={[
           { key: "rank", header: "#", render: (r) => <span className={cx("font-mono font-bold", r.rank <= 10 ? "text-emerald-400" : "text-slate-500")}>{r.rank}</span> },
