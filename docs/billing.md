@@ -2,6 +2,23 @@
 
 _Written 10 November 2026._
 
+## Status: payments are paused — early access is free
+
+The priority is onboarding as many artists, labels, stations and venues as possible before charging anyone.
+So the flow is deliberately switched off:
+
+- `/pricing` says **Free during early access** and still publishes the future prices, so nothing is a surprise later.
+- The join form asks for an optional contact number, never a payment, and stores `amount_ugx = 0` with a
+  `[early access]` note on the request.
+- The confirmation says plainly: nothing charged, no card details taken, you will be contacted before any price applies.
+- A CMO sees these as **Early Access & Plan Requests** — a list of people to onboard, not invoices to collect.
+
+To start charging, set `NEXT_PUBLIC_PAYMENTS_ENABLED=true` in Vercel. The same component switches to the paid
+request (amount due, mobile-money number required, "Start … · UGX …" button). No migration, no code change —
+and the database already holds the plan and the amount that was quoted at signup.
+
+Everything below describes the paid flow, which is built and tested but **not active**.
+
 ## Why the pricing looks like this
 
 SongBoost sells airplay tracking to Ugandan artists for **$10/month**, paid by mobile money. That is the

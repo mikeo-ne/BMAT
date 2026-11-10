@@ -90,7 +90,28 @@ export const PLANS: readonly Plan[] = [
   },
 ] as const;
 
+/**
+ * Payments are paused: the goal right now is onboarding as many artists, labels
+ * and stations as possible, so nobody is asked for money. Flip
+ * NEXT_PUBLIC_PAYMENTS_ENABLED=true (Vercel env) to switch the request flow back
+ * into a paid one — no code change, no migration.
+ */
+export const PAYMENTS_ENABLED = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
+
+export const EARLY_ACCESS = {
+  active: !PAYMENTS_ENABLED,
+  badge: "Free during early access",
+  headline: "No payment while we grow the panel",
+  blurb:
+    "Every plan is free while East Sound is onboarding its first artists, labels and stations. Join, use the whole panel, and keep your history. We will tell you well before anything is charged.",
+} as const;
+
 export const ANNUAL_MONTHS_FREE = 2;
+
+/** What the page charges today: nothing while early access is on. */
+export function dueNow(plan: Plan, billing: Billing): number {
+  return EARLY_ACCESS.active ? 0 : planAmount(plan, billing);
+}
 
 /** Annual billing = ten months. Whole shillings, no rounding surprises. */
 export function planAmount(plan: Plan, billing: Billing): number {

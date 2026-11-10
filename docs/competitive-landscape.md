@@ -157,9 +157,10 @@ Legend: ✅ present · ➖ partial/partner · ❌ absent.
   offline page, install prompt; push subscriptions in `push_subscriptions` and a
   VAPID-gated sender (`docs/pwa-and-push.md`). Alert *rules* still reach email
   and WhatsApp, not push, until the outbox sender is extended.
-- **Self-serve plans** — `/pricing` in shillings (artist UGX 35,000), mobile-money
-  request flow with a quotable reference, CMO request list (`docs/billing.md`).
-  No money moves: a collection account is the remaining step.
+- **Self-serve plans** — `/pricing` in shillings (artist UGX 35,000), request flow
+  with a quotable reference, CMO list (`docs/billing.md`). **Payments are paused:
+  early access is free** while we onboard users; charging is one env var away
+  (`NEXT_PUBLIC_PAYMENTS_ENABLED`), plus a mobile-money collection account.
 
 **P2 — moat:** *metric shipped, data pending*
 - **Reach/impressions** — AQH-based estimate with the caveat attached and a

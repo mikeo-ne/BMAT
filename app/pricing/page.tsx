@@ -4,13 +4,13 @@ import Link from "next/link";
 import { Footer } from "@/components/site/Footer";
 import { Header } from "@/components/site/Header";
 import { PlanRequest } from "@/components/site/PlanRequest";
-import { PLANS, formatUgx } from "@/lib/plans";
+import { EARLY_ACCESS, PLANS, formatUgx } from "@/lib/plans";
 import { og } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Pricing — airplay monitoring priced in shillings",
+  title: "Pricing — free during early access",
   description:
-    "East Sound pricing in Ugandan shillings: artist plans from UGX 35,000 a month, label, broadcaster, venue and CMO licences. Paid by MTN or Airtel mobile money.",
+    "East Sound is free while we onboard our first artists, labels and stations. Prices in Ugandan shillings are published for later: artist from UGX 35,000 a month, label, broadcaster, venue and CMO licences.",
   alternates: { canonical: "/pricing" },
   openGraph: og("/pricing"),
 };
@@ -28,13 +28,21 @@ export default function PricingPage() {
         <section className="mx-auto max-w-7xl px-4 pb-6 pt-14 sm:px-6">
           <p className="font-mono text-xs uppercase tracking-widest text-emerald-400">Pricing</p>
           <h1 className="mt-3 max-w-3xl text-4xl font-bold text-white sm:text-5xl">
-            Priced in shillings. Paid by mobile money.
+            Free while we grow the panel.
           </h1>
           <p className="mt-4 max-w-2xl text-slate-400">
-            Artists pay {formatUgx(35_000)} a month — the price Ugandan artists already pay for airplay
-            tracking. Organisations pay for the paperwork they file: statements, cue sheets, distribution packs
-            and the data feed.
+            {EARLY_ACCESS.blurb} Prices are published below so nothing is a surprise later: artists from{" "}
+            {formatUgx(35_000)} a month — the price Ugandan artists already pay for airplay tracking — and
+            organisations pay for the paperwork they file.
           </p>
+          {EARLY_ACCESS.active && (
+            <div className="mt-6 inline-flex flex-wrap items-center gap-3 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3">
+              <span className="rounded-md bg-emerald-400 px-2 py-0.5 text-xs font-bold text-slate-950">FREE NOW</span>
+              <span className="text-sm text-emerald-100">
+                No card, no mobile money, no invoice. Join, upload, and keep your history.
+              </span>
+            </div>
+          )}
         </section>
 
         <section className="mx-auto max-w-7xl px-4 pb-10 sm:px-6">
@@ -46,9 +54,17 @@ export default function PricingPage() {
                   <span className="text-[11px] uppercase tracking-wider text-slate-500">{plan.audience}</span>
                 </div>
                 <p className="mt-2 text-2xl font-bold text-emerald-300">
-                  {plan.custom ? "Quoted" : formatUgx(plan.monthlyUgx)}
+                  {EARLY_ACCESS.active ? "Free" : plan.custom ? "Quoted" : formatUgx(plan.monthlyUgx)}
                 </p>
-                {!plan.custom && <p className="text-xs text-slate-500">per month · two months free on annual</p>}
+                <p className="text-xs text-slate-500">
+                  {EARLY_ACCESS.active
+                    ? plan.custom
+                      ? "early access · quoted later"
+                      : `early access · ${formatUgx(plan.monthlyUgx)}/mo after`
+                    : plan.custom
+                      ? "quoted on a call"
+                      : "per month · two months free on annual"}
+                </p>
                 <p className="mt-3 text-sm text-slate-400">{plan.summary}</p>
                 <ul className="mt-3 space-y-1.5 text-sm text-slate-300">
                   {plan.features.map((f) => (
@@ -78,8 +94,9 @@ export default function PricingPage() {
             <div>
               <h2 className="font-semibold text-white">How payment works</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Send a request, get a reference, pay by MTN or Airtel mobile money when we call. No card details,
-                no automatic renewal, and a receipt you can show an accountant.
+                {EARLY_ACCESS.active
+                  ? "It does not, yet. Early access is free and no payment details are collected. When charging starts it will be MTN or Airtel mobile money, with notice first — never an automatic renewal."
+                  : "Send a request, get a reference, pay by MTN or Airtel mobile money when we call. No card details, no automatic renewal, and a receipt you can show an accountant."}
               </p>
             </div>
             <div>

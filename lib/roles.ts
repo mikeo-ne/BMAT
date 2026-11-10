@@ -57,7 +57,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { id: "unmatched", label: "Unmatched Audio Queue" },
     { id: "mentions", label: "Brand Mentions" },
     { id: "station-requests", label: "Station Requests" },
-    { id: "plan-requests", label: "Plan Requests" },
+    { id: "plan-requests", label: "Early Access" },
   ],
   label: [
     { id: "overview", label: "Overview" },

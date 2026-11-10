@@ -2,7 +2,7 @@
 
 import { loadPlanRequests, type PlanRequestRow } from "@/lib/db/cmo";
 import { useLoad } from "@/lib/db/core";
-import { formatUgx } from "@/lib/plans";
+import { EARLY_ACCESS, formatUgx } from "@/lib/plans";
 import { Badge, DataTable, Section } from "@/components/dashboard/ui";
 import { ExportCsv } from "@/components/dashboard/ExportCsv";
 
@@ -19,7 +19,7 @@ export function PlanRequests() {
   return (
     <Section
       id="plan-requests"
-      title="Plan Requests"
+      title={EARLY_ACCESS.active ? "Early Access & Plan Requests" : "Plan Requests"}
       actions={
         <ExportCsv
           label="Export"
@@ -42,7 +42,15 @@ export function PlanRequests() {
         columns={[
           { key: "reference", header: "Reference", render: (r) => <span className="font-mono text-xs text-white">{r.reference}</span> },
           { key: "plan", header: "Plan", render: (r) => <span className="capitalize">{r.plan}</span> },
-          { key: "amount", header: "Amount", render: (r) => <span className="font-mono text-xs">{r.amountUgx ? formatUgx(r.amountUgx) : "Quoted"}</span> },
+          {
+            key: "amount",
+            header: "Amount",
+            render: (r) => (
+              <span className="font-mono text-xs">
+                {r.amountUgx ? formatUgx(r.amountUgx) : EARLY_ACCESS.active ? "Free (early access)" : "Quoted"}
+              </span>
+            ),
+          },
           { key: "msisdn", header: "Mobile money", render: (r) => <span className="font-mono text-xs">{r.msisdn ?? "—"}</span> },
           {
             key: "status",
@@ -56,8 +64,10 @@ export function PlanRequests() {
       />
       <p className="mt-3 text-xs text-slate-500">
         {live
-          ? "Live requests. A CMO moves a request to contacted or active; nobody can activate a plan from a browser."
-          : "Sample requests. In live mode these come from the pricing page."}
+          ? EARLY_ACCESS.active
+            ? "Live signups. Nothing is charged during early access — the reference and contact number are for whoever calls them next."
+            : "Live requests. A CMO moves a request to contacted or active; nobody can activate a plan from a browser."
+          : "Sample signups. In live mode these come from the pricing page."}
       </p>
     </Section>
   );
