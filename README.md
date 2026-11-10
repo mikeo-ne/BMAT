@@ -40,8 +40,8 @@ Additional rules:
 | `/` | Landing: sticky nav, live badge, EN/LG/SW, Solutions & Use Cases dropdowns, hero visualizer, playout ticker, Top 10 with regional filters + 10s evidence player |
 | `/blog`, `/blog/[slug]` | Live metric feed, category pills, search |
 | `/dashboard` | Routes to the caller's own dashboard |
-| `/dashboard/cmo` | Registry, split calculator, Top 100, regional heatmap, dispute engine, unmatched queue |
-| `/dashboard/label` | Roster, batch fingerprint dropzone, ISRC/UPC tracker, revenue, WhatsApp/email alerts with delivery history |
+| `/dashboard/cmo` | Registry (CSV export), split calculator, Top 100, regional heatmap, dispute engine, unmatched queue |
+| `/dashboard/label` | Roster, batch fingerprint dropzone, ISRC/UPC tracker, CSV export, revenue, WhatsApp/email alerts with delivery history |
 | `/dashboard/artist` | Discography, spin velocity, split summary, WhatsApp/email alerts with delivery history |
 | `/dashboard/broadcaster` | Playout timeline, UPRS cue sheet PDF/XLSX export, ad control auditor |
 | `/dashboard/venue` | UPRS compliance badge, listener nodes, DJ set logs |
@@ -57,6 +57,10 @@ Additional rules:
 - Route-level `error.tsx` boundaries so a runtime error never white-screens.
 - Seeded PRNG for demo data → identical server/client render, no hydration mismatch.
 - Verified: production build clean; headless-Chrome run across all 5 roles, cross-role URL jumps, PDF/XLSX export, audio playback and mobile width with **zero console errors**.
+
+## Competitive position
+
+`docs/competitive-landscape.md` maps the market East Sound is entering — SongBoost (Uganda), Radiomonitor (120 countries, 400+ African stations), GoCreate Africa (CMO deployments), BMAT and the global analytics tools — with a feature matrix and the gaps that become the roadmap. Every table on every dashboard can be exported to CSV, because "give me the data" is the first thing a CMO, label or advertiser asks for.
 
 ## Going live
 

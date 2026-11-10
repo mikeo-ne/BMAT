@@ -6,6 +6,7 @@ import { useLoad } from "@/lib/db/core";
 import { ISRC_RE } from "@/lib/db/masters";
 import { useAuth } from "@/lib/auth-context";
 import { fmtInt, fmtUGX, safeArray } from "@/lib/safe";
+import { ExportCsv } from "@/components/dashboard/ExportCsv";
 import { BarChart, DataTable, LoadGate, SaveNote, Section, StatGrid } from "@/components/dashboard/ui";
 import { SongCatalogue, SongUploader } from "@/components/dashboard/Songs";
 import { WhatsAppAlerts } from "@/components/dashboard/WhatsAppAlerts";
@@ -42,7 +43,16 @@ function Roster({ data, reload }: { data: LabelData; reload: () => void }) {
   };
 
   return (
-    <Section id="roster" title="Artist Roster">
+    <Section id="roster" title="Artist Roster" actions={
+      <ExportCsv
+        label="Export roster"
+        sheets={[{
+          subject: "east-sound-roster",
+          headers: ["Artist", "Genre", "Songs", "Plays (30 days)"],
+          rows: safeArray(data.roster).map((a) => [a.name, a.genre, a.tracks, a.spins30d]),
+        }]}
+      />
+    }>
       <form onSubmit={add} className="mb-4 flex flex-wrap items-center gap-2">
         <input className="input !w-56 !py-2" placeholder="Artist name" value={name} onChange={(e) => setName(e.target.value)} aria-label="Artist name" maxLength={120} />
         <select className="input !w-40 !py-2" value={genre} onChange={(e) => setGenre(e.target.value)} aria-label="Genre">
@@ -91,7 +101,21 @@ export function LabelDashboard() {
               <p className="mt-3 text-xs text-slate-500">Tip: add your artists to the roster above first, then pick them from a list when you upload.</p>
             )}
           </Section>
-          <Section id="catalogue" title="Catalogue" actions={<CodesNote songs={d.catalogue} />}>
+          <Section id="catalogue" title="Catalogue" actions={
+            <div className="flex items-center gap-3">
+              <CodesNote songs={d.catalogue} />
+              <ExportCsv
+                sheets={[{
+                  subject: "east-sound-catalogue",
+                  headers: ["Title", "Artist", "Featuring", "Genre", "Producer", "Composer", "Publisher", "ISRC", "UPC", "Release", "Enrolled"],
+                  rows: safeArray(d.catalogue).map((s) => [
+                    s.title, s.artistName, s.featuring, s.genre, s.producer, s.composer, s.publisher,
+                    s.isrc, s.upc, s.releaseDate, s.enrolledAt ? "yes" : "no",
+                  ]),
+                }]}
+              />
+            </div>
+          }>
             <SongCatalogue songs={d.catalogue} artists={d.roster} onChanged={state.reload}
               empty="No songs yet — upload your first master above." />
           </Section>

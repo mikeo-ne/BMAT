@@ -5,6 +5,7 @@ import { loadArtist, type Track } from "@/lib/db/artist";
 import { useLoad } from "@/lib/db/core";
 import { useAuth } from "@/lib/auth-context";
 import { cx, fmtInt, fmtUGX, safeArray } from "@/lib/safe";
+import { ExportCsv } from "@/components/dashboard/ExportCsv";
 import { Badge, DataTable, LineChart, LoadGate, Section, StatGrid } from "@/components/dashboard/ui";
 import { WhatsAppAlerts } from "@/components/dashboard/WhatsAppAlerts";
 import { SongCatalogue, SongUploader } from "@/components/dashboard/Songs";
@@ -42,7 +43,18 @@ function ArtistView({ d, name, scope, reload }: { d: Awaited<ReturnType<typeof l
         ]} />
       </section>
 
-      <Section id="songs" title="My Songs">
+      <Section id="songs" title="My Songs" actions={
+        <ExportCsv
+          label="Export songs"
+          sheets={[{
+            subject: "east-sound-my-songs",
+            headers: ["Title", "Artist", "Featuring", "Genre", "Producer", "Composer", "Publisher", "ISRC", "UPC", "Release"],
+            rows: safeArray(d.songs).map((s) => [
+              s.title, s.artistName, s.featuring, s.genre, s.producer, s.composer, s.publisher, s.isrc, s.upc, s.releaseDate,
+            ]),
+          }]}
+        />
+      }>
         <SongUploader owner={{ kind: "artist", userId: d.userId }} defaultArtist={name || undefined} existing={d.songs} onSaved={reload} />
         <div className="mt-6">
           <SongCatalogue songs={d.songs} lockArtist={Boolean(name)} onChanged={reload}
