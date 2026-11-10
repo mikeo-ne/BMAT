@@ -4,15 +4,18 @@
 // artist dashboards. RLS decides ownership: a label edits its organisation's
 // songs, an independent artist edits their own self-released songs.
 import { db, must } from "./core";
+import { safeArray } from "@/lib/safe";
 
 export type SongDetails = {
   title: string;
   artistName: string;
   /** Label roster artist; null for artists who upload their own songs. */
   artistId: string | null;
-  featuring: string;
+  /** Every writer, in the order they should be credited on the cue sheet. */
+  songwriters: string[];
+  /** Performers credited as "feat." — as many as the song really has. */
+  featured: string[];
   producer: string;
-  composer: string;
   publisher: string;
   genre: string;
   isrc: string;
@@ -26,7 +29,13 @@ export type Song = SongDetails & {
   masterPath: string | null;
   enrolledAt: string | null;
   enrollError: string | null;
+  /** The old single-text columns, joined for cue sheets and CSV exports. */
+  composer: string;
+  featuring: string;
 };
+
+/** A song has a handful of writers, not a spreadsheet. */
+export const MAX_CREDITS = 12;
 
 export type Owner = { kind: "label"; orgId: string | null } | { kind: "artist"; userId: string | null };
 
@@ -45,17 +54,50 @@ type Row = {
   duration_sec: number | null; master_path: string | null; enrolled_at: string | null; enroll_error: string | null;
 };
 
-export function toSong(r: Partial<Row> & { id: string; title: string }): Song {
+/** Trim, drop blanks, drop repeats (case-insensitively), cap the list. */
+export function cleanNames(list: readonly string[] | null | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of safeArray(list)) {
+    const name = String(raw ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+    if (out.length >= MAX_CREDITS) break;
+  }
+  return out;
+}
+
+/** Names → the single line the cue sheet and CSV exports read. */
+export function creditLine(list: readonly string[] | null | undefined): string {
+  return cleanNames(list).join("; ");
+}
+
+/** The old free-text field → names. "A, B & C" is three people, not one. */
+export function parseCreditLine(text: string | null | undefined): string[] {
+  return cleanNames(
+    String(text ?? "")
+      .replace(/\s+(?:feat\.?|ft\.|featuring)\s+/gi, ";")
+      .split(/\s*(?:;|,|&|\/|\band\b)\s*/i),
+  );
+}
+
+export function toSong(r: Partial<Row> & { id: string; title: string }, credits?: { songwriters?: string[]; featured?: string[] }): Song {
+  const songwriters = credits?.songwriters ?? parseCreditLine(r.composer);
+  const featured = credits?.featured ?? parseCreditLine(r.featuring);
   return {
     id: r.id, title: r.title, artistName: r.artist_name ?? "", artistId: r.artist_id ?? null,
-    featuring: r.featuring ?? "", producer: r.producer ?? "", composer: r.composer ?? "", publisher: r.publisher ?? "",
+    songwriters, featured, producer: r.producer ?? "", publisher: r.publisher ?? "",
     genre: r.genre ?? "", isrc: r.isrc ?? "", upc: r.upc ?? "", releaseDate: r.release_date ?? "",
     durationSec: r.duration_sec ?? null, masterPath: r.master_path ?? null, enrolledAt: r.enrolled_at ?? null, enrollError: r.enroll_error ?? null,
+    composer: creditLine(songwriters), featuring: creditLine(featured),
   };
 }
 
 export function emptyDetails(over: Partial<SongDetails> = {}): SongDetails {
-  return { title: "", artistName: "", artistId: null, featuring: "", producer: "", composer: "", publisher: "", genre: "", isrc: "", upc: "", releaseDate: "", ...over };
+  return { title: "", artistName: "", artistId: null, songwriters: [], featured: [], producer: "", publisher: "", genre: "", isrc: "", upc: "", releaseDate: "", ...over };
 }
 
 /** "Nalu Akello - Kampala Nights (Master).wav" → artist + title guesses. */
@@ -88,7 +130,8 @@ const nn = (v: string) => (v.trim() ? v.trim() : null);
 function toRow(d: SongDetails) {
   return {
     title: d.title.trim(), artist_name: d.artistName.trim(), artist_id: d.artistId || null,
-    featuring: nn(d.featuring), producer: nn(d.producer), composer: nn(d.composer), publisher: nn(d.publisher), genre: nn(d.genre),
+    featuring: nn(creditLine(d.featured)), producer: nn(d.producer), composer: nn(creditLine(d.songwriters)),
+    publisher: nn(d.publisher), genre: nn(d.genre),
     isrc: d.isrc ? d.isrc.toUpperCase().replace(/-/g, "").replace(/^(..)(...)(..)(.....)$/, "$1-$2-$3-$4") : null,
     upc: nn(d.upc), release_date: nn(d.releaseDate),
   };
@@ -113,29 +156,93 @@ export function demoList(): Song[] {
   return demoSongs.map((s) => ({ ...s }));
 }
 
+/** Credits for a set of songs, keyed by recording id. Missing table or a
+ *  failed read is not an error: the joined text columns still describe the
+ *  song, and that is what the cue sheet prints until this answers. */
+export type CreditMap = Map<string, { songwriters: string[]; featured: string[] }>;
+
+export async function creditsFor(ids: readonly string[]): Promise<CreditMap> {
+  const out: CreditMap = new Map();
+  const sb = db();
+  const list = safeArray(ids).filter(Boolean).slice(0, 500);
+  if (!sb || !list.length) return out;
+  try {
+    const { data, error } = await sb
+      .from("recording_credits")
+      .select("recording_id, role, name, position")
+      .in("recording_id", list)
+      .order("position", { ascending: true });
+    if (error || !Array.isArray(data)) return out;
+    for (const row of data as { recording_id: string; role: string; name: string }[]) {
+      const entry = out.get(row.recording_id) ?? { songwriters: [], featured: [] };
+      if (row.role === "songwriter") entry.songwriters.push(row.name);
+      else if (row.role === "featured") entry.featured.push(row.name);
+      out.set(row.recording_id, entry);
+    }
+    return out;
+  } catch {
+    return out;
+  }
+}
+
+/** Replace a song's credits. Silent when the table is not deployed yet. */
+async function writeCredits(id: string, d: SongDetails, mode: "replace" | "append"): Promise<void> {
+  const sb = db();
+  if (!sb) return;
+  const rows = [
+    ...cleanNames(d.songwriters).map((name, i) => ({ recording_id: id, role: "songwriter", name, position: i })),
+    ...cleanNames(d.featured).map((name, i) => ({ recording_id: id, role: "featured", name, position: i })),
+  ];
+  try {
+    if (mode === "replace") {
+      const del = await sb.from("recording_credits").delete().eq("recording_id", id);
+      if (del.error && del.error.code !== "42P01") throw del.error;
+    }
+    if (!rows.length) return;
+    const ins = await sb.from("recording_credits").insert(rows);
+    if (ins.error && ins.error.code !== "42P01") throw friendly(ins.error, "Couldn't save the writing credits.");
+  } catch (e) {
+    // The song itself is saved with the joined text columns, so a credit-table
+    // problem must not lose the upload — but it should not pass silently either.
+    throw e instanceof Error && /duplicate/i.test(e.message) ? new Error("The same writer is listed twice.") : e;
+  }
+}
+
 export async function createSong(owner: Owner, d: SongDetails): Promise<string> {
   const sb = db();
+  const clean: SongDetails = { ...d, songwriters: cleanNames(d.songwriters), featured: cleanNames(d.featured) };
   if (!sb) {
     const id = `demo-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-    demoSongs.unshift({ ...toSong({ id, title: d.title }), ...d, id });
+    demoSongs.unshift({
+      ...toSong({ id, title: clean.title }),
+      ...clean,
+      id,
+      composer: creditLine(clean.songwriters),
+      featuring: creditLine(clean.featured),
+    });
     return id;
   }
   const own = owner.kind === "label" ? { label_org_id: owner.orgId } : { artist_profile_id: owner.userId };
-  const res = await sb.from("recordings").insert({ ...toRow(d), ...own }).select("id").single();
+  const res = await sb.from("recordings").insert({ ...toRow(clean), ...own }).select("id").single();
   if (res.error) throw friendly(res.error, "Couldn't save the song.");
-  return (res.data as { id: string }).id;
+  const id = (res.data as { id: string }).id;
+  await writeCredits(id, clean, "replace");
+  return id;
 }
 
 export async function updateSong(id: string, d: SongDetails): Promise<void> {
   const sb = db();
+  const cleaned: SongDetails = { ...d, songwriters: cleanNames(d.songwriters), featured: cleanNames(d.featured) };
   if (!sb) {
     const s = demoSongs.find((x) => x.id === id);
-    if (s) Object.assign(s, d);
+    if (s) Object.assign(s, cleaned, { composer: creditLine(cleaned.songwriters), featuring: creditLine(cleaned.featured) });
     return;
   }
-  const res = await sb.from("recordings").update(toRow(d)).eq("id", id).select("id");
+  const clean: SongDetails = { ...d, songwriters: cleanNames(d.songwriters), featured: cleanNames(d.featured) };
+  const res = await sb.from("recordings").update(toRow(clean)).eq("id", id).select("id");
   if (res.error) throw friendly(res.error, "Couldn't save the changes.");
   if (!res.data?.length) throw new Error("Your account isn't allowed to change this song.");
+  await writeCredits(id, clean, "replace");
 }
 
 /** Upload (or replace) the reference audio; the worker re-learns the song. */

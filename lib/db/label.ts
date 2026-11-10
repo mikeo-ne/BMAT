@@ -4,7 +4,7 @@
 import * as demo from "@/lib/data/label";
 import { safeArray } from "@/lib/safe";
 import { db, must } from "./core";
-import { SONG_COLUMNS, demoList, demoSeed, toSong, type Song } from "./masters";
+import { SONG_COLUMNS, creditsFor, demoList, demoSeed, toSong, type Song } from "./masters";
 
 export type RosterArtist = { id: string; name: string; genre: string; tracks: number; spins30d: number };
 export type LabelData = {
@@ -47,6 +47,7 @@ export async function loadLabel(): Promise<LabelData> {
     sb.from("royalty_statements").select("period, amount_ugx, status").order("period").limit(12),
   ]);
   const recRows = safeArray(must(recs, "catalogue") as Parameters<typeof toSong>[0][]);
+  const credits = await creditsFor(recRows.map((r) => r.id));
   const spinBy = new Map(safeArray(must(spins, "spins") as { recording_id: string; spins: number }[]).map((s) => [s.recording_id, Number(s.spins)]));
   const roster = safeArray(must(artists, "roster") as { id: string; name: string; genre: string | null }[]).map((a) => {
     const mine = recRows.filter((r) => r.artist_id === a.id);
@@ -68,7 +69,7 @@ export async function loadLabel(): Promise<LabelData> {
       revenueYtd: revenue.filter((r) => r.period.startsWith(year)).reduce((s, r) => s + r.ugx, 0),
     },
     roster,
-    catalogue: recRows.map(toSong),
+    catalogue: recRows.map((r) => toSong(r, credits.get(r.id))),
     revenue: revenue.map(({ period: _p, ...r }) => r),
   };
 }

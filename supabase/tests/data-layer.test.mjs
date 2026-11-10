@@ -112,7 +112,7 @@ try { await M.label.saveCodes(sql("select id from recordings where title = 'Riva
 check("cannot edit a rival label's recording through the app", !hacked);
 
 // Upload flow (details part; the audio goes to Storage, covered by the RLS suite)
-const D = (o) => ({ title: "", artistName: "", artistId: null, featuring: "", producer: "", composer: "", publisher: "", genre: "", isrc: "", upc: "", releaseDate: "", ...o });
+const D = (o) => ({ title: "", artistName: "", artistId: null, songwriters: [], featured: [], producer: "", publisher: "", genre: "", isrc: "", upc: "", releaseDate: "", ...o });
 const nalu = lab.roster.find((a) => a.name === "Nalu Akello");
 const newId = await M.masters.createSong({ kind: "label", orgId: lab.orgId }, D({ title: "Upload Test", artistName: nalu.name, artistId: nalu.id, producer: "Prod X", genre: "Afrobeat", isrc: "ugabc2600123", releaseDate: "2026-12-01" }));
 check("label creates a song with its details", sql(`select title || '|' || artist_name || '|' || producer || '|' || isrc || '|' || (artist_id is not null) from recordings where id = '${newId}'`) === "Upload Test|Nalu Akello|Prod X|UG-ABC-26-00123|true");
@@ -120,8 +120,18 @@ const lab3 = await M.label.loadLabel();
 const up = lab3.catalogue.find((c) => c.id === newId);
 check("the new song shows in the catalogue with its details", up?.producer === "Prod X" && up?.genre === "Afrobeat" && up.masterPath === null);
 check("…and counts toward the artist's tracks", lab3.roster.find((a) => a.id === nalu.id).tracks === nalu.tracks + 1);
-await M.masters.updateSong(newId, { ...up, featuring: "Guest", composer: "N. Akello" });
-check("editing a song's details is saved", sql(`select featuring || '|' || composer from recordings where id = '${newId}'`) === "Guest|N. Akello");
+await M.masters.updateSong(newId, { ...up, songwriters: ["N. Akello", "R. Mutebi"], featured: ["Guest"] });
+check("editing a song's details is saved", sql(`select featuring || '|' || composer from recordings where id = '${newId}'`) === "Guest|N. Akello; R. Mutebi");
+check(
+  "…and each writer is its own credit row, in order",
+  sql(`select string_agg(role || ':' || name, ',' order by role, position) from recording_credits where recording_id = '${newId}'`) ===
+    "featured:Guest,songwriter:N. Akello,songwriter:R. Mutebi",
+);
+await M.masters.updateSong(newId, { ...up, songwriters: ["N. Akello", "n. akello", " R. Mutebi "], featured: ["Guest"] });
+check(
+  "the same writer typed twice is stored once",
+  sql(`select count(*) from recording_credits where recording_id = '${newId}' and role = 'songwriter'`) === "2",
+);
 let dupMsg = "";
 try { await M.masters.createSong({ kind: "label", orgId: lab.orgId }, D({ title: "Dup", artistName: "X", isrc: "UG-ABC-26-00123" })); } catch (e) { dupMsg = e.message; }
 check("a duplicate ISRC is refused with a clear message", /already registered/.test(dupMsg), dupMsg);

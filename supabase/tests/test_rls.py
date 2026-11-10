@@ -168,7 +168,7 @@ def main() -> int:
     got, _ = as_user(None, "select count(*) from stations")
     expect("anonymous visitor still reads no station rows", got, "0")
     got, _ = as_user(None, "select string_agg(k, ',' order by k) from json_object_keys(public.public_ingest_health()) k")
-    expect("public_ingest_health() returns counts and timestamps only", got, "last_detection,last_heartbeat,monitored,stations")
+    expect("public_ingest_health() returns counts and timestamps only", got, "last_detection,last_heartbeat,monitored,stations,stream_ready")
 
     print("\nWRITES that must be refused")
     rival_rec = q("select id from recordings where title = 'Rival Anthem'")
@@ -201,6 +201,23 @@ def main() -> int:
     expect_refused("label forges an entry in its own alert queue", err)
     out, err = as_user(None, "select public.enqueue_alerts(now() - interval '1 hour')")
     expect_refused("anonymous visitor enqueues alerts", err)
+
+    # Credits: naming a writer is an edit to the song, so it follows the song.
+    own_credits = q(f"insert into recording_credits (recording_id, role, name, position) values ('{own_rec}', 'songwriter', 'N. Akello', 0) returning id")
+    out, err = as_user(users["label"], f"insert into recording_credits (recording_id, role, name, position) values ('{rival_rec}', 'songwriter', 'Sneaky', 0)")
+    expect_refused("label adds a writer to a rival label's song", err)
+    out, err = as_user(users["artist"], f"insert into recording_credits (recording_id, role, name, position) values ('{rival_rec}', 'songwriter', 'Sneaky', 0)")
+    expect_refused("artist adds a writer to someone else's song", err)
+    out, err = as_user(None, f"insert into recording_credits (recording_id, role, name, position) values ('{own_rec}', 'songwriter', 'Sneaky', 0)")
+    expect_refused("anonymous visitor adds a writer", err)
+    out, err = as_user(users["label"], f"insert into recording_credits (recording_id, role, name, position) values ('{own_rec}', 'songwriter', 'n. akello', 1)")
+    expect_refused("the same writer cannot be credited twice (case-insensitive)", err)
+    out, err = as_user(users["label"], f"insert into recording_credits (recording_id, role, name, position) values ('{own_rec}', 'producer', 'Nope', 2)")
+    expect_refused("an unknown credit role is refused", err)
+    got, _ = as_user(users["label"], f"select string_agg(role || ':' || name, ',' order by role, position) from recording_credits where recording_id = '{own_rec}'")
+    expect("the owning label reads its own credits", got, "songwriter:N. Akello")
+    got, _ = as_user(users["artist"], f"select count(*) from recording_credits where recording_id = '{rival_rec}'")
+    expect("another artist reads none of a rival's credits", got, "0")
 
     out, err = as_user(users["broadcaster"], "with u as (update mentions set status = 'rejected' returning 1) select count(*) from u")
     expect_refused("broadcaster reviews its own brand mentions", err, out)
@@ -345,6 +362,11 @@ def main() -> int:
     got, _ = as_user(None, "select streams_online from public.public_platform_stats()")
     want = q("select count(*) from stations where stream_status = 'online' and last_heartbeat > now() - interval '10 minutes'")
     expect("homepage counts only stations that reported recently", got, want)
+    got, _ = as_user(None, "select panel_stations || '/' || stream_ready from public.public_platform_stats()")
+    want = q("select (count(*) filter (where coalesce(stream_status, '') <> 'disabled')) || '/' ||"
+             " (count(*) filter (where coalesce(stream_status, '') <> 'disabled'"
+             "   and nullif(btrim(coalesce(stream_url, '')), '') is not null)) from stations")
+    expect("…and reports the panel size even when nothing is streaming", got, want)
     out, err = as_user(None, f"select public.owns_master('{own_rec}/x.wav')")
     expect_refused("anonymous visitor calls owns_master()", err)
     out, err = as_user(None, f"select public.alert_wanted('{uid['artist']}', 'firstspin')")

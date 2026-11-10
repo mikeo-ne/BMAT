@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { LANGS, useI18n, type Lang } from "@/lib/i18n";
 import { ROLE_META, ROLES } from "@/lib/roles";
 import { SOLUTIONS } from "@/lib/data/public";
-import { loadPublicStats } from "@/lib/db/shared";
+import { badgeLine, loadPublicStats, type PublicStats } from "@/lib/db/shared";
 import { cx } from "@/lib/safe";
 import { Logo } from "./Logo";
 
@@ -81,15 +81,14 @@ function Dropdown({ label, items }: { label: string; items: { key: string; title
 
 export function LiveBadge() {
   const { t } = useI18n();
-  const [stats, setStats] = useState<{ streams: number; venues: number } | null>(null);
+  const [stats, setStats] = useState<PublicStats | null>(null);
   useEffect(() => {
     loadPublicStats().then(setStats).catch(() => setStats(null)); // live mode only; demo keeps the default copy
   }, []);
   // Live site: only real numbers (nothing until they load). Demo: the sample copy.
-  const text = stats
-    ? (stats.venues > 0 ? t("liveTpl").replace("{v}", String(stats.venues)) : t("liveStationsTpl")).replace("{s}", String(stats.streams))
-    : isSupabaseConfigured ? "" : t("live");
-  if (isSupabaseConfigured && !stats) return null;
+  const line = badgeLine(stats, isSupabaseConfigured);
+  if (!line) return null;
+  const text = Object.entries(line.values).reduce((out, [k, v]) => out.replace(`{${k}}`, v), t(line.key));
   return (
     <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300">
       <span className="relative flex h-2 w-2">

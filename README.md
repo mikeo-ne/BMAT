@@ -17,7 +17,7 @@ npm run dev                  # http://localhost:3000
 
 **Live mode** (Supabase connected): every dashboard reads and writes the real database, limited by role at the database level.
 
-**Setting up live mode**: create a Supabase project, run the three files in `supabase/migrations/` in order in the SQL editor, add the URL + anon key to `.env.local`, and add `<site>/auth/callback` and `<site>/auth/reset` to Auth → URL Configuration → Redirect URLs.
+**Setting up live mode**: create a Supabase project, paste `supabase/setup.sql` into the SQL editor (or run every file in `supabase/migrations/` in order), add the URL + anon key to `.env.local`, and add `<site>/auth/callback` and `<site>/auth/reset` to Auth → URL Configuration → Redirect URLs.
 
 ## Role isolation — three layers
 
@@ -40,6 +40,7 @@ Additional rules:
 | `/` | Landing: sticky nav, live badge, EN/LG/SW, Solutions & Use Cases dropdowns, hero visualizer, playout ticker, Top 10 with regional filters + 10s evidence player |
 | Broadcaster dashboard | Claim an unclaimed station or add a new one; CMO approves in **Station Requests** |
 | `/pricing` | Plans in shillings; **free during early access** (payments paused via `NEXT_PUBLIC_PAYMENTS_ENABLED`) |
+| **Many writers per song** | Upload and edit forms take one row per songwriter and one per featured artist; `recording_credits` stores each person, and the old `composer` / `featuring` columns keep the semicolon-joined line the cue sheet prints |
 | `/offline`, `/manifest.webmanifest` | Installed-app shell: offline page, install prompt, push subscription |
 | `/api/push/send` | Send one push payload to subscribed devices (CRON_SECRET + VAPID keys) |
 | `/api/feed/airplay` | Read-only JSON/CSV airplay feed for CMO systems — bearer token, RLS decides rows |

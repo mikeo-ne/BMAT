@@ -22,6 +22,7 @@ const DICT = {
     live: "32 Streams & 150+ Venues Active",
     liveTpl: "{s} Streams & {v} Venues Active",
     liveStationsTpl: "{s} Stations Monitored Live",
+    livePanelTpl: "{s} stations on the panel · {r} ready to stream",
     heroTitle: "Every spin. Every station. Every shilling accounted for.",
     heroSub:
       "East Sound monitors Ugandan radio around the clock, matches what plays to who owns it, and turns airplay into evidence-backed royalties. TV and venue monitoring are coming next.",
@@ -39,6 +40,7 @@ const DICT = {
     live: "Emikutu 32 n'ebifo 150+ biri ku mpewo",
     liveTpl: "Emikutu {s} n'ebifo {v} biri ku mpewo",
     liveStationsTpl: "Emikutu {s} biri ku mpewo",
+    livePanelTpl: "Emikutu {s} ku lukalala · {r} mwetegefu okussa ku mpewo",
     heroTitle: "Buli luyimba, buli mukutu, buli shilingi — byonna bibalibwa.",
     heroSub:
       "East Sound ewuliriza leediyo mu Uganda essaawa 24, n'ezuula nnannyini buli luyimba olukubiddwa, n'ekakasa nti bannannyini nnyimba basasulwa nga balina obujulizi. Okuwuliriza TV n'ebifo by'okusanyukiramu kujja mangu.",
@@ -56,6 +58,7 @@ const DICT = {
     live: "Vituo 32 na Kumbi 150+ Hewani",
     liveTpl: "Vituo {s} na Kumbi {v} Hewani",
     liveStationsTpl: "Vituo {s} Vinafuatiliwa Moja kwa Moja",
+    livePanelTpl: "Vituo {s} kwenye paneli · {r} tayari kutiririsha",
     heroTitle: "Kila wimbo. Kila kituo. Kila shilingi inahesabiwa.",
     heroSub:
       "East Sound hufuatilia redio za Uganda saa 24, hulinganisha kila wimbo unaochezwa na mmiliki wake, na kugeuza uchezaji kuwa mrabaha wenye ushahidi. Ufuatiliaji wa TV na kumbi unakuja hivi karibuni.",

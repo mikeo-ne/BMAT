@@ -4,7 +4,7 @@
 import * as demo from "@/lib/data/artist";
 import { safeArray } from "@/lib/safe";
 import { db, must } from "./core";
-import { SONG_COLUMNS, demoList, demoSeed, toSong, type Song } from "./masters";
+import { SONG_COLUMNS, creditsFor, demoList, demoSeed, toSong, type Song } from "./masters";
 
 export type Track = { id: string; title: string; year: number | null; isrc: string; spins30d: number; trend: number };
 export type ArtistData = {
@@ -60,6 +60,8 @@ export async function loadArtist(): Promise<ArtistData> {
     velocity = safeArray(v).map((d) => Number(d.spins));
   }
   const title = new Map(recRows.map((r) => [r.id, r.title]));
+  const mineOnly = own.filter((r) => !r.label_org_id);
+  const credits = await creditsFor(mineOnly.map((r) => r.id));
   return {
     stats: {
       tracks: recRows.length,
@@ -70,7 +72,7 @@ export async function loadArtist(): Promise<ArtistData> {
     discography,
     leadTitle: lead?.title ?? "",
     velocity,
-    songs: own.filter((r) => !r.label_org_id).map(toSong),
+    songs: mineOnly.map((r) => toSong(r, credits.get(r.id))),
     labelSongs: own.filter((r) => r.label_org_id).length,
     userId: who.user?.id ?? null,
     splits: safeArray(must(splits, "splits") as { recording_id: string; party_name: string; share_pct: number }[]).map((x) => ({

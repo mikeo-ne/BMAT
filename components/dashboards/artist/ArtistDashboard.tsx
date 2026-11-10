@@ -26,6 +26,12 @@ function ArtistView({ d, name, scope, reload }: { d: Awaited<ReturnType<typeof l
     for (const s of safeArray(d.splits)) m.set(s.work, [...(m.get(s.work) ?? []), { party: s.party, share: s.share }]);
     return Array.from(m.entries());
   }, [d.splits]);
+  // Songs whose writers are named but whose split has never been agreed: the
+  // cue sheet can credit them, the money cannot move until someone signs.
+  const unsplit = useMemo(() => {
+    const agreed = new Set(byWork.map(([work]) => work.toLowerCase()));
+    return safeArray(d.songs).filter((s) => s.songwriters.length > 1 && !agreed.has(s.title.toLowerCase()));
+  }, [byWork, d.songs]);
   const v = safeArray(d.velocity);
   const now7 = v.slice(-7).reduce((a, b) => a + b, 0);
   const prev7 = v.slice(-14, -7).reduce((a, b) => a + b, 0);
@@ -98,6 +104,22 @@ function ArtistView({ d, name, scope, reload }: { d: Awaited<ReturnType<typeof l
             </div>
           ))}
         </div>
+        {unsplit.length > 0 && (
+          <div className="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/5 p-4">
+            <p className="text-sm font-medium text-amber-200">Writers named, split not agreed yet</p>
+            <ul className="mt-2 space-y-1 text-sm text-slate-300">
+              {unsplit.map((s) => {
+                const even = Math.round((100 / s.songwriters.length) * 100) / 100;
+                return (
+                  <li key={s.id}>
+                    <span className="font-medium text-white">{s.title}</span> — {s.songwriters.join(", ")}.
+                    {" "}An even split would be {even}% each; agree it in writing and the statement can pay it out.
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </Section>
 
       <Section id="alerts" title="Airplay Alerts">
