@@ -38,6 +38,7 @@ Additional rules:
 | Route | Purpose |
 |---|---|
 | `/` | Landing: sticky nav, live badge, EN/LG/SW, Solutions & Use Cases dropdowns, hero visualizer, playout ticker, Top 10 with regional filters + 10s evidence player |
+| `/coverage` | Per-region station counts from the live panel, evidence and compliance claims, manual-logs comparison |
 | `/blog`, `/blog/[slug]` | Live metric feed, category pills, search |
 | `/dashboard` | Routes to the caller's own dashboard |
 | `/dashboard/cmo` | Registry (CSV export), split calculator, Top 100, regional heatmap, dispute engine, unmatched queue |

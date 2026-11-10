@@ -24,6 +24,7 @@ export const MIGRATIONS = [
   ["0011_upc_check.sql", "Upload form: warn when a UPC is already used by another artist"],
   ["0012_alert_channels.sql", "Airplay alerts on WhatsApp and SMS as well as email"],
   ["0013_public_stats.sql", "Aggregate counts for the public website"],
+  ["0014_public_coverage.sql", "Coverage: anonymous per-region station counts for /coverage"],
 ];
 
 const BANNER = (n, name, note) => [

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { og } from "@/lib/seo";
 import { Header } from "@/components/site/Header";
 import { Hero } from "@/components/site/Hero";
@@ -30,6 +31,23 @@ export default function HomePage() {
                 <p className="mt-2 text-sm text-slate-400">{s.desc}</p>
               </article>
             ))}
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
+          <div className="glass flex flex-wrap items-center justify-between gap-4 p-6">
+            <div className="max-w-2xl">
+              <p className="font-mono text-xs uppercase tracking-widest text-emerald-400">Coverage</p>
+              <h2 className="mt-2 text-2xl font-bold text-white">Four regions, not two studios in Kampala</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Stations in Central, Western, Eastern and Northern Uganda, monitored around the clock, each play
+                backed by a 10-second clip and UPRS-ready paperwork. Most airplay here is still written on a log
+                sheet — that is the standard we are replacing.
+              </p>
+            </div>
+            <Link href="/coverage" className="btn-ghost">
+              See the coverage map →
+            </Link>
           </div>
         </section>
 

@@ -7,6 +7,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const newest = (POSTS || []).map((p) => p.date).sort().at(-1);
   return [
     { url: abs("/"), changeFrequency: "daily", priority: 1 },
+    { url: abs("/coverage"), changeFrequency: "daily", priority: 0.8 },
     { url: abs("/blog"), lastModified: newest, changeFrequency: "weekly", priority: 0.8 },
     ...(POSTS || []).map((p) => ({
       url: abs(`/blog/${p.slug}`),

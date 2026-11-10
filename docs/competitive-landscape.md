@@ -156,11 +156,63 @@ Legend: ✅ present · ➖ partial/partner · ❌ absent.
 - Regional expansion via partners (Kenya, Rwanda, Tanzania) rather than build-out.
 - Publish the national chart with a media partner; tie it to UPRS distribution.
 
+## The three tiers, and the one line that answers each
+
+A rival brief circulating in November 2026 (the "BMAT in East Africa" notebook)
+sorted the market into three tiers. It is a useful frame because each tier loses
+to us for a *different* reason, so each one gets a different sentence — not one
+generic "we are better" claim.
+
+| Tier | Who | Their real strength | Where they lose to us | Our line |
+| --- | --- | --- | --- | --- |
+| **Global enterprise** | BMAT (Spain), Audible Magic (US), ACRCloud (China) | Reference-grade fingerprinting, enterprise SLAs, deals with big CMOs and platforms | Priced for enterprise, sold as an API/engine, no Ugandan cue sheets, no venue licensing workflow, no Luganda/WhatsApp support, data hosted abroad | "Same class of audio matching. Ugandan paperwork, Ugandan prices, Ugandan stations." |
+| **Regional / pan-African** | Radiomonitor (South Africa/Nigeria, charts for Sony/UMG/WMG), SongBoost, GoCreate | Charts and reports labels trust, mobile-first onboarding, CMO relationships elsewhere | Coverage concentrates on a handful of big-city stations; a country-in-a-spreadsheet mindset; little/no evidence per play | "They cover Africa. We cover *your* region, station by station, and we can play you the clip." |
+| **Legacy manual** | Handwritten radio log sheets, paper cue sheets, UPRS field agents | Free at the point of use, already in everyone's workflow, no onboarding | Days-to-weeks delay, unverifiable, misses upcountry stations, expensive to audit | "A log sheet is a promise. A 10-second clip is proof." |
+
+Two corrections to keep the brief honest:
+
+- **"Wavsatch / RadioMonitor" is Radiomonitor.** One company, an established
+  South African monitoring firm; not a Ugandan startup.
+- **Mdundo and Boomplay are not competitors.** They report *streams*. East
+  Sound reports *terrestrial broadcast* (radio now, TV next) and venues. The
+  honest framing — and the useful product framing — is integration: a rights
+  holder wants streams and spins side by side, and we are happy to be the
+  broadcast half of that picture.
+
+### What shipped because of this brief
+
+- **`/coverage`** (new public page, linked from the header, homepage and
+  sitemap): per-region station counts straight from the monitoring panel, with
+  the four-region argument, the evidence argument and a manual-logs-vs-us table.
+  Numbers come from a `public_coverage()` RPC that returns counts only — no
+  station names, no stream URLs — and the page labels sample data as sample.
+- **`docs/competitive-landscape.md`** (this file) now carries the tier table so
+  sales copy and product decisions point at the same target.
+- Existing: CSV export on every table a rights holder sees (see PR #41), which
+  is the direct answer to "a PDF report from a foreign service".
+
+### What the tier table says to build next
+
+1. **Against global enterprise:** an evidence-first audit trail (clip +
+   timestamp + confidence + station licence) that a CMO can file. Most of the
+   data already exists; the missing piece is a one-click *statement pack*.
+2. **Against regional tools:** deepen regional density where they are thin —
+   Northern and Western Uganda first, since a 1-station region is the weakest
+   line on the coverage page.
+3. **Against manual logs:** a broadcaster-facing "replace your log sheet" flow
+   — auto-generated cue sheets per station per month, which doubles as the UPRS
+   filing.
+
+
 ## Positioning sentence
 
 > East Sound is the only airplay platform that proves every play with audio,
 > prices in shillings, speaks Luganda, and closes the loop from detection to a
 > royalty statement — for rights holders, broadcasters and the CMO, in one system.
+
+Short form for the site and pitch deck (**The Hyper-Local, Affordable Standard
+for East Africa**): density across all four Ugandan regions, UPRS compliance
+built in, and a 10-second audible clip behind every number.
 
 ## Sources
 
