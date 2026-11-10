@@ -6,7 +6,7 @@
 // In development the framing rules are relaxed: the sandbox preview is shown
 // inside an iframe on a different origin, and X-Frame-Options: DENY would
 // blank it. Production keeps the strict pair.
-const isDev = process.env.NODE_ENV !== "production";
+const isDev = process.env.NODE_ENV === "development";
 const security = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   ...(isDev ? [] : [{ key: "X-Frame-Options", value: "DENY" }]),
