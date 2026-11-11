@@ -17,6 +17,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from . import build_id
 from .audio import encode_mp3
 from .config import Settings, Station
 from .detector import Detection, Unmatched
@@ -82,7 +83,8 @@ class JsonlSink(Sink):
     def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None,
                   error: str | None = None) -> None:
         self._write("heartbeats.jsonl", {"station": st.slug, "at": _iso(dt.datetime.now(dt.timezone.utc)),
-                                         "status": status, "now_playing": now_playing, "error": error})
+                                         "status": status, "now_playing": now_playing, "error": error,
+                                         "build": build_id()})
 
 
 class SupabaseSink(Sink):
@@ -159,10 +161,18 @@ class SupabaseSink(Sink):
         sid = self._station_id(st, stream_url)
         now = _iso(dt.datetime.now(dt.timezone.utc))
         row: dict[str, Any] = {"stream_status": status, "now_playing": now_playing, "last_heartbeat": now,
-                               "stream_error": (error or None) and error[:300]}
+                               "stream_error": (error or None) and error[:300], "worker_build": build_id()}
         if error:
             row["stream_error_at"] = now
-        self._rest("PATCH", "stations", row, f"?id=eq.{sid}")
+        try:
+            self._rest("PATCH", "stations", row, f"?id=eq.{sid}")
+        except (OSError, ValueError):
+            # A worker can be newer than the database for a minute after a
+            # deploy. Losing the detail is survivable; losing the heartbeat is
+            # what makes the whole panel look dead.
+            for key in ("stream_error", "stream_error_at", "worker_build"):
+                row.pop(key, None)
+            self._rest("PATCH", "stations", row, f"?id=eq.{sid}")
 
 
 class EastSoundPlayoutSink(Sink):

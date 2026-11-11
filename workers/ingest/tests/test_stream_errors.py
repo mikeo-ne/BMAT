@@ -80,6 +80,10 @@ def main() -> int:
     check(isinstance(row.get("stream_error_at"), str), "and timestamped")
     check(isinstance(row.get("last_heartbeat"), str), "the heartbeat still stamps the time")
 
+    # "Did the deploy land?" has to be answerable from the database, because
+    # the alternative is asking someone to read the host's log tail.
+    check("worker_build" in row and isinstance(row["worker_build"], str), "the heartbeat says which build it is")
+
     sink.calls.clear()
     SupabaseSink.heartbeat(sink, st, "online", "A — B", "https://example.test/a", None)
     (_, row) = sink.calls[-1]
@@ -93,6 +97,7 @@ def main() -> int:
         lines = (Path(d) / "heartbeats.jsonl").read_text().strip().splitlines()
         row = json.loads(lines[-1])
         check(row.get("error") == "Connection refused", "dry-run heartbeats include the error")
+        check("build" in row, "dry-run heartbeats include the build")
         check(row.get("station") == "capital-fm" and row.get("status") == "reconnecting", "…and the usual fields")
         check(dt.datetime.fromisoformat(row["at"]).tzinfo is not None, "…with a real UTC timestamp")
 

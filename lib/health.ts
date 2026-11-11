@@ -244,6 +244,7 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
         monitored?: number;
         stream_ready?: number;
         stream_errors?: number;
+        worker_build?: string | null;
         sample_error?: string | null;
         last_heartbeat?: string | null;
         last_detection?: string | null;
@@ -279,6 +280,7 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
   const ready = Number(health.stream_ready) || 0;
   const broken = Number(health.stream_errors) || 0;
   const sampleError = (health.sample_error ?? "").toString().trim();
+  const build = (health.worker_build ?? "").toString().trim();
   const heardAt = health.last_heartbeat ? Date.parse(health.last_heartbeat) : NaN;
   const heartbeatAge = now().getTime() - heardAt;
   const workerUp = Number.isFinite(heartbeatAge) && heartbeatAge <= HEARTBEAT_STALE_MS;
@@ -313,6 +315,9 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
   const age = now().getTime() - at;
   const WORKER_FIX =
     "Deploy the worker on an always-on host — Vercel cannot hold 25 streams open. RUNBOOK.md step 1 has the Railway/Fly recipe (10 minutes).";
+  // "Did the deploy land?" is otherwise a question only the host's log can
+  // answer; the worker now stamps its commit on every heartbeat.
+  const buildNote = build ? ` (worker build ${build})` : "";
 
   checks.push(
     Number.isFinite(at) && age <= staleAfter
@@ -344,11 +349,11 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
             // nothing. Saying "upload songs" to a host that is blocked
             // wastes the operator's evening.
             detail:
-              broken > 0
+              (broken > 0
                 ? `The worker is up but cannot read ${broken} station${broken === 1 ? "" : "s"} — nothing is being recorded.`
                 : Number.isFinite(at)
                   ? `The worker is up, but the last detection was ${humanAge(age)} — nothing it hears is matching a master.`
-                  : "The worker is up; no plays recorded yet.",
+                  : "The worker is up; no plays recorded yet.") + buildNote,
             fix:
               broken > 0
                 ? `The worker's own words: ${sampleError || "see stations.stream_error"}. If every station fails the same way, move the worker to a Uganda or Kenya host — Ugandan broadcasters refuse many overseas datacentre IPs.`
