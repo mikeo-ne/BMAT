@@ -34,6 +34,7 @@ export const MIGRATIONS = [
   ["0021_panel_stats.sql", "Public stats report panel size as well as live streams"],
   ["0022_recording_credits.sql", "Many songwriters and featured artists per song"],
   ["0023_stream_errors.sql", "Stations record why a stream cannot be read"],
+  ["0024_worker_build.sql", "Stations record which worker build heartbeated them"],
 ];
 
 const BANNER = (n, name, note) => [
