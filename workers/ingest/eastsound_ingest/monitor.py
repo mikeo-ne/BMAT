@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import re
 import subprocess
 import threading
 import time
@@ -22,11 +23,17 @@ log = logging.getLogger(__name__)
 HEARTBEAT_SEC = 60
 
 
+_URL_RE = re.compile(r"https?://\S+", re.I)
+
+
 def _short_error(stderr: str) -> str:
-    """The useful sentence from ffmpeg's stderr, without the banner and line noise."""
+    """The useful sentence from ffmpeg's stderr, without the banner, the line
+    noise, or the stream address itself — this text is shown in a dashboard and
+    (in part) on the public /api/health, and an ingest URL can carry a token."""
     lines = [l.strip() for l in stderr.splitlines() if l.strip()]
     keep = [l for l in lines if not l.startswith(("ffmpeg version", "built with", "configuration:", "libav", "Input #0", "Output #0", "Stream mapping", "Press [q]"))]
-    return (keep[-1] if keep else lines[-1] if lines else "stream ended")[:300]
+    line = keep[-1] if keep else (lines[-1] if lines else "stream ended")
+    return _URL_RE.sub("<stream>", line)[:300]
 
 
 class StationMonitor(threading.Thread):

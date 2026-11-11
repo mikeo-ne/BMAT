@@ -1979,7 +1979,8 @@ as $$
     'stream_errors',  (select count(*) from public.stations
                         where stream_error is not null
                           and coalesce(stream_status, '') <> 'online'),
-    'sample_error',   (select left(stream_error, 200) from public.stations
+    'sample_error',   (select left(regexp_replace(stream_error, 'https?://\S+', '<stream>', 'gi'), 200)
+                        from public.stations
                         where stream_error is not null
                         order by stream_error_at desc nulls last
                         limit 1),

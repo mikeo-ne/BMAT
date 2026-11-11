@@ -60,6 +60,13 @@ def main() -> int:
     check(len(short) <= 300 and "\n" not in short, "it stays one short line")
     check(_short_error("") == "stream ended", "an empty stderr still says something")
 
+    # An ingest URL can carry a token; this text is shown in a dashboard and
+    # part of it is public on /api/health.
+    leaky = "Error opening input file https://user:secret@radio.example.ug/live?token=abc123."
+    cleaned = _short_error(leaky)
+    check("http" not in cleaned and "secret" not in cleaned and "token=" not in cleaned, "the stream address is not echoed")
+    check(cleaned.startswith("Error opening input file <stream>"), "the reason survives the redaction")
+
     # 2. The heartbeat carries it to the database ---------------------------
     st = Station(slug="capital-fm", name="Capital FM")
     sink = FakeSupabaseSink()
