@@ -188,6 +188,7 @@ function BroadcasterView({ d, date, setDate, loading, freshness }: { d: Broadcas
       </div>
     );
   }
+  const mon = d.station.monitoring;
   return (
     <>
       <section id="overview" className="scroll-mt-20">
@@ -204,6 +205,22 @@ function BroadcasterView({ d, date, setDate, loading, freshness }: { d: Broadcas
             {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" aria-label="Loading" />}
           </label>
         </div>
+
+        {mon && mon.status !== "online" && (
+          <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${mon.error ? "border-rose-400/30 bg-rose-400/5 text-rose-200" : "border-amber-400/30 bg-amber-400/5 text-amber-200"}`}>
+            <p className="font-medium">
+              {mon.error ? "We can't hear your stream right now" : "Connecting to your stream…"}
+            </p>
+            <p className="mt-1 text-slate-300">
+              {mon.error
+                ? <>The monitor reported: <span className="font-mono text-xs text-rose-300">{mon.error}</span>. Nothing from this station is being recorded until it can be read — plays logged before that are still in your timeline.</>
+                : <>The monitor is trying to reconnect. If this lasts more than a few minutes, the stream address may have changed.</>}
+            </p>
+            {mon.heartbeatAt && (
+              <p className="mt-1 text-xs text-slate-500">Last contact {new Date(mon.heartbeatAt).toLocaleString("en-GB", { timeZone: "Africa/Kampala" })} Kampala time.</p>
+            )}
+          </div>
+        )}
         <StatGrid items={[
           { label: "Music", value: `${share.music}%` },
           { label: "Ads", value: `${share.ad}%` },

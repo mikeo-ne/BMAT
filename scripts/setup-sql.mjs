@@ -33,6 +33,7 @@ export const MIGRATIONS = [
   ["0020_station_requests.sql", "Station onboarding: broadcasters claim or add a station, CMO approves"],
   ["0021_panel_stats.sql", "Public stats report panel size as well as live streams"],
   ["0022_recording_credits.sql", "Many songwriters and featured artists per song"],
+  ["0023_stream_errors.sql", "Stations record why a stream cannot be read"],
 ];
 
 const BANNER = (n, name, note) => [

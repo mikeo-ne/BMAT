@@ -48,6 +48,14 @@ The code path is ready; what we still need is an address we are allowed to use. 
 5. **Tell the truth on the site.** `/coverage` reads `kind` from the database, so the TV count changes the
    moment a channel is monitored — no copy to edit, and no claim before the fact.
 
+## AfroMobile / MTN TV
+
+If the question is "can we just take the streams AfroMobile already carries?", the answer is no — they are
+subscriber-gated and paid, and pulling them would break the broadcaster relationship we need. What AfroMobile's
+scale does tell us is where the audience is: 60+ TV channels and 53 radio stations after the MTN TV launch in
+August 2026. `docs/afro-mobile.md` has the numbers, the three routes we can actually take (public broadcaster
+feeds, a data partnership, DVB-T2 capture), and the outreach text.
+
 ## Cost note
 
 A 1080p TV stream decoded to 11 kHz mono PCM is roughly the same CPU as a radio stream (decode dominates,

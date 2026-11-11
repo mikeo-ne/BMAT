@@ -60,6 +60,29 @@ describe("buildReadiness", () => {
     expect(byId(report, "ingest").detail).toMatch(/Last detection/);
   });
 
+  it("repeats the worker's own reason when streams cannot be read", async () => {
+    const report = await buildReadiness(
+      input([
+        { match: "/auth/v1/health", body: { name: "GoTrue" } },
+        { match: "profiles?select=id", body: [{ id: "u1" }] },
+        {
+          match: "rpc/public_ingest_health",
+          body: {
+            stations: 28, monitored: 25, stream_ready: 26, stream_errors: 25,
+            sample_error: "Server returned 403 Forbidden (access denied)",
+            last_heartbeat: "2026-11-04T11:59:00Z", last_detection: null,
+          },
+        },
+      ]),
+    );
+    const check = byId(report, "stations");
+    expect(check.state).toBe("ok");
+    expect(check.detail).toContain("25 of them report a stream error");
+    expect(check.fix).toContain("403 Forbidden");
+    expect(check.fix).toMatch(/from Uganda or Kenya/);
+    expect(report.ready).toBe(true);
+  });
+
   it("calls out a project whose migrations were never run", async () => {
     const report = await buildReadiness(
       input([

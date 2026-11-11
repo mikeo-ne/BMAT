@@ -11,8 +11,16 @@ import type { Mention, MentionStatus } from "@/lib/mentions";
 export type SegmentKind = "music" | "ad" | "talk";
 export type Segment = { start: number; end: number; kind: SegmentKind; label: string; composer?: string; publisher?: string; isrc?: string; evidencePath?: string | null };
 export type AdLine = { id: string; advertiser: string; spot: string; booked: number; aired: number; daypart: string };
+/** What the worker last said about this station's stream. */
+export type Monitoring = {
+  status: string;
+  error: string | null;
+  errorAt: string | null;
+  heartbeatAt: string | null;
+} | null;
+
 export type BroadcasterData = {
-  station: { name: string; licence: string } | null;
+  station: { name: string; licence: string; monitoring?: Monitoring } | null;
   date: string;
   segments: Segment[];
   ads: AdLine[];
@@ -39,9 +47,21 @@ function withTalk(items: Segment[]): Segment[] {
 
 export async function loadBroadcaster(date: string): Promise<BroadcasterData> {
   const sb = db();
-  if (!sb) return { station: demo.STATION, date, segments: demo.PLAYOUT, ads: demo.AD_BOOKINGS };
+  if (!sb)
+    return {
+      station: { ...demo.STATION, monitoring: { status: "online", error: null, errorAt: null, heartbeatAt: new Date().toISOString() } },
+      date,
+      segments: demo.PLAYOUT,
+      ads: demo.AD_BOOKINGS,
+    };
 
-  const stations = safeArray(must(await sb.from("stations").select("id, name, frequency").order("name"), "stations") as { id: string; name: string; frequency: string | null }[]);
+  const stations = safeArray(must(
+    await sb.from("stations").select("id, name, frequency, stream_status, stream_error, stream_error_at, last_heartbeat").order("name"),
+    "stations",
+  ) as {
+    id: string; name: string; frequency: string | null; stream_status: string | null;
+    stream_error: string | null; stream_error_at: string | null; last_heartbeat: string | null;
+  }[]);
   const st = stations[0];
   if (!st) return { station: null, date, segments: [], ads: [] };
 
@@ -76,7 +96,16 @@ export async function loadBroadcaster(date: string): Promise<BroadcasterData> {
   const aired = await Promise.all(bRows.map((b) => sb.from("ad_spots").select("id", { count: "exact", head: true }).eq("booking_id", b.id)));
 
   return {
-    station: { name: `${st.name}${st.frequency ? ` · ${st.frequency} FM` : ""}`, licence: "" },
+    station: {
+      name: `${st.name}${st.frequency ? ` · ${st.frequency} FM` : ""}`,
+      licence: "",
+      monitoring: {
+        status: st.stream_status ?? "starting",
+        error: st.stream_error,
+        errorAt: st.stream_error_at,
+        heartbeatAt: st.last_heartbeat,
+      },
+    },
     date,
     segments: withTalk([...music, ...adSegs]),
     ads: bRows.map((b, i) => ({ id: b.id, advertiser: b.advertiser, spot: b.spot, booked: b.booked, aired: aired[i].count ?? 0, daypart: b.daypart ?? "All day" })),

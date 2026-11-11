@@ -157,6 +157,9 @@ Legend: ✅ present · ➖ partial/partner · ❌ absent.
   offline page, install prompt; push subscriptions in `push_subscriptions` and a
   VAPID-gated sender (`docs/pwa-and-push.md`). Alert *rules* still reach email
   and WhatsApp, not push, until the outbox sender is extended.
+- **AfroMobile / MTN TV** is adjacent, not competing: 60+ TV channels and 53 radio stations distributed over an
+  app, but no per-play detection or cue sheets (`docs/afro-mobile.md`). Distribution is the complement to
+  evidence; it is also a partner to approach for channel lists and EPG.
 - **Self-serve plans** — `/pricing` in shillings (artist UGX 35,000), request flow
   with a quotable reference, CMO list (`docs/billing.md`). **Payments are paused:
   early access is free** while we onboard users; charging is one env var away
