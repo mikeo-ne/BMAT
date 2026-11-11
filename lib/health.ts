@@ -339,12 +339,22 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
             id: "ingest",
             label: "Ingest worker reporting",
             state: "warn",
-            detail: Number.isFinite(at)
-              ? `The worker is up, but the last detection was ${humanAge(age)} — nothing it hears is matching a master.`
-              : "The worker is up; no plays recorded yet.",
-            fix: monitored > 0
-              ? "Upload songs (label: Upload Songs · artist: My Songs). Plays appear once a monitored station plays one."
-              : "Enable at least one station in stations.csv so the worker has something to listen to.",
+            // A live worker with no plays has two very different causes:
+            // it cannot read the streams, or it can read them and matches
+            // nothing. Saying "upload songs" to a host that is blocked
+            // wastes the operator's evening.
+            detail:
+              broken > 0
+                ? `The worker is up but cannot read ${broken} station${broken === 1 ? "" : "s"} — nothing is being recorded.`
+                : Number.isFinite(at)
+                  ? `The worker is up, but the last detection was ${humanAge(age)} — nothing it hears is matching a master.`
+                  : "The worker is up; no plays recorded yet.",
+            fix:
+              broken > 0
+                ? `The worker's own words: ${sampleError || "see stations.stream_error"}. If every station fails the same way, move the worker to a Uganda or Kenya host — Ugandan broadcasters refuse many overseas datacentre IPs.`
+                : monitored > 0
+                  ? "Upload songs (label: Upload Songs · artist: My Songs). Plays appear once a monitored station plays one."
+                  : "Enable at least one station in stations.csv so the worker has something to listen to.",
           },
   );
 

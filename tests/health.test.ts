@@ -83,6 +83,28 @@ describe("buildReadiness", () => {
     expect(report.ready).toBe(true);
   });
 
+  it("does not blame missing masters when the streams are unreadable", async () => {
+    const report = await buildReadiness(
+      input([
+        { match: "/auth/v1/health", body: { name: "GoTrue" } },
+        { match: "profiles?select=id", body: [{ id: "u1" }] },
+        {
+          match: "rpc/public_ingest_health",
+          body: {
+            stations: 28, monitored: 25, stream_ready: 26, stream_errors: 25,
+            sample_error: "Server returned 403 Forbidden (access denied)",
+            last_heartbeat: "2026-11-04T11:59:00Z", last_detection: null,
+          },
+        },
+      ]),
+    );
+    const ingest = byId(report, "ingest");
+    expect(ingest.state).toBe("warn");
+    expect(ingest.detail).toMatch(/cannot read 25 stations/);
+    expect(ingest.fix).toContain("403 Forbidden");
+    expect(ingest.fix).not.toMatch(/Upload songs/);
+  });
+
   it("calls out a project whose migrations were never run", async () => {
     const report = await buildReadiness(
       input([
