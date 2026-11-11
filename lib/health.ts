@@ -243,6 +243,8 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
         stations?: number;
         monitored?: number;
         stream_ready?: number;
+        stream_errors?: number;
+        sample_error?: string | null;
         last_heartbeat?: string | null;
         last_detection?: string | null;
       })
@@ -275,6 +277,8 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
   const rows = Number(health.stations) || 0;
   const monitored = Number(health.monitored) || 0;
   const ready = Number(health.stream_ready) || 0;
+  const broken = Number(health.stream_errors) || 0;
+  const sampleError = (health.sample_error ?? "").toString().trim();
   const heardAt = health.last_heartbeat ? Date.parse(health.last_heartbeat) : NaN;
   const heartbeatAge = now().getTime() - heardAt;
   const workerUp = Number.isFinite(heartbeatAge) && heartbeatAge <= HEARTBEAT_STALE_MS;
@@ -295,7 +299,13 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
           // have somewhere to listen, not that someone once set a flag.
           detail:
             `${rows} station${rows === 1 ? "" : "s"} in the panel` +
-            (ready ? `, ${ready} with a stream URL.` : "."),
+            (ready ? `, ${ready} with a stream URL.` : ".") +
+            (broken > 0 ? ` ${broken} of them report a stream error.` : ""),
+          ...(broken > 0
+            ? {
+                fix: `Why the silence, from the worker itself: ${sampleError || "see stations.stream_error"}. Ugandan broadcasters commonly refuse datacentre IPs outside the region — run the worker from Uganda or Kenya before blaming the panel.`,
+              }
+            : {}),
         },
   );
 
@@ -329,12 +339,22 @@ export async function buildReadiness(input: HealthInput): Promise<Readiness> {
             id: "ingest",
             label: "Ingest worker reporting",
             state: "warn",
-            detail: Number.isFinite(at)
-              ? `The worker is up, but the last detection was ${humanAge(age)} — nothing it hears is matching a master.`
-              : "The worker is up; no plays recorded yet.",
-            fix: monitored > 0
-              ? "Upload songs (label: Upload Songs · artist: My Songs). Plays appear once a monitored station plays one."
-              : "Enable at least one station in stations.csv so the worker has something to listen to.",
+            // A live worker with no plays has two very different causes:
+            // it cannot read the streams, or it can read them and matches
+            // nothing. Saying "upload songs" to a host that is blocked
+            // wastes the operator's evening.
+            detail:
+              broken > 0
+                ? `The worker is up but cannot read ${broken} station${broken === 1 ? "" : "s"} — nothing is being recorded.`
+                : Number.isFinite(at)
+                  ? `The worker is up, but the last detection was ${humanAge(age)} — nothing it hears is matching a master.`
+                  : "The worker is up; no plays recorded yet.",
+            fix:
+              broken > 0
+                ? `The worker's own words: ${sampleError || "see stations.stream_error"}. If every station fails the same way, move the worker to a Uganda or Kenya host — Ugandan broadcasters refuse many overseas datacentre IPs.`
+                : monitored > 0
+                  ? "Upload songs (label: Upload Songs · artist: My Songs). Plays appear once a monitored station plays one."
+                  : "Enable at least one station in stations.csv so the worker has something to listen to.",
           },
   );
 

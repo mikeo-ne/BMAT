@@ -38,7 +38,8 @@ def _iso(t: dt.datetime) -> str:
 class Sink:
     def detection(self, d: Detection) -> None: ...
     def unmatched(self, u: Unmatched) -> None: ...
-    def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None) -> None: ...
+    def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None,
+                  error: str | None = None) -> None: ...
     def mention(self, m: Mention) -> None: ...
     def close(self) -> None: ...
 
@@ -78,8 +79,10 @@ class JsonlSink(Sink):
             "score": m.score, "transcript": m.transcript, "evidence": str(clip),
         })
 
-    def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None) -> None:
-        self._write("heartbeats.jsonl", {"station": st.slug, "at": _iso(dt.datetime.now(dt.timezone.utc)), "status": status, "now_playing": now_playing})
+    def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None,
+                  error: str | None = None) -> None:
+        self._write("heartbeats.jsonl", {"station": st.slug, "at": _iso(dt.datetime.now(dt.timezone.utc)),
+                                         "status": status, "now_playing": now_playing, "error": error})
 
 
 class SupabaseSink(Sink):
@@ -151,10 +154,15 @@ class SupabaseSink(Sink):
         return KeywordSet([Keyword(r["brand"], tuple(r.get("terms") or [r["brand"]]), tuple(r.get("aliases") or []), r["id"])
                            for r in rows if r.get("brand")])
 
-    def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None) -> None:
+    def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None,
+                  error: str | None = None) -> None:
         sid = self._station_id(st, stream_url)
-        self._rest("PATCH", "stations", {"stream_status": status, "now_playing": now_playing,
-                                         "last_heartbeat": _iso(dt.datetime.now(dt.timezone.utc))}, f"?id=eq.{sid}")
+        now = _iso(dt.datetime.now(dt.timezone.utc))
+        row: dict[str, Any] = {"stream_status": status, "now_playing": now_playing, "last_heartbeat": now,
+                               "stream_error": (error or None) and error[:300]}
+        if error:
+            row["stream_error_at"] = now
+        self._rest("PATCH", "stations", row, f"?id=eq.{sid}")
 
 
 class EastSoundPlayoutSink(Sink):
@@ -239,8 +247,9 @@ class EastSoundPlayoutSink(Sink):
             rec["evidence"] = ev
         self._post([rec])
 
-    def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None) -> None:
-        log.debug("[%s] %s now_playing=%s", st.slug, status, now_playing)  # East Sound probes health itself
+    def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None,
+                  error: str | None = None) -> None:
+        log.debug("[%s] %s now_playing=%s error=%s", st.slug, status, now_playing, error)  # East Sound probes health itself
 
 
 class AsyncSink(Sink):
@@ -282,8 +291,9 @@ class AsyncSink(Sink):
     def detection(self, d: Detection) -> None: self._put("detection", d)
     def unmatched(self, u: Unmatched) -> None: self._put("unmatched", u)
     def mention(self, m: Mention) -> None: self._put("mention", m)
-    def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None) -> None:
-        self._put("heartbeat", st, status, now_playing, stream_url)
+    def heartbeat(self, st: Station, status: str, now_playing: str | None, stream_url: str | None,
+                  error: str | None = None) -> None:
+        self._put("heartbeat", st, status, now_playing, stream_url, error)
 
     def close(self) -> None:
         self.q.put(None)

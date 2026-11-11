@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import re
 import subprocess
 import threading
 import time
@@ -22,6 +23,19 @@ log = logging.getLogger(__name__)
 HEARTBEAT_SEC = 60
 
 
+_URL_RE = re.compile(r"https?://\S+", re.I)
+
+
+def _short_error(stderr: str) -> str:
+    """The useful sentence from ffmpeg's stderr, without the banner, the line
+    noise, or the stream address itself — this text is shown in a dashboard and
+    (in part) on the public /api/health, and an ingest URL can carry a token."""
+    lines = [l.strip() for l in stderr.splitlines() if l.strip()]
+    keep = [l for l in lines if not l.startswith(("ffmpeg version", "built with", "configuration:", "libav", "Input #0", "Output #0", "Stream mapping", "Press [q]"))]
+    line = keep[-1] if keep else (lines[-1] if lines else "stream ended")
+    return _URL_RE.sub("<stream>", line)[:300]
+
+
 class StationMonitor(threading.Thread):
     def __init__(self, station: Station, index: FingerprintIndex, sink: Sink, settings: Settings,
                  stop: threading.Event, realtime: bool = True, scanner: MentionScanner | None = None):
@@ -31,6 +45,7 @@ class StationMonitor(threading.Thread):
         self.scanner = scanner  # brand-mention scanning (optional, EST_MENTIONS=1)
         self.url: str | None = station.stream_url
         self.status = "starting"
+        self.error: str | None = None  # last thing ffmpeg complained about, shown in the dashboard
         self.detections = 0
         self.base_override = None  # fixed start time for recorded-file scans
 
@@ -55,7 +70,7 @@ class StationMonitor(threading.Thread):
 
     def _beat(self) -> None:
         np_ = self.det.now_playing
-        self.sink.heartbeat(self.st, self.status, f"{np_.title} — {np_.artist}" if np_ else None, self.url)
+        self.sink.heartbeat(self.st, self.status, f"{np_.title} — {np_.artist}" if np_ else None, self.url, self.error)
 
     # -- main loop ----------------------------------------------------------
     def run(self) -> None:
@@ -92,6 +107,7 @@ class StationMonitor(threading.Thread):
             log.error("[%s] ffmpeg failed to start: %s", self.st.slug, e)
             return False
         self.status = "online"
+        self.error = None
         try:
             while not self.stop_ev.is_set():
                 raw = proc.stdout.read(step_bytes) if proc.stdout else b""
@@ -115,5 +131,8 @@ class StationMonitor(threading.Thread):
             err = (proc.stderr.read() if proc.stderr else b"").decode(errors="ignore").strip()
             proc.wait(timeout=5)
             if err:
-                log.warning("[%s] stream ended: %s", self.st.slug, err.splitlines()[-1][:200])
+                # Keep the last line: that is the "Connection refused" or
+                # "403 Forbidden" that answers "why is nothing being recorded?".
+                self.error = _short_error(err)
+                log.warning("[%s] stream ended: %s", self.st.slug, self.error)
         return samples > SAMPLE_RATE * 30

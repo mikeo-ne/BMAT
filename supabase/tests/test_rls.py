@@ -168,7 +168,7 @@ def main() -> int:
     got, _ = as_user(None, "select count(*) from stations")
     expect("anonymous visitor still reads no station rows", got, "0")
     got, _ = as_user(None, "select string_agg(k, ',' order by k) from json_object_keys(public.public_ingest_health()) k")
-    expect("public_ingest_health() returns counts and timestamps only", got, "last_detection,last_heartbeat,monitored,stations,stream_ready")
+    expect("public_ingest_health() returns counts and timestamps only", got, "last_detection,last_heartbeat,monitored,sample_error,stations,stream_errors,stream_ready")
 
     print("\nWRITES that must be refused")
     rival_rec = q("select id from recordings where title = 'Rival Anthem'")
