@@ -70,7 +70,7 @@ describe("buildReadiness", () => {
           body: {
             stations: 28, monitored: 25, stream_ready: 26, stream_errors: 25,
             sample_error: "Server returned 403 Forbidden (access denied)",
-            last_heartbeat: "2026-11-04T11:59:00Z", last_detection: null,
+            worker_build: "9e216e4", last_heartbeat: "2026-11-04T11:59:00Z", last_detection: null,
           },
         },
       ]),
@@ -93,7 +93,7 @@ describe("buildReadiness", () => {
           body: {
             stations: 28, monitored: 25, stream_ready: 26, stream_errors: 25,
             sample_error: "Server returned 403 Forbidden (access denied)",
-            last_heartbeat: "2026-11-04T11:59:00Z", last_detection: null,
+            worker_build: "9e216e4", last_heartbeat: "2026-11-04T11:59:00Z", last_detection: null,
           },
         },
       ]),
@@ -103,6 +103,8 @@ describe("buildReadiness", () => {
     expect(ingest.detail).toMatch(/cannot read 25 stations/);
     expect(ingest.fix).toContain("403 Forbidden");
     expect(ingest.fix).not.toMatch(/Upload songs/);
+    // "Did my deploy land?" — the heartbeat carries the commit.
+    expect(ingest.detail).toContain("worker build 9e216e4");
   });
 
   it("calls out a project whose migrations were never run", async () => {
