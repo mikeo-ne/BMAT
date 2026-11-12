@@ -19,6 +19,7 @@ export function Footer() {
           <Link href="/#use-cases" className="hover:text-white">Use cases</Link>
           <Link href="/legal/terms" className="hover:text-white">Terms</Link>
           <Link href="/legal/privacy" className="hover:text-white">Privacy</Link>
+          <Link href="/legal/copyright" className="hover:text-white">Copyright</Link>
         </nav>
       </div>
     </footer>

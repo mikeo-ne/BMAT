@@ -20,6 +20,7 @@ export function AuthModal() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<Role | "">("");
+  const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -53,6 +54,10 @@ export function AuthModal() {
     setNotice(null);
     if (modal !== "forgot" && !isRole(role)) {
       setError("Select your use case / role to continue.");
+      return;
+    }
+    if (modal === "signup" && !agreed) {
+      setError("Please confirm you're 18 or older and agree to the Terms and Privacy Notice.");
       return;
     }
     setBusy(true);
@@ -240,6 +245,18 @@ export function AuthModal() {
                 required
               />
             </div>
+          )}
+
+          {modal === "signup" && (
+            <label className="flex items-start gap-2.5 text-xs leading-5 text-slate-400">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-400" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} required />
+              <span>
+                I&apos;m 18 or older and I agree to the{" "}
+                <a href="/legal/terms" target="_blank" rel="noopener" className="text-emerald-400 underline">Terms of Use</a> and{" "}
+                <a href="/legal/privacy" target="_blank" rel="noopener" className="text-emerald-400 underline">Privacy Notice</a>, including my
+                details being stored on secure servers outside Uganda.
+              </span>
+            </label>
           )}
 
           {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{error}</p>}

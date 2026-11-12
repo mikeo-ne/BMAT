@@ -18,5 +18,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
     { url: abs("/legal/terms"), changeFrequency: "yearly", priority: 0.2 },
     { url: abs("/legal/privacy"), changeFrequency: "yearly", priority: 0.2 },
+    { url: abs("/legal/copyright"), changeFrequency: "yearly", priority: 0.2 },
   ];
 }

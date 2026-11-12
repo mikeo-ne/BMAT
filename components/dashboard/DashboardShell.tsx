@@ -8,6 +8,7 @@ import { ROLE_META, ROLE_NAV, type Role } from "@/lib/roles";
 import { cx } from "@/lib/safe";
 import { PushToggle } from "./PushToggle";
 import { RoleGuard } from "./RoleGuard";
+import { TermsBanner, YourData } from "./PrivacyControls";
 
 function Shell({ role, children }: { role: Role; children: ReactNode }) {
   const { session, signOut } = useAuth();
@@ -100,7 +101,11 @@ function Shell({ role, children }: { role: Role; children: ReactNode }) {
           <span className="truncate text-sm text-slate-400">{session?.displayName}</span>
           {DEMO_MODE && <span className="ml-auto rounded-md bg-amber-400/10 px-2 py-0.5 text-[11px] font-medium text-amber-300">Demo data</span>}
         </header>
-        <main className="mx-auto max-w-7xl space-y-8 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        <main className="mx-auto max-w-7xl space-y-8 px-4 py-6 sm:px-6 sm:py-8">
+          <TermsBanner />
+          {children}
+          <YourData />
+        </main>
       </div>
     </div>
   );
