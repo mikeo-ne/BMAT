@@ -45,5 +45,7 @@ def stream_command(url: str, kind: str = "radio") -> list[str]:
         ]
     if kind == "tv" or ".m3u8" in url:
         cmd += ["-fflags", "+genpts", "-live_start_index", "-1", "-analyzeduration", "10000000"]
-    cmd += ["-vn", "-ac", "1", "-ar", str(SAMPLE_RATE), "-i", url, "-f", "s16le", "-"]
+    # Output options must come AFTER -i: before it, ffmpeg applies them to the
+    # input, and MP3/AAC demuxers reject them ("Option sample_rate not found").
+    cmd += ["-i", url, "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "s16le", "-"]
     return cmd

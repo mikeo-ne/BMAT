@@ -66,6 +66,9 @@ def main() -> int:
 
     guess_cmd = stream_command("https://stream.example/ubc.m3u8", "radio")
     check("-live_start_index" in guess_cmd, "a .m3u8 URL gets HLS flags even if kind says radio")
+    for c in (radio_cmd, tv_cmd):
+        i = c.index("-i")
+        check(all(c.index(o) > i for o in ("-vn", "-ac", "-ar")), "decode options come after -i (else MP3 streams fail to open)")
 
     # 3. Example panel ------------------------------------------------------
     check(TV_EXAMPLE.exists(), "stations.tv.example.csv is present")
