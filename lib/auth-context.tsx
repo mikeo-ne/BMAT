@@ -27,6 +27,9 @@ type AuthCtx = {
   signIn: (email: string, password: string, role: Role) => Promise<Result>;
   signUp: (email: string, password: string, role: Role, displayName: string) => Promise<Result>;
   requestPasswordReset: (email: string) => Promise<Result>;
+  /** Finish sign-up with the code from the confirmation email. */
+  verifySignupCode: (email: string, code: string, role: Role) => Promise<Result>;
+  resendSignupCode: (email: string) => Promise<Result>;
   signOut: () => Promise<void>;
 };
 
@@ -169,9 +172,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
       return { ok: false, error: friendlyAuthError("already registered", "signup") };
     }
-    if (!data.session) return { ok: true, message: "Check your inbox to confirm your email, then sign in." };
+    if (!data.session) return { ok: true, message: "verify" };
     return { ok: true, message: role === "cmo" ? "CMO accounts are activated after verification by East Sound." : undefined };
   }, [signIn]);
+
+  const verifySignupCode = useCallback<AuthCtx["verifySignupCode"]>(async (email, code, role) => {
+    const token = code.replace(/\s+/g, "");
+    if (!/^\d{6,10}$/.test(token)) return { ok: false, error: "Enter the code from the email — numbers only." };
+    const sb = getSupabaseBrowser();
+    if (!sb) return { ok: true };
+    const { data, error } = await sb.auth.verifyOtp({ email, token, type: "signup" });
+    if (error || !data.user) {
+      const m = error?.message ?? "";
+      return { ok: false, error: /expired|invalid/i.test(m) ? "That code is wrong or has expired. Check the latest email, or send a new code." : friendlyAuthError(m, "signup") };
+    }
+    const { role: registered, name } = await loadProfileRole(data.user.id);
+    const r = registered ?? role;
+    setSession({ userId: data.user.id, email, role: r, displayName: name ?? email, mode: "supabase" });
+    return { ok: true, message: r === "cmo" ? "CMO accounts are activated after verification by East Sound." : undefined };
+  }, []);
+
+  const resendSignupCode = useCallback<AuthCtx["resendSignupCode"]>(async (email) => {
+    const sb = getSupabaseBrowser();
+    if (!sb) return { ok: true, message: "Demo mode: no email is sent." };
+    const { error } = await sb.auth.resend({ type: "signup", email, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } });
+    if (error) return { ok: false, error: /rate|seconds/i.test(error.message) ? "Please wait a minute before asking for another code." : error.message };
+    return { ok: true, message: "A new code is on its way. Use the newest email." };
+  }, []);
 
   const requestPasswordReset = useCallback<AuthCtx["requestPasswordReset"]>(async (email) => {
     if (!email.includes("@")) return { ok: false, error: "Enter the email you registered with." };
@@ -204,9 +231,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signUp,
       requestPasswordReset,
+      verifySignupCode,
+      resendSignupCode,
       signOut,
     }),
-    [session, loading, modal, signIn, signUp, requestPasswordReset, signOut],
+    [session, loading, modal, signIn, signUp, requestPasswordReset, verifySignupCode, resendSignupCode, signOut],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
