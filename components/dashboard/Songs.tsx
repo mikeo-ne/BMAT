@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/masters";
 import { cx, safeArray } from "@/lib/safe";
 import { Badge } from "@/components/dashboard/ui";
+import { matchFileToSong, songsFromLinks, splitLinks, type LinkSong } from "@/lib/db/links";
 
 type Artist = { id: string; name: string };
 const AUDIO_RE = /\.(wav|mp3|flac|aac|m4a|ogg|aif|aiff)$/i;
@@ -190,10 +191,14 @@ export function SongForm({ value, onChange, artists, lockArtist, songId }: {
 // ---------------------------------------------------------------------------
 // Upload: pick audio → fill in details → save
 
+
 type Job = {
   id: string;
-  file: File;
-  status: "analysing" | "ready" | "saving" | "saved" | "error";
+  /** Missing until the audio is attached (songs added from a link). */
+  file?: File;
+  status: "needs_audio" | "analysing" | "ready" | "saving" | "saved" | "error";
+  /** Filled from a streaming link: where from, and whether codes were found. */
+  fromLink?: { platform: string; matchedOn: LinkSong["matchedOn"]; label?: string };
   ref?: Reference;
   details: SongDetails;
   error?: string;
@@ -214,9 +219,40 @@ export function SongUploader({ owner, artists, defaultArtist, existing, onSaved 
   const patch = (id: string, p: Partial<Job>) => setJobs((j) => safeArray(j).map((x) => (x.id === id ? { ...x, ...p } : x)));
   const roster = safeArray(artists);
 
+  const analyse = async (audio: AudioContext | null, id: string, file: File) => {
+    try {
+      if (!audio) throw new Error("This browser can't read audio files. Try Chrome or Edge.");
+      if (file.size > 500 * 1024 * 1024) throw new Error("File is over 500 MB.");
+      const ref = await makeReference(audio, file);
+      patch(id, { status: "ready", ref });
+    } catch (err) {
+      patch(id, { status: "error", error: err instanceof Error ? err.message : "Couldn't read this file." });
+    }
+  };
+
+  /** Attach a file to one waiting song (its own "Attach audio" button). */
+  const attach = (id: string, file: File) => {
+    const audio = getAudioContext();
+    if (!isAudio(file)) return patch(id, { error: "That isn't an audio file." });
+    patch(id, { file, status: "analysing", error: undefined });
+    void analyse(audio, id, file);
+  };
+
   const add = async (files: File[]) => {
     const audio = getAudioContext(); // created inside the drop/click gesture
-    const list = files.filter(isAudio).slice(0, 25);
+    const all = files.filter(isAudio).slice(0, 25);
+    // First, give each file to the song from a link with the same title.
+    const waiting = safeArray(jobs).filter((j) => j.status === "needs_audio");
+    const claimed = new Set<string>();
+    const list: File[] = [];
+    for (const f of all) {
+      const open = waiting.filter((j) => !claimed.has(j.id));
+      const i = matchFileToSong(guessFromFilename(f.name).title, open.map((j) => j.details.title));
+      if (i >= 0) {
+        claimed.add(open[i].id);
+        attach(open[i].id, f);
+      } else list.push(f);
+    }
     const fresh: Job[] = list.map((f, i) => {
       const g = guessFromFilename(f.name);
       const match = roster.find((a) => a.name.toLowerCase() === g.artistName.toLowerCase());
@@ -226,16 +262,25 @@ export function SongUploader({ owner, artists, defaultArtist, existing, onSaved 
       };
     });
     setJobs((j) => [...fresh, ...safeArray(j)]);
-    for (const job of fresh) {
-      try {
-        if (!audio) throw new Error("This browser can't read audio files. Try Chrome or Edge.");
-        if (job.file.size > 500 * 1024 * 1024) throw new Error("File is over 500 MB.");
-        const ref = await makeReference(audio, job.file);
-        patch(job.id, { status: "ready", ref });
-      } catch (err) {
-        patch(job.id, { status: "error", error: err instanceof Error ? err.message : "Couldn't read this file." });
-      }
-    }
+    for (const job of fresh) if (job.file) await analyse(audio, job.id, job.file);
+  };
+
+  /** Songs from streaming links: details filled in, waiting for their audio. */
+  const addFromLinks = (songs: { song: LinkSong; platform: string }[]) => {
+    const stamp = Date.now();
+    const fresh: Job[] = songs.map(({ song, platform }, i) => {
+      const match = roster.find((a) => a.name.toLowerCase() === song.artistName.toLowerCase());
+      return {
+        id: `link-${stamp}-${i}`, status: "needs_audio", fromLink: { platform, matchedOn: song.matchedOn, label: song.label },
+        details: emptyDetails({
+          title: song.title, artistName: defaultArtist ?? match?.name ?? song.artistName, artistId: match?.id ?? null,
+          // Catalogue genres are often wrong and the record label is not the music publisher:
+          // genre only when it is one of ours; publisher is left for the owner to fill.
+          featured: song.featured, genre: GENRES.find((g) => g.toLowerCase() === song.genre.toLowerCase()) ?? "", isrc: song.isrc, upc: song.upc, releaseDate: song.releaseDate,
+        }),
+      };
+    });
+    setJobs((j) => [...fresh, ...safeArray(j)]);
   };
 
   const save = async (job: Job) => {
@@ -262,6 +307,7 @@ export function SongUploader({ owner, artists, defaultArtist, existing, onSaved 
 
   return (
     <div>
+      <LinkBox onSongs={addFromLinks} />
       <div onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={onDrop}
         onClick={() => input.current?.click()} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
         role="button" tabIndex={0}
@@ -281,14 +327,14 @@ export function SongUploader({ owner, artists, defaultArtist, existing, onSaved 
             return (
               <li key={j.id} className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
                 <div className="mb-3 flex flex-wrap items-center gap-3">
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-white">{j.file.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-white">{j.file?.name ?? (j.details.title || "Song from link")}</span>
                   {j.ref && (
                     <span className="flex h-6 items-end gap-px" aria-hidden>
                       {safeArray(j.ref.envelope).map((v, i) => <span key={i} className="w-1 rounded-sm bg-emerald-400/70" style={{ height: `${Math.max(8, v * 100)}%` }} />)}
                     </span>
                   )}
                   <Badge tone={j.status === "saved" ? "ok" : j.status === "error" ? "bad" : "info"}>
-                    {{ analysing: "Reading audio…", ready: "Add details", saving: "Saving…", saved: "Saved", error: "Can't use this file" }[j.status]}
+                    {{ needs_audio: "Attach audio", analysing: "Reading audio…", ready: "Add details", saving: "Saving…", saved: "Saved", error: "Can't use this file" }[j.status]}
                   </Badge>
                   {j.status !== "saving" && (
                     <button type="button" className="text-xs text-slate-500 hover:text-white" onClick={() => setJobs((x) => x.filter((y) => y.id !== j.id))}>
@@ -305,7 +351,17 @@ export function SongUploader({ owner, artists, defaultArtist, existing, onSaved 
                   <p className="text-sm text-rose-300">{j.error}</p>
                 ) : (
                   <>
+                    {j.fromLink && (
+                      <p className={cx("mb-3 rounded-lg border px-3 py-2 text-xs", j.fromLink.matchedOn === "deezer" ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-200" : "border-amber-400/20 bg-amber-400/5 text-amber-200")}>
+                        {j.fromLink.matchedOn === "deezer"
+                          ? `Details filled in from ${j.fromLink.platform}, with ISRC and UPC from the release${j.fromLink.label ? ` (label: ${j.fromLink.label})` : ""}. Check them against your distributor's records, and add the songwriters and publisher.`
+                          : `Title and artist filled in from ${j.fromLink.platform}. We couldn't find this release's ISRC or UPC — add them from your distributor.`}
+                      </p>
+                    )}
                     <SongForm value={j.details} onChange={(d) => patch(j.id, { details: d, error: undefined })} artists={artists} lockArtist={Boolean(defaultArtist)} />
+                    {j.status === "needs_audio" && (
+                      <AttachAudio onFile={(f) => attach(j.id, f)} />
+                    )}
                     {j.ref?.truncated && <p className="mt-2 text-xs text-amber-300">This file is very long; only the first 15 minutes are used for recognition.</p>}
                     {dup && <p className="mt-2 text-xs text-amber-300">“{dup}” by this artist is already in your catalogue — saving adds a second copy.</p>}
                     {j.error && <p role="alert" className="mt-2 text-sm text-rose-300">{j.error}</p>}
@@ -314,6 +370,7 @@ export function SongUploader({ owner, artists, defaultArtist, existing, onSaved 
                         {j.status === "saving" ? "Saving…" : "Save song"}
                       </button>
                       {j.status === "analysing" && <span className="text-xs text-slate-500">You can fill in details while the audio is read.</span>}
+                      {j.status === "needs_audio" && <span className="text-xs text-slate-500">Attach the song&apos;s audio file to save it — East Sound learns the song from your file.</span>}
                     </div>
                   </>
                 )}
@@ -321,6 +378,65 @@ export function SongUploader({ owner, artists, defaultArtist, existing, onSaved 
             );
           })}
         </ul>
+      )}
+    </div>
+  );
+}
+
+function AttachAudio({ onFile }: { onFile: (f: File) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-slate-700 px-3 py-2">
+      <button type="button" className="btn-ghost !py-1.5 text-xs" onClick={() => ref.current?.click()}>Attach audio file</button>
+      <span className="text-xs text-slate-500">or drop it on the box above — it&apos;s matched to this song by title.</span>
+      <input ref={ref} type="file" accept="audio/*,.wav,.mp3,.flac,.aac,.m4a" hidden
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
+    </div>
+  );
+}
+
+/** Paste Spotify / Apple Music / Deezer / YouTube / Audiomack / Boomplay links; album links add every track. */
+function LinkBox({ onSongs }: { onSongs: (s: { song: LinkSong; platform: string }[]) => void }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problems, setProblems] = useState<string[]>([]);
+  const [note, setNote] = useState<string | null>(null);
+  const run = async () => {
+    const urls = splitLinks(text);
+    setProblems([]); setNote(null);
+    if (!urls.length) return setProblems(["Paste at least one song or album link."]);
+    if (urls.length > 25) return setProblems(["Up to 25 links at a time."]);
+    setBusy(true);
+    try {
+      const results = await songsFromLinks(urls);
+      const found = results.flatMap((r) => (r.ok ? r.songs.map((song) => ({ song, platform: r.platform })) : []));
+      setProblems(results.flatMap((r) => (r.ok ? [] : [`${r.url} — ${r.error}`])));
+      if (found.length) {
+        onSongs(found);
+        setText("");
+        setNote(`${found.length} song${found.length === 1 ? "" : "s"} added below. Check the details, then attach each song's audio.`);
+      }
+    } catch (e) {
+      setProblems([e instanceof Error ? e.message : "Couldn't read those links."]);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mb-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+      <label htmlFor="song-links" className="text-sm font-semibold text-white">Add from links</label>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Paste Spotify, Apple Music, Deezer, YouTube, Audiomack or Boomplay links, one per line. An album link adds every track.
+        We fill in the title, artists, ISRC, UPC and release date — you check them, add the writers and attach the audio.
+      </p>
+      <textarea id="song-links" rows={3} className="input mt-2 font-mono text-xs" value={text} onChange={(e) => setText(e.target.value)}
+        placeholder={"https://open.spotify.com/album/…\nhttps://music.apple.com/ug/album/…?i=…"} />
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <button type="button" className="btn-primary !py-2" onClick={run} disabled={busy}>{busy ? "Reading links…" : "Fill in details"}</button>
+        {note && <span role="status" className="text-xs text-emerald-300">{note}</span>}
+      </div>
+      {problems.length > 0 && (
+        <ul role="alert" className="mt-2 space-y-1 text-xs text-rose-300">{problems.map((p) => <li key={p} className="break-all">{p}</li>)}</ul>
       )}
     </div>
   );
