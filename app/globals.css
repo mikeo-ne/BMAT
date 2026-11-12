@@ -6,9 +6,12 @@
   color-scheme: dark;
 }
 
-html,
+html {
+  @apply bg-slate-950;
+}
+/* Body stays transparent so the site-wide 3D backdrop (fixed, z -10) shows through. */
 body {
-  @apply bg-slate-950 text-slate-200 antialiased;
+  @apply bg-transparent text-slate-200 antialiased;
 }
 
 ::selection {
