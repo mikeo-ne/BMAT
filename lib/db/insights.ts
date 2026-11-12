@@ -8,7 +8,7 @@ import { db, must } from "./core";
 
 export type StationPlays = { name: string; region: string | null; plays: number; last_play: string };
 export type RecentPlay = {
-  id: number; title: string; station: string | null; frequency: string | null;
+  id: number; title: string; artist?: string | null; station: string | null; frequency: string | null;
   detected_at: string; duration_sec: number | null; evidence_path: string | null; share_token: string | null;
 };
 export type Insights = {
@@ -147,11 +147,11 @@ function demoInsights(days: number): Insights {
     by_hour: [0, 0, 0, 0, 0, 1, 2, 3, 4, 2, 1, 2, 3, 2, 1, 1, 2, 4, 5, 6, 4, 3, 1, 0],
     by_weekday: [5, 6, 7, 6, 9, 8, 6],
     recent: [
-      { id: 9001, title: "Kampala Nights", station: "Capital FM", frequency: "91.3", detected_at: at(0, 19, 42), duration_sec: 214, evidence_path: null, share_token: null },
-      { id: 9002, title: "Kampala Nights", station: "Galaxy FM", frequency: "100.2", detected_at: at(0, 17, 5), duration_sec: 198, evidence_path: null, share_token: null },
-      { id: 9003, title: "Omukwano", station: "Busoga One FM", frequency: "90.6", detected_at: at(1, 8, 30), duration_sec: 187, evidence_path: null, share_token: null },
-      { id: 9004, title: "Kampala Nights", station: "NBS Radio (Next Radio)", frequency: "96.6", detected_at: at(1, 21, 15), duration_sec: 205, evidence_path: null, share_token: null },
-      { id: 9005, title: "Omukwano", station: "Crooze FM", frequency: "91.2", detected_at: at(2, 20, 2), duration_sec: 176, evidence_path: null, share_token: null },
+      { id: 9001, title: "Kampala Nights", artist: "Lamaro Grace", station: "Capital FM", frequency: "91.3", detected_at: at(0, 19, 42), duration_sec: 214, evidence_path: null, share_token: null },
+      { id: 9002, title: "Kampala Nights", artist: "Lamaro Grace", station: "Galaxy FM", frequency: "100.2", detected_at: at(0, 17, 5), duration_sec: 198, evidence_path: null, share_token: null },
+      { id: 9003, title: "Omukwano", artist: "Kato Brian", station: "Busoga One FM", frequency: "90.6", detected_at: at(1, 8, 30), duration_sec: 187, evidence_path: null, share_token: null },
+      { id: 9004, title: "Kampala Nights", artist: "Lamaro Grace", station: "NBS Radio (Next Radio)", frequency: "96.6", detected_at: at(1, 21, 15), duration_sec: 205, evidence_path: null, share_token: null },
+      { id: 9005, title: "Omukwano", artist: "Kato Brian", station: "Crooze FM", frequency: "91.2", detected_at: at(2, 20, 2), duration_sec: 176, evidence_path: null, share_token: null },
     ],
   }, true);
 }

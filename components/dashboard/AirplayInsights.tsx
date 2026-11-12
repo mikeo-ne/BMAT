@@ -14,7 +14,8 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const RANGES = [7, 30, 90] as const;
 
 /** Where, when and by whom an artist's songs are played — and who isn't playing them yet. */
-export function AirplayInsights() {
+export function AirplayInsights({ audience = "artist" }: { audience?: "artist" | "label" }) {
+  const label = audience === "label";
   const [days, setDays] = useState<(typeof RANGES)[number]>(30);
   const state = useLoad(() => loadInsights(days), [days]);
   const picker = (
@@ -29,11 +30,11 @@ export function AirplayInsights() {
   );
   return (
     <>
-      <Section id="insights" kicker="Airplay insights" title="Where and when you're played" actions={picker}>
-        <LoadGate state={state}>{(d) => <Overview d={d} />}</LoadGate>
+      <Section id="insights" kicker="Airplay insights" title={label ? "Where and when your roster is played" : "Where and when you're played"} actions={picker}>
+        <LoadGate state={state}>{(d) => <Overview d={d} label={label} />}</LoadGate>
       </Section>
-      <Section id="gaps" kicker="Promotion targets" title="Stations not playing you yet">
-        <LoadGate state={state}>{(d) => <Gaps d={d} />}</LoadGate>
+      <Section id="gaps" kicker="Promotion targets" title={label ? "Stations not playing your roster yet" : "Stations not playing you yet"}>
+        <LoadGate state={state}>{(d) => <Gaps d={d} label={label} />}</LoadGate>
       </Section>
       <Section id="proof" kicker="Shareable evidence" title="Recent plays · share the proof">
         <LoadGate state={state}>{(d) => <Recent d={d} onChange={state.reload} />}</LoadGate>
@@ -42,7 +43,7 @@ export function AirplayInsights() {
   );
 }
 
-function Overview({ d }: { d: Insights }) {
+function Overview({ d, label }: { d: Insights; label: boolean }) {
   const peaks = peakHours(d.byHour);
   const max = Math.max(1, ...d.byHour);
   const bestDay = d.byWeekday.some((v) => v > 0) ? WEEKDAYS[d.byWeekday.indexOf(Math.max(...d.byWeekday))] : "—";
@@ -51,7 +52,7 @@ function Overview({ d }: { d: Insights }) {
       {d.demo && <p className="text-xs text-amber-200/80">Sample data — sign in to see your own plays.</p>}
       <StatGrid items={[
         { label: `Plays (${d.days} days)`, value: fmtInt(d.plays) },
-        { label: "Stations playing you", value: `${fmtInt(d.stationsPlaying)} / ${fmtInt(d.stationsMonitored)}`, hint: "of the stations we monitor" },
+        { label: label ? "Stations playing your roster" : "Stations playing you", value: `${fmtInt(d.stationsPlaying)} / ${fmtInt(d.stationsMonitored)}`, hint: "of the stations we monitor" },
         { label: "Peak hour", value: peaks.length ? hourLabel(peaks[0]) : "—", hint: "Kampala time" },
         { label: "Best day", value: bestDay },
       ]} />
@@ -89,13 +90,13 @@ function Overview({ d }: { d: Insights }) {
   );
 }
 
-function Gaps({ d }: { d: Insights }) {
+function Gaps({ d, label }: { d: Insights; label: boolean }) {
   const groups = byRegion(d.notPlaying);
   if (!groups.length) return <p className="text-sm text-emerald-200">Every station we monitor has played you in the last {d.days} days.</p>;
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-400">
-        <b className="text-slate-200">{d.notPlaying.length}</b> of {d.stationsMonitored} monitored stations haven&apos;t played any of your songs in the last {d.days} days. These are your next pitches.
+        <b className="text-slate-200">{d.notPlaying.length}</b> of {d.stationsMonitored} monitored stations haven&apos;t played any {label ? "of your roster's" : "of your"} songs in the last {d.days} days. These are your next pitches.
       </p>
       {groups.map(([region, names]) => (
         <div key={region}>
@@ -151,7 +152,7 @@ function PlayRow({ p, demo, onChange }: { p: RecentPlay; demo: boolean; onChange
       <EvidencePlayer seed={p.id} size="sm" label={`${p.title} on ${p.station ?? "radio"}`}
         resolveUrl={!demo && p.evidence_path ? () => evidenceUrl(p.evidence_path) : undefined} />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-white">{p.title}</p>
+        <p className="truncate font-medium text-white">{p.title}{p.artist ? <span className="font-normal text-slate-400"> · {p.artist}</span> : null}</p>
         <p className="text-xs text-slate-400">{p.station ?? "Unknown station"}{p.frequency ? ` ${p.frequency}` : ""} · {fmtTime(p.detected_at, true)}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
