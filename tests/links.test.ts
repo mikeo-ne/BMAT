@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { featuredFromTitle, normTitle, parseLink, pickMatch, resolveLink, splitArtistTitle } from "@/lib/links/resolve";
+import { _resetSpotifyToken, featuredFromTitle, normTitle, parseLink, pickMatch, resolveLink, splitArtistTitle } from "@/lib/links/resolve";
 import { matchFileToSong, splitLinks } from "@/lib/db/links";
 
 const json = (body: unknown, url = "") => ({ ok: true, url, json: async () => body, text: async () => JSON.stringify(body) }) as unknown as Response;
@@ -18,6 +18,65 @@ function fakeFetch(routes: Record<string, Response>) {
   };
   return { f, calls };
 }
+
+describe("Spotify Web API (official keys)", () => {
+  const creds = { id: "cid", secret: "csecret" };
+  const SP_TRACK = { id: "0eGsygTp906u18L0Oimnem", name: "Sitya Loss", duration_ms: 249500, artists: [{ name: "Eddy Kenzo" }, { name: "Guest" }], external_ids: { isrc: "usuyg1111111" }, album: { id: "4aawyAB9vmqN3uQ7FjRGTy" } };
+  const SP_ALBUM = { id: "4aawyAB9vmqN3uQ7FjRGTy", name: "Sitya Loss", release_date: "2014-06-01", release_date_precision: "day", external_ids: { upc: "123456789012" }, images: [{ url: "small", width: 64 }, { url: "big", width: 640 }], tracks: { items: [{ id: "0eGsygTp906u18L0Oimnem" }] } };
+
+  function spFetch(extra: Record<string, Response> = {}) {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    const routes: Record<string, Response> = {
+      "https://accounts.spotify.com/api/token": json({ access_token: "tok", expires_in: 3600 }),
+      "https://api.spotify.com/v1/tracks/0eGsygTp906u18L0Oimnem": json(SP_TRACK),
+      "https://api.spotify.com/v1/albums/4aawyAB9vmqN3uQ7FjRGTy": json(SP_ALBUM),
+      "https://api.deezer.com/track/isrc:USUYG1111111": json(DZ_TRACK),
+      "https://api.deezer.com/album/9": json(DZ_ALBUM),
+      ...extra,
+    };
+    const f = async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      for (const [k, v] of Object.entries(routes)) if (url.startsWith(k)) return v;
+      return { ok: false, url, json: async () => null, text: async () => "" } as unknown as Response;
+    };
+    return { f, calls };
+  }
+
+  it("takes ISRC and UPC from Spotify, label and genre from Deezer by exact ISRC", async () => {
+    _resetSpotifyToken();
+    const { f, calls } = spFetch();
+    const r = await resolveLink("https://open.spotify.com/track/0eGsygTp906u18L0Oimnem?si=x", f, creds);
+    expect(r.ok && r.songs[0]).toMatchObject({ title: "Sitya Loss", artistName: "Eddy Kenzo", featured: ["Guest"], isrc: "USUYG1111111", upc: "123456789012",
+      releaseDate: "2014-06-01", label: "Big Talent", genre: "African Music", durationSec: 250, artwork: "big", matchedOn: "spotify" });
+    const tok = calls.find((c) => c.url.includes("accounts.spotify.com"));
+    expect(tok?.init?.method).toBe("POST");
+    expect(String((tok?.init?.headers as Record<string, string>).authorization)).toBe(`Basic ${btoa("cid:csecret")}`);
+    expect(calls.some((c) => c.url.startsWith("https://api.deezer.com/search"))).toBe(false); // no fuzzy matching needed
+  });
+
+  it("reads album links track by track and reuses the token", async () => {
+    _resetSpotifyToken();
+    const { f, calls } = spFetch();
+    const r = await resolveLink("https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy", f, creds);
+    expect(r.ok && r.songs.map((x) => [x.title, x.isrc, x.upc])).toEqual([["Sitya Loss", "USUYG1111111", "123456789012"]]);
+    await resolveLink("https://open.spotify.com/track/0eGsygTp906u18L0Oimnem", f, creds);
+    expect(calls.filter((c) => c.url.includes("accounts.spotify.com"))).toHaveLength(1);
+  });
+
+  it("falls back to the embed page when Spotify refuses the keys", async () => {
+    _resetSpotifyToken();
+    const entity = { title: "Sitya Loss", artists: [{ name: "Eddy Kenzo" }], duration: 249500 };
+    const page = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { state: { data: { entity } } } } })}</script>`;
+    const { f } = spFetch({
+      "https://accounts.spotify.com/api/token": { ok: false, url: "", json: async () => ({}), text: async () => "" } as unknown as Response,
+      "https://open.spotify.com/embed/track/": html(page, "https://open.spotify.com/embed/track/0eGsygTp906u18L0Oimnem"),
+      "https://api.deezer.com/search": json({ data: [{ id: 1, title: "Sitya Loss", duration: 249, artist: { name: "Eddy Kenzo" } }] }),
+      "https://api.deezer.com/track/1": json(DZ_TRACK),
+    });
+    const r = await resolveLink("https://open.spotify.com/track/0eGsygTp906u18L0Oimnem", f, creds);
+    expect(r.ok && r.songs[0]).toMatchObject({ isrc: "USUYG1111111", matchedOn: "deezer" });
+  });
+});
 
 describe("music links", () => {
   it("accepts only known music sites", () => {
