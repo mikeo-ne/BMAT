@@ -352,8 +352,8 @@ export function SongUploader({ owner, artists, defaultArtist, existing, onSaved 
                 ) : (
                   <>
                     {j.fromLink && (
-                      <p className={cx("mb-3 rounded-lg border px-3 py-2 text-xs", j.fromLink.matchedOn === "deezer" ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-200" : "border-amber-400/20 bg-amber-400/5 text-amber-200")}>
-                        {j.fromLink.matchedOn === "deezer"
+                      <p className={cx("mb-3 rounded-lg border px-3 py-2 text-xs", j.fromLink.matchedOn !== "source-only" ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-200" : "border-amber-400/20 bg-amber-400/5 text-amber-200")}>
+                        {j.fromLink.matchedOn !== "source-only"
                           ? `Details filled in from ${j.fromLink.platform}, with ISRC and UPC from the release${j.fromLink.label ? ` (label: ${j.fromLink.label})` : ""}. Check them against your distributor's records, and add the songwriters and publisher.`
                           : `Title and artist filled in from ${j.fromLink.platform}. We couldn't find this release's ISRC or UPC — add them from your distributor.`}
                       </p>

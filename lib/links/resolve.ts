@@ -4,6 +4,10 @@
  * Labels add whole catalogues at once, and typing every ISRC by hand is where
  * mistakes come from. A link already knows the answers:
  *
+ *  0. Spotify links, when SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET are set: the
+ *     official Spotify Web API gives the ISRC and UPC directly (label and genre
+ *     are then looked up on Deezer by that exact ISRC). Without the keys, or if
+ *     Spotify refuses, the steps below are used instead.
  *  1. Read the link's own platform for title, artists and length
  *     (Deezer API · Spotify embed data · Apple iTunes lookup · YouTube oEmbed ·
  *     the page's Open Graph tags for Audiomack / Boomplay).
@@ -31,7 +35,7 @@ export type LinkSong = {
   durationSec: number | null;
   artwork: string | null;
   /** Where the codes came from, so the form can say "check these". */
-  matchedOn: "deezer" | "source-only";
+  matchedOn: "spotify" | "deezer" | "source-only";
 };
 
 export type LinkResult = { url: string; ok: true; platform: string; songs: LinkSong[] } | { url: string; ok: false; error: string };
@@ -248,6 +252,123 @@ async function viaDeezerSearch(fetcher: Fetcher, base: Omit<LinkSong, "matchedOn
   return { ...base, matchedOn: "source-only" };
 }
 
+// ---- Spotify Web API (official, needs app keys) -------------------------------------
+
+export type SpotifyCreds = { id: string; secret: string };
+
+function envCreds(): SpotifyCreds | null {
+  const id = process.env.SPOTIFY_CLIENT_ID?.trim();
+  const secret = process.env.SPOTIFY_CLIENT_SECRET?.trim();
+  return id && secret ? { id, secret } : null;
+}
+
+let tokenCache: { key: string; token: string; until: number } | null = null;
+
+async function spotifyToken(fetcher: Fetcher, c: SpotifyCreds): Promise<string | null> {
+  if (tokenCache && tokenCache.key === c.id && tokenCache.until > Date.now()) return tokenCache.token;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetcher("https://accounts.spotify.com/api/token", {
+      method: "POST", signal: ctrl.signal, cache: "no-store",
+      headers: { authorization: `Basic ${btoa(`${c.id}:${c.secret}`)}`, "content-type": "application/x-www-form-urlencoded" },
+      body: "grant_type=client_credentials",
+    });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { access_token?: string; expires_in?: number };
+    if (!j.access_token) return null;
+    tokenCache = { key: c.id, token: j.access_token, until: Date.now() + Math.max(60, (j.expires_in ?? 3600) - 120) * 1000 };
+    return j.access_token;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** Test hook: forget the cached token. */
+export function _resetSpotifyToken(): void {
+  tokenCache = null;
+}
+
+async function spGet<T>(fetcher: Fetcher, token: string, path: string): Promise<T | null> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetcher(`https://api.spotify.com/v1${path}`, { headers: { authorization: `Bearer ${token}`, accept: "application/json" }, signal: ctrl.signal, cache: "no-store" });
+    return r.ok ? ((await r.json()) as T) : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+type SpArtist = { name: string };
+type SpTrack = { id: string; name: string; duration_ms?: number; artists?: SpArtist[]; external_ids?: { isrc?: string }; album?: { id: string } };
+type SpAlbum = {
+  id: string; name: string; release_date?: string; release_date_precision?: string; label?: string; genres?: string[];
+  external_ids?: { upc?: string; ean?: string }; images?: { url: string; width?: number }[]; tracks?: { items?: { id: string }[] };
+};
+
+const spDate = (a: SpAlbum | null) => (a?.release_date && a.release_date_precision === "day" ? isoDate(a.release_date) : "");
+
+/**
+ * Song details from the official Spotify Web API. Spotify has the ISRC (track)
+ * and UPC (album) but no longer shares the label, so that and the genre come from
+ * Deezer by the exact ISRC — never by a fuzzy search. Since Spotify's February
+ * 2026 changes there is no batch lookup, so album tracks are read one by one.
+ * Returns null when Spotify refuses, so the caller can fall back.
+ */
+async function spotifyApi(fetcher: Fetcher, u: URL, c: SpotifyCreds): Promise<LinkSong[] | null> {
+  const m = u.pathname.match(/\/(track|album)\/([A-Za-z0-9]{10,})/);
+  if (!m) return null;
+  const token = await spotifyToken(fetcher, c);
+  if (!token) return null;
+  const albums = new Map<string, SpAlbum | null>();
+  const album = async (id: string) => {
+    if (!albums.has(id)) albums.set(id, await spGet<SpAlbum>(fetcher, token, `/albums/${id}`));
+    return albums.get(id) ?? null;
+  };
+  let ids: string[];
+  if (m[1] === "track") ids = [m[2]];
+  else {
+    const a = await album(m[2]);
+    if (!a) return null;
+    ids = (a.tracks?.items ?? []).map((t) => t.id).filter(Boolean).slice(0, MAX_ALBUM_TRACKS);
+  }
+  const dzCache = new Map<number, DzAlbum | null>();
+  const songs: LinkSong[] = [];
+  for (const id of ids) {
+    const t = await spGet<SpTrack>(fetcher, token, `/tracks/${id}`);
+    if (!t?.name) continue;
+    const a = t.album?.id ? await album(t.album.id) : null;
+    const isrc = (t.external_ids?.isrc ?? "").toUpperCase();
+    const dz = isrc ? await deezerByIsrc(fetcher, isrc, dzCache) : null;
+    const artists = (t.artists ?? []).map((x) => x.name);
+    const art = [...(a?.images ?? [])].sort((x, y) => (y.width ?? 0) - (x.width ?? 0))[0]?.url ?? null;
+    songs.push({
+      title: t.name.trim(),
+      artistName: artists[0] ?? "",
+      featured: Array.from(new Set([...artists.slice(1), ...featuredFromTitle(t.name)])),
+      isrc,
+      upc: a?.external_ids?.upc ?? a?.external_ids?.ean ?? dz?.upc ?? "",
+      releaseDate: spDate(a) || dz?.releaseDate || "",
+      label: a?.label || dz?.label || "",
+      genre: dz?.genre || a?.genres?.[0] || "",
+      durationSec: t.duration_ms ? Math.round(t.duration_ms / 1000) : null,
+      artwork: art ?? dz?.artwork ?? null,
+      matchedOn: isrc ? "spotify" : "source-only",
+    });
+  }
+  return songs.length ? songs : null;
+}
+
+async function deezerByIsrc(fetcher: Fetcher, isrc: string, albumCache: Map<number, DzAlbum | null>): Promise<LinkSong | null> {
+  if (!/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/.test(isrc)) return null;
+  return deezerSong(fetcher, `isrc:${isrc}`, albumCache);
+}
+
 // ---- per-platform readers --------------------------------------------------------
 
 type Seed = Omit<LinkSong, "matchedOn">;
@@ -322,7 +443,7 @@ async function openGraph(fetcher: Fetcher, u: URL): Promise<Seed[]> {
 
 // ---- entry point -------------------------------------------------------------------
 
-export async function resolveLink(raw: string, fetcher: Fetcher = fetch): Promise<LinkResult> {
+export async function resolveLink(raw: string, fetcher: Fetcher = fetch, spotifyCreds: SpotifyCreds | null = envCreds()): Promise<LinkResult> {
   const first = parseLink(raw);
   if (!first) return { url: raw, ok: false, error: "Use a link from Spotify, Apple Music, Deezer, YouTube, Audiomack or Boomplay." };
   const u = await expand(fetcher, first);
@@ -342,6 +463,10 @@ export async function resolveLink(raw: string, fetcher: Fetcher = fetch): Promis
       const songs = (await Promise.all((tracks?.data ?? []).slice(0, MAX_ALBUM_TRACKS).map((t) => deezerSong(fetcher, t.id, albumCache)))).filter((s): s is LinkSong => Boolean(s));
       if (!songs.length) throw new Error("Deezer didn't find this album.");
       return { url: raw, ok: true, platform, songs };
+    }
+    if (platform === "Spotify" && spotifyCreds) {
+      const songs = await spotifyApi(fetcher, u, spotifyCreds);
+      if (songs) return { url: raw, ok: true, platform, songs };
     }
     const seeds =
       platform === "Spotify" ? await spotify(fetcher, u)
