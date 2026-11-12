@@ -36,6 +36,7 @@ export const MIGRATIONS = [
   ["0023_stream_errors.sql", "Stations record why a stream cannot be read"],
   ["0024_worker_build.sql", "Stations record which worker build heartbeated them"],
   ["0025_insights_and_proof.sql", "Airplay insights for rights holders and shareable proof-of-play links"],
+  ["0026_insights_artist_name.sql", "Insights show which artist each play belongs to"],
 ];
 
 const BANNER = (n, name, note) => [

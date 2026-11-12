@@ -10,6 +10,7 @@ import { ExportCsv } from "@/components/dashboard/ExportCsv";
 import { BarChart, DataTable, LoadGate, SaveNote, Section, StatGrid } from "@/components/dashboard/ui";
 import { SongCatalogue, SongUploader } from "@/components/dashboard/Songs";
 import { WhatsAppAlerts } from "@/components/dashboard/WhatsAppAlerts";
+import { AirplayInsights } from "@/components/dashboard/AirplayInsights";
 
 type Save = { kind: "idle" | "saving" | "saved" | "error"; msg?: string };
 
@@ -119,6 +120,7 @@ export function LabelDashboard() {
             <SongCatalogue songs={d.catalogue} artists={d.roster} onChanged={state.reload}
               empty="No songs yet — upload your first master above." />
           </Section>
+          <AirplayInsights audience="label" />
           <Section id="revenue" title="Label Revenue">
             {safeArray(d.revenue).length ? (
               <>
