@@ -151,7 +151,7 @@ export function Hero() {
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_20%,rgba(16,185,129,0.18),transparent_55%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.05)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
-        <svg className="absolute -right-40 top-10 h-[640px] w-[640px] opacity-30" viewBox="0 0 400 400">
+        <svg className="absolute -right-40 top-10 h-[640px] w-[640px] opacity-30 motion-safe:animate-rings" viewBox="0 0 400 400">
           {[40, 80, 120, 160, 196].map((r) => (
             <circle key={r} cx="200" cy="200" r={r} fill="none" stroke="#34d399" strokeOpacity={0.5 - r / 500} strokeWidth="1" />
           ))}
