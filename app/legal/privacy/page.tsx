@@ -56,7 +56,8 @@ export default function PrivacyPage() {
       <h2>5. How long we keep it</h2>
       <ul>
         <li>Account details, songs and fingerprints: while your account is open, and up to 30 days after you ask us to delete it.</li>
-        <li>Evidence clips: up to 24 months after the play, then deleted. Plays themselves (without clips) are kept for royalty history.</li>
+        <li>Evidence clips: up to 24 months after the play, then deleted. Plays themselves (without clips) are kept for royalty history. Deletion runs automatically.</li>
+        <li>Short radio samples we could not identify: about 2 days, then deleted automatically, unless our team matches one to a song, when it becomes evidence for that play.</li>
         <li>Security logs: up to 12 months. Copyright reports: up to 3 years after they are closed.</li>
         <li>Records needed for open disputes, accounting or legal reasons are kept as long as those reasons last.</li>
       </ul>

@@ -111,6 +111,21 @@ Buddu, Radio One) are listed but idle until a stream we trust is captured. A leg
 python -m tests.test_panel     # drift, parse, enable rules, URLs, regions
 ```
 
+## Clip retention (automatic)
+
+With Supabase configured, the worker deletes old audio from the `evidence` bucket
+two minutes after start-up and then every 6 hours (`retention.py`):
+
+| What | Kept | Variable |
+|---|---|---|
+| Unidentified radio samples (open or discarded) | 2 days, row and clip deleted | `EST_UNMATCHED_RETENTION_DAYS` |
+| Play and brand-mention clips, and samples a CMO matched | 730 days (24 months, per the Privacy Notice); the play stays, only the clip goes | `EST_EVIDENCE_RETENTION_DAYS` |
+| How often | 6 hours | `EST_RETENTION_EVERY_HOURS` |
+
+`0` switches that part off. Unidentified samples arrive at roughly 3,600 a day
+(~290 MB), so keep their window short on the Supabase free plan (1 GB storage).
+Each run logs `clip retention: N unmatched samples and M play/mention clips deleted`.
+
 ## What it records
 
 | Event | Where | Contents |
