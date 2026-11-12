@@ -6,6 +6,8 @@ import { Hero } from "@/components/site/Hero";
 import { AirplayChart } from "@/components/site/AirplayChart";
 import { Footer } from "@/components/site/Footer";
 import { UseCaseGrid } from "@/components/site/UseCaseGrid";
+import { SignalField } from "@/components/site/SignalField";
+import { TiltCard } from "@/components/site/TiltCard";
 import { EARLY_ACCESS } from "@/lib/plans";
 import { SOLUTIONS } from "@/lib/data/public";
 
@@ -36,6 +38,7 @@ export default function HomePage() {
             </Link>
           </section>
         )}
+        <SignalField />
         <AirplayChart />
 
         <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
@@ -43,10 +46,10 @@ export default function HomePage() {
           <h2 className="mt-2 text-3xl font-bold text-white">One detection pipeline, five products</h2>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {(SOLUTIONS || []).map((s) => (
-              <article id={`solution-${s.id}`} key={s.id} className="glass scroll-mt-24 p-5 transition hover:border-emerald-400/40">
+              <TiltCard id={`solution-${s.id}`} key={s.id} className="glass scroll-mt-24 p-5 hover:border-emerald-400/40">
                 <h3 className="font-semibold text-white">{s.name}</h3>
                 <p className="mt-2 text-sm text-slate-400">{s.desc}</p>
-              </article>
+              </TiltCard>
             ))}
           </div>
         </section>

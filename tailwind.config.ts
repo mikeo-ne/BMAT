@@ -19,12 +19,17 @@ const config: Config = {
           "0%": { transform: "scale(0.8)", opacity: "0.8" },
           "100%": { transform: "scale(2.2)", opacity: "0" },
         },
+        rings: {
+          "0%, 100%": { transform: "perspective(900px) rotateX(0deg) rotateY(0deg)" },
+          "50%": { transform: "perspective(900px) rotateX(38deg) rotateY(-22deg)" },
+        },
         fadeIn: { "0%": { opacity: "0", transform: "translateY(4px)" }, "100%": { opacity: "1", transform: "none" } },
       },
       animation: {
         marquee: "marquee 40s linear infinite",
         "pulse-ring": "pulseRing 1.6s ease-out infinite",
         "fade-in": "fadeIn 180ms ease-out",
+        rings: "rings 18s ease-in-out infinite",
       },
     },
   },
