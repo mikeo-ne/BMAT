@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { DEMO_ROLE_COOKIE, isRole, ROLE_META, type Role } from "./roles";
 import { getSupabaseBrowser } from "./supabase/client";
+import { TERMS_VERSION } from "@/lib/legal";
 import { isSupabaseConfigured } from "./supabase/config";
 import { safeStorage } from "./safe";
 
@@ -165,7 +166,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await sb.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: redirect, data: { requested_role: role, display_name: displayName } },
+      // The sign-up form will not submit without the consent box ticked; this records it on the profile.
+      options: { emailRedirectTo: redirect, data: { requested_role: role, display_name: displayName, terms_version: TERMS_VERSION, terms_accepted: true, offshore_consent: true } },
     });
     if (error) return { ok: false, error: friendlyAuthError(error.message, "signup") };
     // Supabase hides "already registered" when email confirmation is on: it returns a user with no identities.

@@ -178,6 +178,12 @@ describe("AuthModal", () => {
     await user.type(screen.getByLabelText("Email"), "venue@example.com");
     await user.type(screen.getByLabelText("Password"), "secret123");
     await user.click(submitButton());
+    // Consent is required: nothing is sent until the box is ticked.
+    expect((await screen.findByRole("alert")).textContent).toMatch(/18 or older/);
+    expect(h.signUp).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("checkbox", { name: /18 or older/i }));
+    await user.click(submitButton());
 
     await waitFor(() =>
       expect(h.signUp).toHaveBeenCalledWith("venue@example.com", "secret123", "venue", "Nyege Nyege"),
