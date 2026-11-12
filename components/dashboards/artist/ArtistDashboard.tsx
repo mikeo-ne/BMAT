@@ -8,6 +8,7 @@ import { cx, fmtInt, fmtUGX, safeArray } from "@/lib/safe";
 import { ExportCsv } from "@/components/dashboard/ExportCsv";
 import { Badge, DataTable, LineChart, LoadGate, Section, StatGrid } from "@/components/dashboard/ui";
 import { WhatsAppAlerts } from "@/components/dashboard/WhatsAppAlerts";
+import { AirplayInsights } from "@/components/dashboard/AirplayInsights";
 import { SongCatalogue, SongUploader } from "@/components/dashboard/Songs";
 
 export function ArtistDashboard() {
@@ -72,6 +73,8 @@ function ArtistView({ d, name, scope, reload }: { d: Awaited<ReturnType<typeof l
           </p>
         )}
       </Section>
+
+      <AirplayInsights />
 
       <Section id="discography" title="Discography">
         <DataTable<Track> rows={d.discography} rowKey={(r) => r.id} empty="No recordings linked to your account yet."
