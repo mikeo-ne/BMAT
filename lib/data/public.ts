@@ -65,7 +65,7 @@ export const PLAYOUT_TICKER = [
 ];
 
 export const SOLUTIONS = [
-  { id: "vericast", name: "Vericast", desc: "24/7 broadcast monitoring & fingerprint matching." },
+  { id: "monitoring", name: "Broadcast Monitoring", desc: "24/7 broadcast monitoring & fingerprint matching." },
   { id: "reportal", name: "Reportal", desc: "Self-serve usage reporting for licensees." },
   { id: "resol", name: "ReSol", desc: "Rights resolution, claims & conflict settlement." },
   { id: "charts", name: "Music Charts", desc: "Verified national & regional airplay charts." },

@@ -1,119 +1,54 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { getAudioContext, playEvidenceSnippet, type SnippetHandle } from "@/lib/audio";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { PLAYOUT_TICKER } from "@/lib/data/public";
-import { safeArray } from "@/lib/safe";
+import { fmtInt, safeArray } from "@/lib/safe";
+import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { LiveBadge } from "./Header";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-function Visualizer() {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const analyser = useRef<AnalyserNode | null>(null);
-  const handle = useRef<SnippetHandle | null>(null);
-  const [listening, setListening] = useState(false);
+type PublicStats = { stations_live: number; stations_total: number; songs: number; plays_7d: number };
 
+/** Live, aggregate-only numbers from the monitoring network. Nothing made up: blank until real numbers load. */
+function LiveNow() {
+  const [s, setS] = useState<PublicStats | null>(null);
   useEffect(() => {
-    const el = canvas.current;
-    const ctx = el?.getContext("2d");
-    if (!el || !ctx) return;
-
-    let raf = 0;
-    let w = 0;
-    let h = 0;
-    const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      w = el.clientWidth;
-      h = el.clientHeight;
-      el.width = Math.max(1, Math.floor(w * dpr));
-      el.height = Math.max(1, Math.floor(h * dpr));
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    };
-    resize();
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(resize) : null;
-    ro?.observe(el);
-
-    const bars = 48;
-    const freq = new Uint8Array(128);
-    const draw = (time: number) => {
-      ctx.clearRect(0, 0, w, h);
-      const a = analyser.current;
-      if (a) a.getByteFrequencyData(freq);
-      if (w < 20 || h < 10) {
-        raf = requestAnimationFrame(draw); // not measured yet — try next frame
-        return;
-      }
-      const gap = w < 400 ? 2 : 3;
-      const bw = Math.max(1, (w - gap * (bars - 1)) / bars);
-      for (let i = 0; i < bars; i++) {
-        const v = a
-          ? (freq[Math.floor((i / bars) * 90)] ?? 0) / 255
-          : 0.18 + 0.14 * Math.sin(time / 600 + i * 0.45) + 0.08 * Math.sin(time / 230 + i * 1.3);
-        const bh = Math.max(2, v * h * 0.85);
-        const x = i * (bw + gap);
-        const y = (h - bh) / 2;
-        const g = ctx.createLinearGradient(0, y, 0, y + bh);
-        g.addColorStop(0, "rgba(110,231,183,0.95)");
-        g.addColorStop(1, "rgba(16,185,129,0.25)");
-        ctx.fillStyle = g;
-        ctx.shadowColor = "rgba(52,211,153,0.6)";
-        ctx.shadowBlur = a ? 12 : 6;
-        ctx.beginPath();
-        if (typeof ctx.roundRect === "function") ctx.roundRect(x, y, bw, bh, Math.max(0, Math.min(bw, bh) / 2));
-        else ctx.rect(x, y, bw, bh);
-        ctx.fill();
-      }
-      raf = requestAnimationFrame(draw);
-    };
-    raf = requestAnimationFrame(draw);
-    return () => {
-      cancelAnimationFrame(raf);
-      ro?.disconnect();
-      handle.current?.stop();
-    };
+    if (!isSupabaseConfigured) return;
+    const sb = getSupabaseBrowser();
+    if (!sb) return;
+    let alive = true;
+    const load = () => sb.rpc("public_stats").then(({ data, error }) => { if (alive && !error && data) setS(data as PublicStats); });
+    load();
+    const id = window.setInterval(load, 60_000);
+    return () => { alive = false; window.clearInterval(id); };
   }, []);
-
-  const toggle = async () => {
-    if (listening) {
-      handle.current?.stop();
-      return;
-    }
-    const audio = getAudioContext(); // created on click only
-    if (!audio) return;
-    try {
-      handle.current = await playEvidenceSnippet(audio, {
-        seed: 3,
-        seconds: 10,
-        onEnded: () => {
-          analyser.current = null;
-          handle.current = null;
-          setListening(false);
-        },
-      });
-      analyser.current = handle.current.analyser;
-      setListening(true);
-    } catch {
-      setListening(false);
-    }
-  };
-
+  const v = (n: number | undefined) => (s && n != null ? fmtInt(n) : "—");
+  const cells = [
+    { k: "Stations listening now", v: s ? `${fmtInt(s.stations_live)} / ${fmtInt(s.stations_total)}` : "—" },
+    { k: "Songs protected", v: v(s?.songs) },
+    { k: "Plays detected · 7 days", v: v(s?.plays_7d) },
+  ];
   return (
     <div className="glass relative overflow-hidden border-emerald-400/15 p-5 shadow-2xl shadow-emerald-950/30">
-      <div className="mb-3 flex items-center justify-between text-xs">
-        <span className="font-mono uppercase tracking-widest text-emerald-400/80">Vericast · live matcher</span>
-        <span className="font-mono text-slate-500">11 kHz · landmark fingerprints</span>
+      <div className="mb-4 flex items-center justify-between text-xs">
+        <span className="flex items-center gap-2 font-mono uppercase tracking-widest text-emerald-400/80">
+          <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 motion-reduce:hidden" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" /></span>
+          Live across Uganda
+        </span>
+        <span className="font-mono text-slate-500">{isSupabaseConfigured ? "updates every minute" : "demo"}</span>
       </div>
-      <canvas ref={canvas} className="h-40 w-full sm:h-48" aria-hidden />
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-white">{listening ? "Sample match: Kampala Nights" : "Idle signal monitor"}</p>
-          <p className="text-xs text-slate-500">{listening ? "Example of an evidence clip" : "Tap to hear a sample evidence clip"}</p>
-        </div>
-        <button type="button" onClick={toggle} className={listening ? "btn-ghost !py-2" : "btn-primary !py-2"}>
-          {listening ? "Stop" : "▶ Listen"}
-        </button>
-      </div>
+      <dl className="grid grid-cols-3 gap-3">
+        {cells.map((c) => (
+          <div key={c.k} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+            <dt className="text-[11px] leading-tight text-slate-500">{c.k}</dt>
+            <dd className="mt-1 font-mono text-xl font-semibold text-white sm:text-2xl">{c.v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-4 text-xs leading-relaxed text-slate-400">
+        Every station is fingerprinted around the clock. Each play is saved with a 10-second clip as proof.
+      </p>
     </div>
   );
 }
@@ -177,7 +112,7 @@ export function Hero() {
           </div>
           <Ticker />
         </div>
-        <Visualizer />
+        <LiveNow />
       </div>
     </section>
   );
