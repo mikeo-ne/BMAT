@@ -28,6 +28,7 @@ from .index import FingerprintIndex
 from .alerts import AlertSender, Senders, SupabaseOutbox, africastalking_sms, brevo_mailer, whatsapp_cloud
 from .masters import MasterSource, MasterSync, enroll_pending
 from .monitor import StationMonitor
+from .retention import Policy, Retention, SupabaseStore
 from .sinks import AsyncSink, EastSoundPlayoutSink, JsonlSink, Sink, SupabaseSink
 
 AUDIO_EXT = {".wav", ".mp3", ".flac", ".aac", ".m4a", ".ogg", ".opus", ".aiff"}
@@ -227,6 +228,11 @@ def cmd_run(a, s) -> None:
     if s.sink_mode == "supabase":
         # Songs uploaded in the dashboards are learned automatically.
         MasterSync(MasterSource(s.supabase_url, s.supabase_service_key), idx, stop).start()
+        Retention(SupabaseStore(s.supabase_url, s.supabase_service_key, s.evidence_bucket),
+                  Policy(s.evidence_retention_days, s.unmatched_retention_days), stop, s.retention_every_hours).start()
+        logging.info("clip retention: unmatched samples %s, play evidence %s (every %gh)",
+                     f"{s.unmatched_retention_days} days" if s.unmatched_retention_days else "kept",
+                     f"{s.evidence_retention_days} days" if s.evidence_retention_days else "kept", s.retention_every_hours)
         logging.info("watching for songs uploaded in the dashboards (every 2 minutes)")
         if s.alerts_on:
             senders = Senders(

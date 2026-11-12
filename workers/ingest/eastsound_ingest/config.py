@@ -59,6 +59,10 @@ class Settings:
     whatsapp_template: str = "airplay_alert"
     whatsapp_lang: str = "en"
     site_url: str = "https://eastsound.vercel.app"
+    # Clip retention (see retention.py). 0 switches that part off.
+    evidence_retention_days: int = 730
+    unmatched_retention_days: int = 2
+    retention_every_hours: float = 6.0
     stations: list[Station] = field(default_factory=list)
 
     @property
@@ -178,6 +182,13 @@ def load_settings(stations_path: str | None) -> Settings:
         whatsapp_lang=os.getenv("WHATSAPP_LANG", "en").strip() or "en",
         site_url=os.getenv("SITE_URL", "https://eastsound.vercel.app").strip().rstrip("/"),
     )
+    for k in ("evidence_retention_days", "unmatched_retention_days"):
+        v = os.getenv(f"EST_{k.upper()}")
+        if v and v.strip().isdigit():
+            setattr(s, k, int(v))
+    v = os.getenv("EST_RETENTION_EVERY_HOURS")
+    if v:
+        s.retention_every_hours = max(1.0, float(v))
     for k in ("window_sec", "step_sec", "end_gap_sec", "min_detection_sec", "unmatched_every_sec"):
         v = os.getenv(f"EST_{k.upper()}")
         if v:
