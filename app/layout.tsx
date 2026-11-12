@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, KEYWORDS, ORG_NAME, SITE_NAME, SITE_URL, jsonLd, siteJsonLd } from "@/lib/seo";
+import { SiteBackdrop } from "@/components/site/SiteBackdrop";
 
 const verification: Metadata["verification"] = {
   // Google Search Console ownership tag (public by design; env var overrides it).
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className="min-h-screen font-sans">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(siteJsonLd()) }} />
+        <SiteBackdrop />
         <Providers>{children}</Providers>
       </body>
     </html>
