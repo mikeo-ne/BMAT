@@ -17,7 +17,10 @@ const NEEDS_QUOTES = /[",\r\n]/;
 /** RFC 4180 cell: quote when it contains a delimiter, quote or newline. */
 export function csvEscape(value: CsvValue): string {
   if (value === null || value === undefined) return "";
-  const text = String(value);
+  let text = String(value);
+  // A typed cell starting with = + - @ (or tab/CR) runs as a formula in Excel and
+  // Sheets. Exports leave the platform (distributors, accountants), so neutralise it.
+  if (typeof value === "string" && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return NEEDS_QUOTES.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

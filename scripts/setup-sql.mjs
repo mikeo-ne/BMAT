@@ -37,6 +37,7 @@ export const MIGRATIONS = [
   ["0024_worker_build.sql", "Stations record which worker build heartbeated them"],
   ["0025_insights_and_proof.sql", "Airplay insights for rights holders and shareable proof-of-play links"],
   ["0026_insights_artist_name.sql", "Insights show which artist each play belongs to"],
+  ["0027_song_airplay_report.sql", "Per-song airplay report keyed by ISRC"],
 ];
 
 const BANNER = (n, name, note) => [
