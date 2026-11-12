@@ -12,6 +12,13 @@ import { usePathname } from "next/navigation";
  * Light by design: plain canvas, fewer points and ~30 fps on phones, stops when
  * the tab is hidden, one still frame for reduced-motion settings.
  *
+ * One map, two jobs: when a section marked `data-map-stage` is on screen (the
+ * home page's "Listening across Uganda"), the map glides into that box, grows
+ * brighter, names the regions and takes drags and taps from it — so the page
+ * never shows two maps on top of each other. Messages: the stage sends
+ * `eastsound:map-drag` {dx, dy} and `eastsound:map-tap` {x, y}; the map answers
+ * `eastsound:map-select` {name, region, lat, lon}.
+ *
  * The outline is a simplified trace of Uganda's border (about 30 points), good
  * for a picture, not for measuring.
  */
@@ -28,9 +35,9 @@ const BORDER: LL[] = [
 // Uganda's share of Lake Victoria, drawn as water.
 const LAKE: LL[] = [[31.85, -1.0], [33.9, -1.0], [33.9, 0.1], [33.4, 0.25], [32.7, 0.08], [32.1, -0.05], [31.85, -0.4]];
 
-const TOWNS: { name: string; at: LL; hub?: boolean }[] = [
-  { name: "Kampala", at: [32.58, 0.35], hub: true },
-  { name: "Gulu", at: [32.3, 2.78] }, { name: "Mbarara", at: [30.65, -0.61] }, { name: "Mbale", at: [34.18, 1.08] },
+const TOWNS: { name: string; at: LL; hub?: boolean; region?: string }[] = [
+  { name: "Kampala", at: [32.58, 0.35], hub: true, region: "Central" },
+  { name: "Gulu", at: [32.3, 2.78], region: "Northern" }, { name: "Mbarara", at: [30.65, -0.61], region: "Western" }, { name: "Mbale", at: [34.18, 1.08], region: "Eastern" },
   { name: "Arua", at: [30.91, 3.02] }, { name: "Fort Portal", at: [30.27, 0.67] }, { name: "Lira", at: [32.9, 2.25] },
   { name: "Jinja", at: [33.2, 0.44] }, { name: "Masaka", at: [31.73, -0.33] }, { name: "Soroti", at: [33.61, 1.71] },
   { name: "Hoima", at: [31.35, 1.43] }, { name: "Kabale", at: [29.99, -1.25] }, { name: "Moroto", at: [34.65, 2.53] },
@@ -79,6 +86,12 @@ export function SiteBackdrop() {
 
     let w = 0, h = 0, raf = 0, last = 0;
     const look = { x: 0, y: 0, tx: 0, ty: 0 };
+    const user = { yaw: 0, pitch: 0 }; // from dragging the stage
+    let focus = 0; // 0 = background, 1 = sitting in the stage
+    const cam = { ox: 0, oy: 0, k: 0, ready: false };
+    const blasts: { x: number; z: number; t0: number }[] = [];
+    let screen: { name: string; sx: number; sy: number }[] = [];
+    let lastT = 0;
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, small ? 1.5 : 2);
@@ -92,11 +105,23 @@ export function SiteBackdrop() {
       look.x += (look.tx - look.x) * 0.05;
       look.y += (look.ty - look.y) * 0.05;
       const scroll = Math.min(1, window.scrollY / Math.max(1, document.body.scrollHeight - h));
-      const yaw = -0.35 + Math.sin(t * 0.00006) * 0.18 + look.x * 0.22;
-      const pitch = 0.95 - scroll * 0.3 + look.y * 0.1;
+      lastT = t;
+      // Is the stage on screen? Then the map moves into it.
+      const stage = document.querySelector<HTMLElement>("[data-map-stage]");
+      const r = stage?.getBoundingClientRect();
+      const inView = r && r.width > 0 && r.bottom > h * 0.15 && r.top < h * 0.85;
+      focus += ((inView ? 1 : 0) - focus) * 0.06;
+      let tox = w * (small ? 0.5 : 0.66), toy = h * (small ? 0.52 : 0.5);
+      let tk = Math.min(w * (small ? 1.05 : 0.62), h * 1.05) * 1.15;
+      if (inView && r) { tox = r.left + r.width * 0.54; toy = r.top + r.height * 0.55; tk = Math.min(r.width * 1.05, r.height * 1.9); }
+      if (!cam.ready) { cam.ox = tox; cam.oy = toy; cam.k = tk; cam.ready = true; }
+      const ease = still ? 1 : 0.08;
+      cam.ox += (tox - cam.ox) * ease; cam.oy += (toy - cam.oy) * ease; cam.k += (tk - cam.k) * ease;
+      const drift = 1 - focus;
+      const yaw = -0.35 + Math.sin(t * 0.00006) * 0.18 * drift + look.x * 0.22 * drift + user.yaw;
+      const pitch = Math.min(1.35, Math.max(0.35, 0.95 - scroll * 0.3 * drift + look.y * 0.1 * drift + user.pitch));
       const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
-      const k = Math.min(w * (small ? 1.05 : 0.62), h * 1.05) * 1.15;
-      const ox = w * (small ? 0.5 : 0.66), oy = h * (small ? 0.52 : 0.5);
+      const k = cam.k, ox = cam.ox, oy = cam.oy;
       const P = (x: number, y: number, z: number) => {
         const x1 = x * cy - z * sy, z1 = x * sy + z * cy;
         const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp + 3;
@@ -105,19 +130,25 @@ export function SiteBackdrop() {
       ctx!.clearRect(0, 0, w, h);
 
       // Signal waves: each town pulses on its own beat.
-      const waves = towns.map((tw) => ({ x: tw.x, z: tw.z, r: (((t / 3200) + tw.phase) % 1) * 0.9 }));
+      const waves = towns.map((tw) => ({ x: tw.x, z: tw.z, r: (((t / 3200) + tw.phase) % 1) * 0.9, gain: 1 }));
+      for (let i = blasts.length - 1; i >= 0; i--) {
+        const age = (t - blasts[i].t0) / 1800;
+        if (age > 1) blasts.splice(i, 1);
+        else waves.push({ x: blasts[i].x, z: blasts[i].z, r: age * 1.6, gain: 2.2 });
+      }
+      const boost = 1 + focus * 0.6;
 
       for (const d of dots) {
         let lift = 0;
         for (const wv of waves) {
           const dist = Math.hypot(d.x - wv.x, d.z - wv.z);
-          lift += Math.exp(-Math.abs(dist - wv.r) * 22) * (1 - wv.r / 0.9);
+          lift += Math.exp(-Math.abs(dist - wv.r) * 22) * Math.max(0, 1 - wv.r / (wv.gain > 1 ? 1.6 : 0.9)) * wv.gain;
         }
         lift = Math.min(1, lift);
         const shimmer = 0.5 + 0.5 * Math.sin(t * 0.0015 + d.seed * 6);
         const y = lift * 0.045 + (d.water ? 0.006 * Math.sin(t * 0.002 + d.x * 9) : 0);
         const p = P(d.x, y, d.z);
-        const a = d.water ? 0.22 + 0.12 * shimmer : 0.32 + 0.16 * shimmer + 0.5 * lift;
+        const a = Math.min(1, (d.water ? 0.22 + 0.12 * shimmer : 0.32 + 0.16 * shimmer + 0.5 * lift) * boost);
         const r = Math.max(1, (4.2 / p.d) * (d.water ? 0.85 : 1 + lift));
         ctx!.fillStyle = d.water
           ? `rgba(56,189,248,${a})`
@@ -146,8 +177,8 @@ export function SiteBackdrop() {
       }
 
       // Towns: a mast with a light; Kampala brightest, with a ring as signals land.
-      ctx!.font = "500 10px ui-sans-serif, system-ui, sans-serif";
       ctx!.textAlign = "center";
+      screen = [];
       for (const tw of towns) {
         const base = P(tw.x, 0, tw.z), top = P(tw.x, tw.hub ? 0.16 : 0.08, tw.z);
         ctx!.strokeStyle = tw.hub ? "rgba(167,243,208,0.7)" : "rgba(110,231,183,0.4)";
@@ -155,9 +186,12 @@ export function SiteBackdrop() {
         ctx!.beginPath(); ctx!.moveTo(base.sx, base.sy); ctx!.lineTo(top.sx, top.sy); ctx!.stroke();
         ctx!.fillStyle = tw.hub ? "#d1fae5" : "rgba(167,243,208,0.85)";
         ctx!.beginPath(); ctx!.arc(top.sx, top.sy, tw.hub ? 3.4 : 2, 0, Math.PI * 2); ctx!.fill();
-        if (!small || tw.hub) {
-          ctx!.fillStyle = tw.hub ? "rgba(236,253,245,0.75)" : "rgba(209,250,229,0.4)";
-          ctx!.fillText(tw.name, top.sx, top.sy - 7);
+        screen.push({ name: tw.name, sx: top.sx, sy: top.sy });
+        const named = tw.region && focus > 0.5;
+        if (!small || tw.hub || named) {
+          ctx!.font = named ? "600 12px ui-sans-serif, system-ui, sans-serif" : "500 10px ui-sans-serif, system-ui, sans-serif";
+          ctx!.fillStyle = named ? "rgba(236,253,245,0.95)" : tw.hub ? "rgba(236,253,245,0.75)" : `rgba(209,250,229,${0.4 + 0.2 * focus})`;
+          ctx!.fillText(named ? `${tw.name} · ${tw.region}` : tw.name, top.sx, top.sy - 8);
         }
       }
       const pulse = (t / 1300) % 1;
@@ -181,6 +215,23 @@ export function SiteBackdrop() {
       look.tx = (e.clientX / Math.max(1, w)) * 2 - 1;
       look.ty = (e.clientY / Math.max(1, h)) * 2 - 1;
     };
+    const onDrag = (e: Event) => {
+      const { dx, dy } = (e as CustomEvent<{ dx: number; dy: number }>).detail;
+      user.yaw += dx * 0.008;
+      user.pitch = Math.min(0.4, Math.max(-0.55, user.pitch + dy * 0.004));
+      if (still) draw(lastT || 4000);
+    };
+    const onTap = (e: Event) => {
+      const { x, y } = (e as CustomEvent<{ x: number; y: number }>).detail;
+      let best: { name: string; d: number } | null = null;
+      for (const s of screen) { const d = Math.hypot(s.sx - x, s.sy - y); if (!best || d < best.d) best = { name: s.name, d }; }
+      const tw = best && best.d < 60 ? towns.find((q) => q.name === best!.name) : null;
+      if (!tw) return;
+      blasts.push({ x: tw.x, z: tw.z, t0: lastT });
+      window.dispatchEvent(new CustomEvent("eastsound:map-select", { detail: { name: tw.name, region: tw.region ?? null, lat: tw.at[1], lon: tw.at[0] } }));
+    };
+    window.addEventListener("eastsound:map-drag", onDrag);
+    window.addEventListener("eastsound:map-tap", onTap);
     const onVis = () => {
       cancelAnimationFrame(raf);
       if (!document.hidden && !still) raf = requestAnimationFrame(loop);
@@ -188,6 +239,8 @@ export function SiteBackdrop() {
 
     resize();
     window.addEventListener("resize", resize);
+    const onStillScroll = () => draw(4000);
+    if (still) window.addEventListener("scroll", onStillScroll, { passive: true });
     if (!still) {
       window.addEventListener("pointermove", onPointer, { passive: true });
       document.addEventListener("visibilitychange", onVis);
@@ -197,6 +250,9 @@ export function SiteBackdrop() {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
       window.removeEventListener("pointermove", onPointer);
+      window.removeEventListener("eastsound:map-drag", onDrag);
+      window.removeEventListener("eastsound:map-tap", onTap);
+      window.removeEventListener("scroll", onStillScroll);
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [off]);
