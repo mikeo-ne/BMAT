@@ -9,6 +9,7 @@ import {
 } from "@/lib/db/insights";
 import { EvidencePlayer } from "@/components/site/EvidencePlayer";
 import { Badge, DataTable, LoadGate, Section, StatGrid } from "./ui";
+import { AirplayReport } from "./AirplayReport";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const RANGES = [7, 30, 90] as const;
@@ -36,6 +37,7 @@ export function AirplayInsights({ audience = "artist" }: { audience?: "artist" |
       <Section id="gaps" kicker="Promotion targets" title={label ? "Stations not playing your roster yet" : "Stations not playing you yet"}>
         <LoadGate state={state}>{(d) => <Gaps d={d} label={label} />}</LoadGate>
       </Section>
+      <AirplayReport days={days} />
       <Section id="proof" kicker="Shareable evidence" title="Recent plays · share the proof">
         <LoadGate state={state}>{(d) => <Recent d={d} onChange={state.reload} />}</LoadGate>
       </Section>

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { DEMO_MODE, useAuth, type AuthMode } from "@/lib/auth-context";
 import { isRole, ROLE_META, ROLES, type Role } from "@/lib/roles";
 import { cx } from "@/lib/safe";
+import { PasswordInput } from "./PasswordInput";
 
 const TITLES: Record<AuthMode, string> = {
   signin: "Sign in to your workspace",
@@ -13,7 +14,7 @@ const TITLES: Record<AuthMode, string> = {
 };
 
 export function AuthModal() {
-  const { modal, closeAuth, openAuth, signIn, signUp, requestPasswordReset } = useAuth();
+  const { modal, closeAuth, openAuth, signIn, signUp, requestPasswordReset, verifySignupCode, resendSignupCode } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,12 +23,17 @@ export function AuthModal() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // After sign-up: waiting for the code from the confirmation email.
+  const [verifying, setVerifying] = useState<string | null>(null);
+  const [code, setCode] = useState("");
   const firstField = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!modal) return;
     setError(null);
     setNotice(null);
+    setVerifying(null);
+    setCode("");
     const id = window.setTimeout(() => firstField.current?.focus(), 30);
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeAuth();
     window.addEventListener("keydown", onKey);
@@ -64,6 +70,10 @@ export function AuthModal() {
         setError(r.error);
         return;
       }
+      if (r.message === "verify" && modal === "signup") {
+        setVerifying(email.trim());
+        return;
+      }
       if (r.message && modal === "signup" && !DEMO_MODE) {
         setNotice(r.message);
         return;
@@ -75,6 +85,30 @@ export function AuthModal() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const submitCode = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!verifying || !isRole(role)) return;
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+    try {
+      const r = await verifySignupCode(verifying, code, role);
+      if (!r.ok) return setError(r.error);
+      closeAuth();
+      router.push(ROLE_META[role].path);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resend = async () => {
+    if (!verifying) return;
+    setError(null);
+    setNotice(null);
+    const r = await resendSignupCode(verifying);
+    r.ok ? setNotice(r.message ?? "Sent.") : setError(r.error);
   };
 
   return (
@@ -101,7 +135,7 @@ export function AuthModal() {
         )}
 
         <h2 id="auth-title" className="text-xl font-bold text-white">
-          {TITLES[modal]}
+          {verifying ? "Check your email" : TITLES[modal]}
         </h2>
         <p className="mt-1 text-sm text-slate-400">
           {modal === "forgot"
@@ -109,6 +143,37 @@ export function AuthModal() {
             : "Your use case decides which dashboard you get. Data never crosses between roles."}
         </p>
 
+        {verifying ? (
+          <form onSubmit={submitCode} className="mt-5 space-y-4" noValidate>
+            <p className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-100">
+              We sent a verification code to <b className="break-all">{verifying}</b>. Enter it below to finish creating your account.
+            </p>
+            <div>
+              <label htmlFor="code" className="label">Verification code</label>
+              <input
+                id="code"
+                className="input text-center font-mono text-2xl tracking-[0.5em]"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={10}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                autoFocus
+                required
+              />
+              <p className="mt-1.5 text-xs text-slate-500">Can&apos;t see it? Check spam or promotions. You can also click the link in the same email.</p>
+            </div>
+            {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{error}</p>}
+            {notice && <p role="status" className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-200">{notice}</p>}
+            <button type="submit" className="btn-primary w-full" disabled={busy || code.length < 6}>
+              {busy ? "Checking…" : "Verify and continue"}
+            </button>
+            <div className="flex justify-between text-sm">
+              <button type="button" onClick={resend} className="text-emerald-400 hover:text-emerald-300">Send a new code</button>
+              <button type="button" onClick={() => { setVerifying(null); setCode(""); setError(null); setNotice(null); }} className="text-slate-400 hover:text-white">Use a different email</button>
+            </div>
+          </form>
+        ) : (
         <form onSubmit={submit} className="mt-5 space-y-4" noValidate>
           {modal !== "forgot" && (
             <div>
@@ -166,10 +231,8 @@ export function AuthModal() {
                   </button>
                 )}
               </div>
-              <input
+              <PasswordInput
                 id="password"
-                type="password"
-                className="input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete={modal === "signup" ? "new-password" : "current-password"}
@@ -192,6 +255,7 @@ export function AuthModal() {
             </button>
           )}
         </form>
+        )}
 
         {DEMO_MODE && (
           <p className="mt-5 rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs text-amber-200/80">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { Logo } from "@/components/site/Logo";
+import { PasswordInput } from "@/components/site/PasswordInput";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 
 /** Password-recovery landing page. The email link brings the user here with a
@@ -69,11 +70,11 @@ export default function ResetPasswordPage() {
           <form onSubmit={submit} className="mt-5 space-y-4">
             <div>
               <label className="label" htmlFor="pw">New password</label>
-              <input id="pw" type="password" className="input" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
+              <PasswordInput id="pw" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
             </div>
             <div>
               <label className="label" htmlFor="pw2">Confirm password</label>
-              <input id="pw2" type="password" className="input" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" />
+              <PasswordInput id="pw2" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" />
             </div>
             {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
             <button className="btn-primary w-full" disabled={busy}>{busy ? "Saving…" : "Update password"}</button>
