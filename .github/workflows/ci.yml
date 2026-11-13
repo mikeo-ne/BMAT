@@ -55,6 +55,7 @@ jobs:
       - run: python -m tests.test_false_matches
       - run: python -m tests.test_panel
       - run: python -m tests.test_tv
+      - run: python -m tests.test_stream_command_integration
       - run: python -m tests.test_stream_errors
       - run: python -m tests.test_doctor
       - run: python -m tests.test_retention
@@ -69,6 +70,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t eastsound-ingest workers/ingest
+      # Test the real command with the image's ffmpeg, not only the runner's version.
+      - name: Decode local HTTP MP3 and HLS in the worker image
+        run: docker run --rm --entrypoint python -v "$PWD/workers/ingest/tests:/app/tests:ro" eastsound-ingest -m tests.test_stream_command_integration
       # Oracle Cloud's free servers are ARM (Ampere): make sure the image builds there too.
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3

@@ -61,25 +61,22 @@ before we spend that money.
 
 ## The lesson we should apply to ourselves
 
-AfroMobile's streams work from Uganda and abroad because its edge is in-region. **Ours does not work at all:** on
-11 November the worker was running in Railway `EU West`, heartbeating every station, and *every one* of the 25
-stations sat at `reconnecting` with `now_playing = null`, no detections, and no unmatched clips since 9 November.
-Ugandan FM endpoints commonly refuse datacenter IPs outside the region.
+On 11 November the worker was heartbeating while 25 stations reconnected and reported
+`Error opening input files: Option not found`. The cause was FFmpeg output options applied
+before the input, not an established geographic block. The command has since been corrected.
+A later production check found **25 stations online with fresh heartbeats** on Railway EU West;
+that is evidence that audio is being read, not proof of a song match. The same check found
+zero matched detections, despite recent unmatched clips and recordings marked enrolled.
+The live index and matching pipeline still need an end-to-end, authorised-play verification.
 
-So the first move is not AfroMobile — it is putting the ingest where the signal is:
-
-- **Now:** run the worker on a Uganda or Kenya VPS (or a Railway region with Ugandan reachability, verified with
-  `ffprobe` before deploying). Test with
-  `ffprobe -v error -show_entries format=format_name -of default=nw=1 "https://…/stream"` — if that fails from the
-  host, the panel will sit at `reconnecting` forever.
-- **Then:** add TV channels through route 1.
-- **Then:** the AfroMobile conversation, with a working TV panel to show.
+Do not move the worker solely on the old region theory. If specific feeds fail, investigate
+their individual errors and test reachability from the proposed host before considering a move.
 
 ## Concrete next steps
 
-1. Move the worker in-region and confirm stations flip `reconnecting → online` (the badge on the homepage and
-   `/api/health` both read the heartbeat, so they will tell us).
-2. Collect one verified HLS URL per TV channel (NBS, Bukedde, UBC, Sanyuka, Salt, Top TV) and insert the rows with
-   `kind='tv'`; `/coverage` will start reporting a TV count on its own.
-3. Send the one-pager above to AfroMobile / Next Media, copying MTN's content partnerships team.
-4. Price the DVB-T2 option for when TV volume justifies it.
+1. Verify a known enrolled, authorised recording can be detected when actually broadcast;
+   investigate unmatched clips, the worker index and matching thresholds if it does not.
+2. Collect verified HLS URLs for TV channels and permission from the broadcasters; insert
+   the approved rows with `kind='tv'`. Do not treat a prospective channel as confirmed coverage.
+3. Approach AfroMobile / Next Media for channel lists, EPG and permission to monitor.
+4. Evaluate DVB-T2 capture, including permissions and costs, when TV volume justifies it.
