@@ -39,6 +39,7 @@ export const MIGRATIONS = [
   ["0026_insights_artist_name.sql", "Insights show which artist each play belongs to"],
   ["0027_song_airplay_report.sql", "Per-song airplay report keyed by ISRC"],
   ["0028_consent_and_data_rights.sql", "Consent records, copyright reports, data export and deletion requests"],
+  ["0029_catalog_rate_limit.sql", "Shared catalogue lookup admission gates"],
 ];
 
 const BANNER = (n, name, note) => [
