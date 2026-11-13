@@ -2,6 +2,7 @@
 
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { normTitle, type LinkResult, type LinkSong } from "@/lib/links/resolve";
+import type { MusicBrainzCandidate } from "@/lib/catalog/musicbrainz";
 
 export type { LinkResult, LinkSong };
 
@@ -24,6 +25,22 @@ export async function songsFromLinks(urls: string[]): Promise<LinkResult[]> {
   const body = (await res.json().catch(() => ({}))) as { results?: LinkResult[]; error?: string };
   if (!res.ok) throw new Error(body.error ?? "Couldn't read those links.");
   return body.results ?? [];
+}
+
+/** Returns suggestions only; does not save a song or download audio. */
+export async function songsFromIsrc(isrc: string): Promise<MusicBrainzCandidate[]> {
+  const sb = getSupabaseBrowser();
+  if (!sb) throw new Error("MusicBrainz lookup isn't available in demo mode. Enter details manually.");
+  const { data } = await sb.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("Sign in again to look up an ISRC.");
+  const res = await fetch("/api/songs/musicbrainz", {
+    method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify({ isrc }),
+  });
+  const body = await res.json().catch(() => ({})) as { candidates?: MusicBrainzCandidate[]; error?: string };
+  if (!res.ok) throw new Error(body.error ?? "Couldn't look up this ISRC.");
+  return body.candidates ?? [];
 }
 
 /**

@@ -47,6 +47,7 @@ describe("supabase/setup.sql", () => {
       "0026_insights_artist_name.sql",
       "0027_song_airplay_report.sql",
       "0028_consent_and_data_rights.sql",
+      "0029_catalog_rate_limit.sql",
     ]);
     const positions = MIGRATIONS.map(([file]: [string, string]) => sql.indexOf(file));
     expect(positions.every((p: number) => p > -1)).toBe(true);

@@ -8,7 +8,8 @@ import {
 } from "@/lib/db/masters";
 import { cx, safeArray } from "@/lib/safe";
 import { Badge } from "@/components/dashboard/ui";
-import { matchFileToSong, songsFromLinks, splitLinks, type LinkSong } from "@/lib/db/links";
+import { matchFileToSong, songsFromIsrc, songsFromLinks, splitLinks, type LinkSong } from "@/lib/db/links";
+import type { MusicBrainzCandidate } from "@/lib/catalog/musicbrainz";
 
 type Artist = { id: string; name: string };
 const AUDIO_RE = /\.(wav|mp3|flac|aac|m4a|ogg|aif|aiff)$/i;
@@ -198,7 +199,7 @@ type Job = {
   file?: File;
   status: "needs_audio" | "analysing" | "ready" | "saving" | "saved" | "error";
   /** Filled from a streaming link: where from, and whether codes were found. */
-  fromLink?: { platform: string; matchedOn: LinkSong["matchedOn"]; label?: string };
+  fromLink?: { platform: string; matchedOn: LinkSong["matchedOn"]; label?: string; sourceArtist: string };
   ref?: Reference;
   details: SongDetails;
   error?: string;
@@ -271,7 +272,7 @@ export function SongUploader({ owner, artists, defaultArtist, existing, onSaved 
     const fresh: Job[] = songs.map(({ song, platform }, i) => {
       const match = roster.find((a) => a.name.toLowerCase() === song.artistName.toLowerCase());
       return {
-        id: `link-${stamp}-${i}`, status: "needs_audio", fromLink: { platform, matchedOn: song.matchedOn, label: song.label },
+        id: `link-${stamp}-${i}`, status: "needs_audio", fromLink: { platform, matchedOn: song.matchedOn, label: song.label, sourceArtist: song.artistName },
         details: emptyDetails({
           title: song.title, artistName: defaultArtist ?? match?.name ?? song.artistName, artistId: match?.id ?? null,
           // Catalogue genres are often wrong and the record label is not the music publisher:
@@ -308,6 +309,7 @@ export function SongUploader({ owner, artists, defaultArtist, existing, onSaved 
   return (
     <div>
       <LinkBox onSongs={addFromLinks} />
+      <IsrcBox onSongs={addFromLinks} defaultArtist={defaultArtist} />
       <div onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={onDrop}
         onClick={() => input.current?.click()} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
         role="button" tabIndex={0}
@@ -353,10 +355,15 @@ export function SongUploader({ owner, artists, defaultArtist, existing, onSaved 
                   <>
                     {j.fromLink && (
                       <p className={cx("mb-3 rounded-lg border px-3 py-2 text-xs", j.fromLink.matchedOn !== "source-only" ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-200" : "border-amber-400/20 bg-amber-400/5 text-amber-200")}>
-                        {j.fromLink.matchedOn !== "source-only"
-                          ? `Details filled in from ${j.fromLink.platform}, with ISRC and UPC from the release${j.fromLink.label ? ` (label: ${j.fromLink.label})` : ""}. Check them against your distributor's records, and add the songwriters and publisher.`
-                          : `Title and artist filled in from ${j.fromLink.platform}. We couldn't find this release's ISRC or UPC — add them from your distributor.`}
+                        {j.fromLink.platform === "MusicBrainz"
+                          ? "MusicBrainz suggestion: check the title, artist and ISRC against your distributor. Add the correct songwriters, featured artists and UPC."
+                          : j.fromLink.matchedOn !== "source-only"
+                            ? `Details filled in from ${j.fromLink.platform}, with ISRC and UPC from the release${j.fromLink.label ? ` (label: ${j.fromLink.label})` : ""}. Check them against your distributor's records, and add the songwriters and publisher.`
+                            : `Title and artist filled in from ${j.fromLink.platform}. We couldn't find this release's ISRC or UPC — add them from your distributor.`}
                       </p>
+                    )}
+                    {j.fromLink && j.fromLink.sourceArtist && j.fromLink.sourceArtist.toLowerCase() !== j.details.artistName.toLowerCase() && (
+                      <p className="mb-3 text-xs text-amber-300">The source lists “{j.fromLink.sourceArtist}” as the main artist; your form says “{j.details.artistName}”. Check the recording and your rights before saving.</p>
                     )}
                     <SongForm value={j.details} onChange={(d) => patch(j.id, { details: d, error: undefined })} artists={artists} lockArtist={Boolean(defaultArtist)} />
                     {j.status === "needs_audio" && (
@@ -379,6 +386,50 @@ export function SongUploader({ owner, artists, defaultArtist, existing, onSaved 
           })}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** A MusicBrainz lookup proposes recordings; the user chooses and edits before saving. */
+function IsrcBox({ onSongs, defaultArtist }: { onSongs: (s: { song: LinkSong; platform: string }[]) => void; defaultArtist?: string }) {
+  const [isrc, setIsrc] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [candidates, setCandidates] = useState<MusicBrainzCandidate[]>([]);
+  const [message, setMessage] = useState("");
+  const run = async () => {
+    setCandidates([]); setMessage(""); setBusy(true);
+    try {
+      const found = await songsFromIsrc(isrc);
+      setCandidates(found);
+      if (!found.length) setMessage("No recording found for that ISRC. Enter your details manually instead.");
+    } catch (e) { setMessage(e instanceof Error ? e.message : "Couldn't look up that ISRC."); }
+    finally { setBusy(false); }
+  };
+  const choose = (c: MusicBrainzCandidate) => {
+    onSongs([{ platform: "MusicBrainz", song: {
+      title: c.title, artistName: c.artistName, featured: [], isrc: c.isrc, upc: "", releaseDate: "",
+      label: "", genre: "", durationSec: null, artwork: null, matchedOn: "source-only",
+    } }]);
+    setCandidates([]); setMessage("Song added below for review. Check artist and credits, then attach your authorised audio.");
+  };
+  return (
+    <div className="mb-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+      <label htmlFor="musicbrainz-isrc" className="text-sm font-semibold text-white">Find a song by ISRC</label>
+      <p className="mt-1 text-xs text-slate-500">Optional MusicBrainz lookup. Results are suggestions, not proof of ownership. Check the version and credits against your distributor.</p>
+      {defaultArtist && <p className="mt-1 text-xs text-amber-300">Your main artist is fixed to {defaultArtist}. Only add recordings you are authorised to register; check that the chosen result is yours.</p>}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <input id="musicbrainz-isrc" className="input !w-auto !py-2 font-mono" value={isrc} maxLength={20} disabled={busy}
+          placeholder="UG-XXX-26-00000" onChange={(e) => { setIsrc(e.target.value); setCandidates([]); setMessage(""); }} />
+        <button type="button" className="btn-ghost !py-2" disabled={busy || !isrc.trim()} onClick={run}>{busy ? "Searching…" : "Look up ISRC"}</button>
+      </div>
+      {message && <p role="status" className="mt-2 text-xs text-slate-300">{message}</p>}
+      {candidates.length > 0 && <ul className="mt-3 space-y-2">{candidates.map((c) => (
+        <li key={c.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 p-2 text-sm text-slate-200">
+          <span className="min-w-0 flex-1">{c.title} — {c.artists.join(", ")} <span className="text-xs text-slate-500">({c.isrc})</span></span>
+          <button type="button" className="btn-ghost !py-1 text-xs" onClick={() => choose(c)}>Review this song</button>
+        </li>
+      ))}</ul>}
+      {candidates.length > 0 && <p className="mt-2 text-xs text-amber-300">Other artist names are shown for review, not automatically marked as featured. Add the correct featured artists and songwriters yourself.</p>}
     </div>
   );
 }
@@ -426,8 +477,8 @@ function LinkBox({ onSongs }: { onSongs: (s: { song: LinkSong; platform: string 
     <div className="mb-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
       <label htmlFor="song-links" className="text-sm font-semibold text-white">Add from links</label>
       <p className="mt-0.5 text-xs text-slate-500">
-        Paste Spotify, Apple Music, Deezer, YouTube, Audiomack or Boomplay links, one per line. An album link adds every track.
-        We fill in the title, artists, ISRC, UPC and release date — you check them, add the writers and attach the audio.
+        Paste Spotify, Apple Music, Deezer, YouTube, Audiomack or Boomplay links, one per line. Supported album links can add multiple tracks.
+        Available details vary by provider — check them, add the writers and attach authorised audio.
       </p>
       <textarea id="song-links" rows={3} className="input mt-2 font-mono text-xs" value={text} onChange={(e) => setText(e.target.value)}
         placeholder={"https://open.spotify.com/album/…\nhttps://music.apple.com/ug/album/…?i=…"} />
