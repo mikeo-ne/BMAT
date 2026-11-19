@@ -47,7 +47,7 @@ function LiveNow() {
         ))}
       </dl>
       <p className="mt-4 text-xs leading-relaxed text-slate-400">
-        Every station is fingerprinted around the clock. Each play is saved with a 10-second clip as proof.
+        East Sound monitors selected radio streams and looks for enrolled songs. Matches may be missed or incorrect, and evidence clips may not always be available.
       </p>
     </div>
   );
