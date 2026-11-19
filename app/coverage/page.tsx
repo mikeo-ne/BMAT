@@ -9,7 +9,7 @@ import { og } from "@/lib/seo";
 export const metadata: Metadata = {
   title: "Coverage — how much of Uganda East Sound monitors",
   description:
-    "East Sound monitors Ugandan radio across all four regions, region by region, with a 10-second audible clip for every detection and UPRS-ready cue sheets for broadcasters.",
+    "Explore East Sound’s Ugandan station panel and monitoring status, and understand the limits of detected music-use reports.",
   alternates: { canonical: "/coverage" },
   openGraph: og("/coverage"),
 };
@@ -21,30 +21,16 @@ export const metadata: Metadata = {
  * region, reporting as of when — and explains what a detection comes with.
  */
 const EDGES = [
-  {
-    title: "Audible proof, not a number",
-    body: "Every match is stored with a 10-second audio clip, the station, the time and the confidence. When a payment is questioned, you play the evidence instead of arguing about a spreadsheet.",
-    against: "Global services and raw recognition engines return rows.",
-  },
-  {
-    title: "Compliance work, not just charts",
-    body: "Broadcasters get UPRS cue sheets as PDF and Excel. Venues get licence and listener-node compliance. Labels and artists get statements built from the same detections.",
-    against: "Charts alone don't move a shilling.",
-  },
-  {
-    title: "Local by design",
-    body: "Prices in shillings, alerts on WhatsApp and email, English · Luganda · Kiswahili, and the data stays in the country — which matters while the state builds its own monitoring system.",
-    against: "A global feed is priced in dollars and hosted abroad.",
-  },
+  { title: "Reviewable matches", body: "Detected music can include station, time and confidence. Evidence clips may be available to authorised users, depending on capture and permissions.", against: "A match can be missed or wrong; a clip is not a rights determination." },
+  { title: "Reporting support", body: "Broadcasters can export detected music as a PDF or Excel cue sheet for review against their own logs.", against: "Reports are not complete programme logs or proof of licence compliance." },
+  { title: "Local context", body: "Station and region details help partners understand the scope of the monitored panel.", against: "Panel coverage does not measure national audience reach or every use of music." },
 ] as const;
 
 const MANUAL_VS_US = [
-  ["Who writes the record", "A presenter's log sheet or a UPRS field visit", "The matcher, 24/7, per station"],
-  ["When it exists", "Days or weeks later, if at all", "Seconds after the play"],
-  ["What backs it up", "Handwriting, memory, trust", "A 10-second clip you can play"],
-  ["Upcountry stations", "Visited rarely", "Monitored like Kampala"],
-  ["Disputed plays", "Nobody can prove anything", "Clip, timestamp, confidence on record"],
-  ["Cost of an audit", "Field visits and paperwork", "Export the file and send it"],
+  ["Record source", "Station or presenter records", "Matches from enrolled recordings on monitored streams"],
+  ["Gaps", "Logs can be incomplete or contain errors", "Outages, missing recordings and false or missed matches can create gaps"],
+  ["Review", "Consult station records", "Compare detections and available evidence with independent records"],
+  ["Reporting", "Compile and check a station report", "Export detected music for review; partner acceptance is not yet confirmed"],
 ] as const;
 
 export default function CoveragePage() {
@@ -58,9 +44,8 @@ export default function CoveragePage() {
             Built for Uganda, region by region — not for an African average.
           </h1>
           <p className="mt-4 max-w-2xl text-slate-400">
-            East Sound is not a global catalogue with a Ugandan office. It is a monitoring panel of Ugandan
-            stations, fingerprinted around the clock, with the paperwork Ugandan rights holders and
-            broadcasters actually have to file.
+            East Sound monitors selected Ugandan station streams and looks for enrolled recordings. Station
+            availability changes, and online status does not prove matching accuracy or completeness.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href="/#charts" className="btn-primary">
@@ -90,8 +75,8 @@ export default function CoveragePage() {
           <p className="font-mono text-xs uppercase tracking-widest text-emerald-400">The real competitor</p>
           <h2 className="mt-2 text-3xl font-bold text-white">Log sheets and paper cue sheets</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-400">
-            Most airplay in Uganda is still recorded by hand — a presenter&apos;s note, a field visit, a
-            spreadsheet rebuilt at the end of the month. That is the standard we are replacing.
+            Station logs and automated matches can complement one another. Comparing both helps identify gaps
+            before any report is used for a decision.
           </p>
           <div className="mt-6 overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -120,8 +105,8 @@ export default function CoveragePage() {
             <div>
               <h2 className="text-xl font-semibold text-white">Want your catalogue in the panel?</h2>
               <p className="mt-1 text-sm text-slate-400">
-                Upload masters on a label or artist dashboard — they are fingerprinted and monitored from the
-                next play.
+                Upload authorised recordings on a label or artist dashboard. Recognition depends on successful
+                enrolment, worker availability and the quality of the broadcast.
               </p>
             </div>
             <Link href="/#use-cases" className="btn-primary">

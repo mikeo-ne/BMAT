@@ -60,9 +60,8 @@ export default function HomePage() {
               <p className="font-mono text-xs uppercase tracking-widest text-emerald-400">Coverage</p>
               <h2 className="mt-2 text-2xl font-bold text-white">Four regions, not two studios in Kampala</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Stations in Central, Western, Eastern and Northern Uganda, monitored around the clock, each play
-                backed by a 10-second clip and UPRS-ready paperwork. Most airplay here is still written on a log
-                sheet — that is the standard we are replacing.
+                Explore the station panel and current monitoring status. Detected matches can help broadcasters
+                and rights holders review music use, alongside their own records.
               </p>
             </div>
             <Link href="/coverage" className="btn-ghost">
@@ -71,6 +70,12 @@ export default function HomePage() {
           </div>
         </section>
 
+        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+          <div className="glass flex flex-wrap items-center justify-between gap-4 p-6">
+            <div className="max-w-2xl"><p className="font-mono text-xs uppercase tracking-widest text-emerald-400">For partners</p><h2 className="mt-2 text-2xl font-bold text-white">Built to complement the work you already do</h2><p className="mt-2 text-sm text-slate-400">Explore proposed pilots for URSB, UPRS, UCC, broadcasters and the wider music industry.</p></div>
+            <Link href="/partners" className="btn-ghost">Explore partnerships →</Link>
+          </div>
+        </section>
         <UseCaseGrid />
       </main>
       <Footer />

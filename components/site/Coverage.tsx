@@ -28,8 +28,8 @@ export function CoverageSection() {
           <p className="font-mono text-xs uppercase tracking-widest text-emerald-400">Coverage · Uganda</p>
           <h2 className="mt-2 text-3xl font-bold text-white">Four regions, not two studios in Kampala</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-400">
-            Global services sell a country average. We listen to the stations that actually break Ugandan
-            records — including the upcountry ones — and we count only what is reporting right now.
+            Explore stations in the panel by region. Monitoring status can change; an online station does not
+            guarantee every song is recognised.
           </p>
         </div>
         <span className={cx("pill", sample ? "pill-off" : "pill-on")} title={sample ? "Sample figures — no live project attached" : "Live counts from the monitoring panel"}>
@@ -42,9 +42,9 @@ export function CoverageSection() {
           {
             label: "Stations in the panel",
             value: fmtInt(coverage.stations),
-            hint: `${fmtInt(coverage.radio)} radio${coverage.tv ? ` · ${fmtInt(coverage.tv)} TV` : ""} — catalogue and fingerprint`,
+            hint: `${fmtInt(coverage.radio)} radio${coverage.tv ? ` · ${fmtInt(coverage.tv)} TV` : ""} — listed in the panel`,
           },
-          { label: "Monitored right now", value: `${fmtInt(coverage.monitored)} · ${shareMonitored(coverage)}%`, hint: "Enabled and reporting to the matcher" },
+          { label: "Monitored right now", value: `${fmtInt(coverage.monitored)} · ${shareMonitored(coverage)}%`, hint: "Reported online; matching still needs validation" },
           { label: "Regions covered", value: fmtInt(regions.length), hint: "Central · Western · Eastern · Northern" },
         ].map((s) => (
           <div key={s.label} className="glass p-5">
